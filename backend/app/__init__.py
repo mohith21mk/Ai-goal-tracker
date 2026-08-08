@@ -1,0 +1,36 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from .api import auth, goals, missions, progress, users
+from .database import init_db
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(title="AI Goal Coach API", version="0.1.0")
+
+    # Initialize database tables and seed initial data
+    init_db()
+
+    # Configure CORS for development frontend
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+    app.include_router(users.router, prefix="/api/users", tags=["users"])
+    app.include_router(goals.router, prefix="/api/goals", tags=["goals"])
+    app.include_router(missions.router, prefix="/api/missions", tags=["missions"])
+    app.include_router(progress.router, prefix="/api/progress", tags=["progress"])
+
+    @app.get("/")
+    async def root() -> dict[str, str]:
+        return {"message": "AI Goal Coach backend is running"}
+
+    return app
+
+
+app = create_app()

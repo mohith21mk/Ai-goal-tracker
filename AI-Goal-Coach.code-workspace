@@ -1,0 +1,24 @@
+{
+  "folders": [
+    {
+      "name": "AI Goal Coach",
+      "path": "."
+    },
+    {
+      "name": "Frontend",
+      "path": "frontend"
+    },
+    {
+      "name": "Backend",
+      "path": "backend"
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/__pycache__": true,
+      "**/.venv": true,
+      "**/dist": true
+    }
+  }
+}
