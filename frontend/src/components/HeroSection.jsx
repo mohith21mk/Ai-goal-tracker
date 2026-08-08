@@ -40,61 +40,75 @@ const HeroSection = () => {
         </div>
       </div>
 
-      {/* Hero Anchor Visual Column (Pure SVG + CSS Cosmic Graphic) */}
-      <div className="hero-anchor-visual">
+      {/* Futuristic Anchor Symbol Visual Column */}
+      <div className="hero-anchor-visual" aria-label="Mastery Key Coach Anchor Symbol of Stability and Growth">
         <div className="anchor-glow-bg" />
         <svg className="anchor-svg animate-float" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Outer Orbit Rings */}
-          <circle cx="160" cy="160" r="140" stroke="rgba(56, 189, 248, 0.15)" strokeWidth="1" strokeDasharray="6 6" />
-          <circle cx="160" cy="160" r="110" stroke="url(#orbitGrad)" strokeWidth="1.5" />
-          <circle cx="160" cy="160" r="80" stroke="rgba(59, 130, 246, 0.2)" strokeWidth="1" />
-
-          {/* Orbiting Energy Nodes */}
-          <circle cx="160" cy="20" r="4" fill="#38BDF8" className="animate-pulse-glow" />
-          <circle cx="270" cy="160" r="3" fill="#3B82F6" />
-          <circle cx="50" cy="160" r="3" fill="#FBBF24" />
-
-          {/* Cosmic Diamond Anchor Shape */}
-          <g transform="translate(160, 160) scale(1.1)">
-            {/* Upper Crown Pyramid */}
-            <polygon points="0,-80 45,-30 0,-10 -45,-30" fill="url(#anchorFacet1)" stroke="#38BDF8" strokeWidth="1.5" />
-            
-            {/* Center Core Diamond */}
-            <polygon points="0,-10 45,-30 55,20 0,60 -55,20 -45,-30" fill="url(#anchorFacet2)" stroke="#38BDF8" strokeWidth="1.5" />
-            
-            {/* Inner Glowing Core Lines */}
-            <line x1="0" y1="-80" x2="0" y2="60" stroke="#38BDF8" strokeWidth="2" opacity="0.8" />
-            <line x1="-55" y1="20" x2="55" y2="20" stroke="#38BDF8" strokeWidth="1.5" opacity="0.6" />
-
-            {/* Gold Energy Point (Lower Center) */}
-            <circle cx="0" cy="20" r="7" fill="#FBBF24" />
-            <circle cx="0" cy="20" r="14" stroke="#FBBF24" strokeWidth="1.5" strokeOpacity="0.6" className="animate-pulse-glow" />
-
-            {/* Cyan Luminous Edges */}
-            <circle cx="0" cy="-80" r="5" fill="#38BDF8" />
-            <circle cx="45" cy="-30" r="3" fill="#38BDF8" />
-            <circle cx="-45" cy="-30" r="3" fill="#38BDF8" />
-            <circle cx="0" cy="60" r="4" fill="#38BDF8" />
-          </g>
-
           <defs>
-            <linearGradient id="orbitGrad" x1="20" y1="160" x2="300" y2="160" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#38BDF8" stopOpacity="0.6" />
-              <stop offset="0.5" stopColor="#3B82F6" stopOpacity="0.2" />
-              <stop offset="1" stopColor="#FBBF24" stopOpacity="0.6" />
+            <linearGradient id="anchorGlow" x1="160" y1="20" x2="160" y2="300" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#38BDF8" stopOpacity="0.9" />
+              <stop offset="0.5" stopColor="#3B82F6" stopOpacity="0.8" />
+              <stop offset="1" stopColor="#FBBF24" stopOpacity="0.9" />
             </linearGradient>
-
-            <linearGradient id="anchorFacet1" x1="0" y1="-80" x2="0" y2="-10" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#38BDF8" stopOpacity="0.4" />
-              <stop offset="1" stopColor="#071426" stopOpacity="0.8" />
-            </linearGradient>
-
-            <linearGradient id="anchorFacet2" x1="0" y1="-30" x2="0" y2="60" gradientUnits="userSpaceOnUse">
+            <linearGradient id="anchorBodyGrad" x1="160" y1="40" x2="160" y2="280" gradientUnits="userSpaceOnUse">
               <stop stopColor="#071426" stopOpacity="0.9" />
-              <stop offset="0.5" stopColor="#0c2548" stopOpacity="0.8" />
-              <stop offset="1" stopColor="#38BDF8" stopOpacity="0.3" />
+              <stop offset="0.5" stopColor="#0C2548" stopOpacity="0.85" />
+              <stop offset="1" stopColor="#050B16" stopOpacity="0.95" />
+            </linearGradient>
+            <linearGradient id="cyanStrokeGrad" x1="0" y1="0" x2="320" y2="320" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#38BDF8" />
+              <stop offset="0.5" stopColor="#60A5FA" />
+              <stop offset="1" stopColor="#FBBF24" />
             </linearGradient>
           </defs>
+
+          {/* Ambient Orbital Rings */}
+          <circle cx="160" cy="160" r="142" stroke="rgba(56, 189, 248, 0.12)" strokeWidth="1" strokeDasharray="6 6" />
+          <circle cx="160" cy="160" r="115" stroke="rgba(59, 130, 246, 0.18)" strokeWidth="1.5" />
+          <circle cx="160" cy="160" r="85" stroke="rgba(56, 189, 248, 0.1)" strokeWidth="1" />
+
+          {/* Orbit Nodes */}
+          <circle cx="160" cy="18" r="4" fill="#38BDF8" className="animate-pulse-glow" />
+          <circle cx="275" cy="160" r="3.5" fill="#3B82F6" />
+          <circle cx="45" cy="160" r="3.5" fill="#FBBF24" />
+          <circle cx="160" cy="302" r="3" fill="#38BDF8" />
+
+          {/* FUTURISTIC ANCHOR SYMBOL */}
+          <g transform="translate(0, 5)">
+            {/* Top Ring / Shackle of Hope */}
+            <circle cx="160" cy="55" r="22" stroke="url(#cyanStrokeGrad)" strokeWidth="3.5" fill="rgba(7, 20, 38, 0.8)" />
+            <circle cx="160" cy="55" r="12" stroke="rgba(56, 189, 248, 0.4)" strokeWidth="1.5" />
+            <circle cx="160" cy="55" r="4" fill="#FBBF24" className="animate-pulse-glow" />
+
+            {/* Horizontal Stock / Crossbar */}
+            <path d="M 90 105 H 230" stroke="url(#cyanStrokeGrad)" strokeWidth="4" strokeLinecap="round" />
+            <polygon points="82,105 92,98 92,112" fill="#38BDF8" />
+            <polygon points="238,105 228,98 228,112" fill="#38BDF8" />
+
+            {/* Main Vertical Spine of Discipline */}
+            <rect x="153" y="77" width="14" height="155" rx="4" fill="url(#anchorBodyGrad)" stroke="url(#cyanStrokeGrad)" strokeWidth="2" />
+            <line x1="160" y1="80" x2="160" y2="230" stroke="#38BDF8" strokeWidth="2" opacity="0.8" />
+
+            {/* Core Energy Nodes */}
+            <circle cx="160" cy="105" r="5" fill="#FBBF24" />
+            <circle cx="160" cy="165" r="4" fill="#38BDF8" />
+
+            {/* Curved Fluke Arms of Stability */}
+            <path d="M 75 195 C 85 260, 235 260, 245 195" fill="none" stroke="url(#cyanStrokeGrad)" strokeWidth="5" strokeLinecap="round" />
+            <path d="M 85 198 C 95 248, 225 248, 235 198" fill="none" stroke="rgba(7, 20, 38, 0.9)" strokeWidth="3" />
+
+            {/* Left Fluke Arrow */}
+            <path d="M 75 195 L 60 170 L 88 180 Z" fill="url(#anchorBodyGrad)" stroke="#38BDF8" strokeWidth="2" />
+            <circle cx="68" cy="178" r="3" fill="#FBBF24" />
+
+            {/* Right Fluke Arrow */}
+            <path d="M 245 195 L 260 170 L 232 180 Z" fill="url(#anchorBodyGrad)" stroke="#38BDF8" strokeWidth="2" />
+            <circle cx="252" cy="178" r="3" fill="#FBBF24" />
+
+            {/* Bottom Crown Base Point */}
+            <polygon points="160,262 148,238 172,238" fill="url(#anchorBodyGrad)" stroke="#38BDF8" strokeWidth="2" />
+            <circle cx="160" cy="250" r="4" fill="#38BDF8" />
+          </g>
         </svg>
       </div>
     </section>
