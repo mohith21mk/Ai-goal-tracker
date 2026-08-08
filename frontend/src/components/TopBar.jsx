@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import './TopBar.css';
 
-const TopBar = () => {
+const TopBar = ({ user }) => {
   const [searchValue, setSearchValue] = useState('');
+
+  const displayName = user?.full_name || user?.email ? `${user.full_name || user.email}` : 'Mohith';
 
   return (
     <header className="topbar-container">
@@ -34,7 +36,7 @@ const TopBar = () => {
         <div className="user-profile-wrapper glass-panel">
           <div className="user-level-badge">
             <span className="badge-star">⚡</span>
-            <span className="badge-text">Level 8 Champion</span>
+            <span className="badge-text">{displayName} | Level 8 Champion</span>
           </div>
           <div className="avatar-wrapper">
             <svg width="32" height="32" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">

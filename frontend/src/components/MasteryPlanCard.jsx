@@ -1,6 +1,18 @@
 import './MasteryPlanCard.css';
 
-const MasteryPlanCard = () => {
+const MasteryPlanCard = ({ activeGoal, linkedMissions = [] }) => {
+  const goalTitle = activeGoal?.title || 'Phase 3: Financial & Physical Mastery';
+  const goalCategory = activeGoal?.category ? activeGoal.category.toUpperCase() : 'ACTIVE BLUEPRINT';
+  
+  const completedMissions = linkedMissions.filter(m => m.completed).length;
+  const totalMissions = linkedMissions.length;
+  
+  const progressPercent = totalMissions > 0 
+    ? Math.round((completedMissions / totalMissions) * 100) 
+    : 60;
+
+  const nextStepText = activeGoal?.description || 'Build 6-Month Emergency Fund';
+
   return (
     <div className="mastery-plan-card glass-panel">
       {/* Header Banner Graphic */}
@@ -23,7 +35,7 @@ const MasteryPlanCard = () => {
         </svg>
 
         <div className="plan-banner-overlay">
-          <span className="plan-tag">ACTIVE BLUEPRINT</span>
+          <span className="plan-tag">{goalCategory}</span>
           <h3 className="plan-main-title font-display">The Mastery Plan</h3>
         </div>
       </div>
@@ -31,13 +43,15 @@ const MasteryPlanCard = () => {
       {/* Content */}
       <div className="plan-body">
         <div className="milestone-info">
-          <span className="milestone-phase font-display">Phase 3: Financial & Physical Mastery</span>
-          <span className="steps-count">3/5 Steps Complete</span>
+          <span className="milestone-phase font-display">{goalTitle}</span>
+          <span className="steps-count">
+            {totalMissions > 0 ? `${completedMissions}/${totalMissions} Protocols` : '3/5 Steps Complete'}
+          </span>
         </div>
 
         {/* Progress Bar */}
         <div className="plan-progress-track">
-          <div className="plan-progress-fill" style={{ width: '60%' }} />
+          <div className="plan-progress-fill" style={{ width: `${progressPercent}%` }} />
         </div>
 
         {/* Next Milestone Step Badge */}
@@ -45,7 +59,7 @@ const MasteryPlanCard = () => {
           <div className="next-step-icon">🎯</div>
           <div className="next-step-details">
             <span className="next-step-label">NEXT MILESTONE</span>
-            <span className="next-step-name">Build 6-Month Emergency Fund</span>
+            <span className="next-step-name">{nextStepText}</span>
           </div>
         </div>
       </div>

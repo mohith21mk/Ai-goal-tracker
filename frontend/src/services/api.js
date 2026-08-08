@@ -48,6 +48,14 @@ export async function getProgress() {
   return response.json();
 }
 
+export async function getTelemetry() {
+  const response = await fetch(`${API_BASE_URL}/api/telemetry`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch dashboard telemetry: ${response.statusText}`);
+  }
+  return response.json();
+}
+
 export async function getGoals() {
   const response = await fetch(`${API_BASE_URL}/api/goals`);
   if (!response.ok) {

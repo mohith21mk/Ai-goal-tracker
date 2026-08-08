@@ -71,7 +71,16 @@ async def toggle_mission(mission_id: int) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"Mission with ID {mission_id} not found")
 
     new_completed = 0 if row["completed"] else 1
-    cursor.execute("UPDATE missions SET completed = ? WHERE id = ?", (new_completed, mission_id))
+    if new_completed == 1:
+        cursor.execute(
+            "UPDATE missions SET completed = 1, completed_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (mission_id,),
+        )
+    else:
+        cursor.execute(
+            "UPDATE missions SET completed = 0, completed_at = NULL WHERE id = ?",
+            (mission_id,),
+        )
     conn.commit()
 
     cursor.execute("SELECT * FROM missions WHERE id = ?", (mission_id,))

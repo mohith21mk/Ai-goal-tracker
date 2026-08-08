@@ -8,7 +8,7 @@ import AICoachCard from '../components/AICoachCard';
 import MasteryPlanCard from '../components/MasteryPlanCard';
 import MissionCard from '../components/MissionCard';
 import MotivationBar from '../components/MotivationBar';
-import { getMissions, toggleMission, getProgress } from '../services/api';
+import { getMissions, toggleMission, getProgress, getTelemetry, getUser, getGoals } from '../services/api';
 import './Dashboard.css';
 
 const defaultFallbackMissions = [
@@ -22,25 +22,49 @@ const defaultFallbackMissions = [
 const Dashboard = () => {
   const [missions, setMissions] = useState(defaultFallbackMissions);
   const [progressData, setProgressData] = useState({ completed: 2, total: 5, percentage: 40 });
+  const [telemetry, setTelemetry] = useState({
+    discipline_score: 92,
+    mindset_strength: 88,
+    consistency: 76,
+    growth_index: 74,
+    streak_days: 0,
+    xp_earned: 35,
+  });
+  const [user, setUser] = useState(null);
+  const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [backendConnected, setBackendConnected] = useState(false);
 
   useEffect(() => {
     async function loadBackendData() {
       try {
-        const [missionsData, telemetry] = await Promise.all([
-          getMissions(),
-          getProgress()
+        const [missionsData, telemetryRes, userRes, goalsRes] = await Promise.all([
+          getMissions().catch(() => null),
+          getTelemetry().catch(() => null),
+          getUser().catch(() => null),
+          getGoals().catch(() => null),
         ]);
+
         if (Array.isArray(missionsData) && missionsData.length > 0) {
           setMissions(missionsData);
         }
-        if (telemetry && typeof telemetry.percentage === 'number') {
-          setProgressData(telemetry);
+
+        if (telemetryRes) {
+          setTelemetry(telemetryRes);
+          if (telemetryRes.mission_completion) {
+            setProgressData(telemetryRes.mission_completion);
+          }
+        } else {
+          const fallbackProg = await getProgress().catch(() => null);
+          if (fallbackProg) setProgressData(fallbackProg);
         }
+
+        if (userRes) setUser(userRes);
+        if (Array.isArray(goalsRes)) setGoals(goalsRes);
+
         setBackendConnected(true);
       } catch (err) {
-        console.warn('Backend API connection failed, operating with fallback local state:', err.message);
+        console.warn('Backend API connection warning, operating with fallback local state:', err.message);
         setBackendConnected(false);
       } finally {
         setLoading(false);
@@ -62,8 +86,14 @@ const Dashboard = () => {
         setMissions(prev => prev.map(m =>
           m.id === id ? { ...m, ...updatedMission } : m
         ));
-        const updatedTelemetry = await getProgress();
-        setProgressData(updatedTelemetry);
+
+        const [freshTelemetry, freshProgress] = await Promise.all([
+          getTelemetry().catch(() => null),
+          getProgress().catch(() => null)
+        ]);
+
+        if (freshTelemetry) setTelemetry(freshTelemetry);
+        if (freshProgress) setProgressData(freshProgress);
       } catch (err) {
         console.error('Error toggling mission on server:', err.message);
       }
@@ -71,6 +101,8 @@ const Dashboard = () => {
   };
 
   const completedCount = missions.filter(m => m.completed).length;
+  const activeGoal = goals.find(g => g.status === 'active') || goals[0] || null;
+  const activeGoalMissions = activeGoal ? missions.filter(m => Number(m.goal_id) === Number(activeGoal.id)) : missions;
 
   return (
     <div className="app-shell">
@@ -80,7 +112,7 @@ const Dashboard = () => {
       {/* 2. Main Scrollable Container */}
       <div className="main-viewport">
         {/* Sticky TopBar */}
-        <TopBar />
+        <TopBar user={user} />
 
         {/* Dashboard View Content */}
         <div className="dashboard-content-layout">
@@ -100,47 +132,47 @@ const Dashboard = () => {
                 {/* Row 1 */}
                 <StatCard
                   title="Discipline Score"
-                  value="92"
+                  value={String(telemetry.discipline_score)}
                   unit="/100"
                   subtitle="Building daily discipline"
                   change="+6"
                   trend="up"
                   icon="🔥"
                   accentColor="#38BDF8"
-                  sparklineData={[45, 55, 60, 72, 80, 85, 92]}
+                  sparklineData={[45, 55, 60, 72, 80, 85, telemetry.discipline_score]}
                 />
                 <StatCard
                   title="Mindset Strength"
-                  value="88"
+                  value={String(telemetry.mindset_strength)}
                   unit="/100"
                   subtitle="Mental fortitude index"
                   change="+8"
                   trend="up"
                   icon="🧠"
                   accentColor="#3B82F6"
-                  sparklineData={[30, 42, 50, 68, 75, 80, 88]}
+                  sparklineData={[30, 42, 50, 68, 75, 80, telemetry.mindset_strength]}
                 />
                 <StatCard
                   title="Consistency"
-                  value="76"
+                  value={String(telemetry.consistency)}
                   unit="/100"
                   subtitle="Closer to Freedom"
                   change="+5"
                   trend="up"
                   icon="⚡"
                   accentColor="#FBBF24"
-                  sparklineData={[50, 52, 58, 62, 70, 72, 76]}
+                  sparklineData={[50, 52, 58, 62, 70, 72, telemetry.consistency]}
                 />
                 <StatCard
                   title="Growth Index"
-                  value="74"
+                  value={String(telemetry.growth_index)}
                   unit="/100"
                   subtitle="Compound expansion"
                   change="+7"
                   trend="up"
                   icon="📈"
                   accentColor="#10B981"
-                  sparklineData={[40, 48, 55, 60, 65, 70, 74]}
+                  sparklineData={[40, 48, 55, 60, 65, 70, telemetry.growth_index]}
                 />
 
                 {/* Row 2 */}
@@ -148,7 +180,7 @@ const Dashboard = () => {
                   title="Missions Completed"
                   value={String(completedCount)}
                   subtitle="Discipline actions"
-                  change="+3"
+                  change={`+${completedCount}`}
                   trend="up"
                   icon="✅"
                   accentColor="#38BDF8"
@@ -166,19 +198,19 @@ const Dashboard = () => {
                 />
                 <StatCard
                   title="Discipline Streak"
-                  value="28"
+                  value={String(telemetry.streak_days)}
                   unit="Days"
                   subtitle="Consistency compounding"
-                  change="🔥 Active"
+                  change={telemetry.streak_days > 0 ? "🔥 Active" : "⚡ Ready"}
                   trend="up"
                   icon="⚡"
                   accentColor="#FBBF24"
-                  sparklineData={[7, 14, 21, 28, 28, 28, 28]}
+                  sparklineData={[0, 0, 0, telemetry.streak_days, telemetry.streak_days, telemetry.streak_days, telemetry.streak_days]}
                 />
                 <StatCard
                   title="Future You"
-                  value="Level 9"
-                  subtitle="Unlocking soon"
+                  value={`Level ${Math.floor((telemetry.xp_earned || 35) / 50) + 8}`}
+                  subtitle={`${telemetry.xp_earned || 35} Total XP`}
                   change="⚡ On Track"
                   trend="up"
                   icon="🚀"
@@ -233,7 +265,7 @@ const Dashboard = () => {
             />
 
             {/* 3. Mastery Plan */}
-            <MasteryPlanCard />
+            <MasteryPlanCard activeGoal={activeGoal} linkedMissions={activeGoalMissions} />
 
             {/* 4. Today's Reflection */}
             <div className="reflection-card glass-panel">

@@ -111,6 +111,14 @@ def init_db() -> None:
         cursor.execute("ALTER TABLE missions ADD COLUMN goal_id INTEGER")
         conn.commit()
 
+    if "completed_at" not in existing_columns:
+        cursor.execute("ALTER TABLE missions ADD COLUMN completed_at TIMESTAMP NULL")
+        conn.commit()
+
+    # Backfill completed_at timestamp for existing completed missions if missing
+    cursor.execute("UPDATE missions SET completed_at = CURRENT_TIMESTAMP WHERE completed = 1 AND completed_at IS NULL")
+    conn.commit()
+
     # Seed initial missions if missions table is completely empty
     cursor.execute("SELECT COUNT(*) FROM missions")
     count = cursor.fetchone()[0]
