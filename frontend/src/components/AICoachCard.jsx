@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { sendCoachMessage } from '../services/api';
 import './AICoachCard.css';
 
 const AICoachCard = ({
@@ -10,25 +11,40 @@ const AICoachCard = ({
   const [chatLog, setChatLog] = useState([
     { sender: 'coach', text: message }
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
 
-  const handleSendPrompt = (e) => {
+  const handleSendPrompt = async (e) => {
     e.preventDefault();
-    if (!promptInput.trim()) return;
+    const userText = promptInput.trim();
+    if (!userText || isSubmitting) return;
 
-    const userText = promptInput;
     setChatLog((prev) => [...prev, { sender: 'user', text: userText }]);
     setPromptInput('');
+    setIsSubmitting(true);
+    setErrorMessage(null);
 
-    // Simulated instant AI coach response
-    setTimeout(() => {
+    try {
+      const responseData = await sendCoachMessage(userText);
+      const coachReply = responseData.reply || `Action locked in for "${userText}". Execute with total discipline today.`;
+
+      setChatLog((prev) => [
+        ...prev,
+        { sender: 'coach', text: coachReply }
+      ]);
+    } catch (err) {
+      console.warn('AI Coach server API call failed, using graceful fallback:', err.message);
+      setErrorMessage('Neural connection unstable. Showing local synthesis.');
       setChatLog((prev) => [
         ...prev,
         {
           sender: 'coach',
-          text: `Action locked in for "${userText}". Execute with total discipline today.`
+          text: `Focus on executing '${userText}' today with total discipline. Live synthesis will reconnect shortly.`
         }
       ]);
-    }, 600);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -56,7 +72,7 @@ const AICoachCard = ({
             <span className="coach-name font-display">{coachName}</span>
             <div className="coach-status">
               <span className={`status-dot ${isOnline ? 'online' : ''}`} />
-              <span className="status-text">{isOnline ? 'Online & Analyzing' : 'Offline'}</span>
+              <span className="status-text">{isSubmitting ? 'Analyzing Prompt...' : isOnline ? 'Online & Analyzing' : 'Offline'}</span>
             </div>
           </div>
         </div>
@@ -64,13 +80,24 @@ const AICoachCard = ({
         <span className="neural-badge">Neural v4.2</span>
       </div>
 
+      {errorMessage && (
+        <div style={{ fontSize: '11px', color: '#FBBF24', padding: '4px 12px', background: 'rgba(251, 191, 36, 0.1)', borderRadius: '6px', margin: '4px 12px 0' }}>
+          ⚠️ {errorMessage}
+        </div>
+      )}
+
       {/* Chat / Message Display */}
       <div className="coach-message-box">
-        {chatLog.slice(-2).map((msg, index) => (
+        {chatLog.slice(-3).map((msg, index) => (
           <div key={index} className={`message-bubble ${msg.sender}`}>
             <p>{msg.text}</p>
           </div>
         ))}
+        {isSubmitting && (
+          <div className="message-bubble coach">
+            <p style={{ fontStyle: 'italic', opacity: 0.8 }}>Synthesizing strategic coaching advice...</p>
+          </div>
+        )}
       </div>
 
       {/* Quick Input Action */}
@@ -80,10 +107,11 @@ const AICoachCard = ({
           placeholder="Ask AI Coach a question..."
           value={promptInput}
           onChange={(e) => setPromptInput(e.target.value)}
+          disabled={isSubmitting}
           className="coach-input"
         />
-        <button type="submit" className="coach-send-btn">
-          <span>Continue Conversation →</span>
+        <button type="submit" disabled={isSubmitting || !promptInput.trim()} className="coach-send-btn">
+          <span>{isSubmitting ? 'Analyzing...' : 'Continue Conversation →'}</span>
         </button>
       </form>
     </div>

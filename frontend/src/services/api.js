@@ -109,3 +109,17 @@ export async function deleteGoal(id) {
   }
   return response.json();
 }
+
+export async function sendCoachMessage(prompt) {
+  const response = await fetch(`${API_BASE_URL}/api/coach/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ message: prompt }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to get coaching response: ${response.statusText}`);
+  }
+  return response.json();
+}
