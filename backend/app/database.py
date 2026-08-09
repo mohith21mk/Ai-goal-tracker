@@ -147,4 +147,20 @@ def init_db() -> None:
         )
         conn.commit()
 
+    # 4. Create messages table for AI Coach chat history persistence
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            sender TEXT NOT NULL CHECK(sender IN ('user', 'coach')),
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+        """
+    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_user_created ON messages(user_id, created_at, id)")
+    conn.commit()
+
     conn.close()

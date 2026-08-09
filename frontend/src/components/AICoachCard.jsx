@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { sendCoachMessage } from '../services/api';
+import { useState, useEffect } from 'react';
+import { sendCoachMessage, getCoachHistory, clearCoachHistory } from '../services/api';
 import './AICoachCard.css';
 
 const AICoachCard = ({
@@ -13,6 +13,35 @@ const AICoachCard = ({
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+
+  // Load persisted conversation history on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function loadHistory() {
+      try {
+        const historyData = await getCoachHistory(50);
+        if (isMounted) {
+          if (historyData && Array.isArray(historyData.messages) && historyData.messages.length > 0) {
+            const loadedLog = historyData.messages.map((m) => ({
+              sender: m.sender,
+              text: m.content
+            }));
+            setChatLog(loadedLog);
+          }
+          setErrorMessage(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.warn('Could not load chat history from database:', err.message);
+          setErrorMessage('Historical chat sync unavailable. Live coach ready.');
+        }
+      }
+    }
+    loadHistory();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleSendPrompt = async (e) => {
     e.preventDefault();
@@ -33,17 +62,28 @@ const AICoachCard = ({
         { sender: 'coach', text: coachReply }
       ]);
     } catch (err) {
-      console.warn('AI Coach server API call failed, using graceful fallback:', err.message);
-      setErrorMessage('Neural connection unstable. Showing local synthesis.');
+      console.warn('AI Coach server API call failed:', err.message);
+      setErrorMessage('Chat response failed to persist. Please try again.');
       setChatLog((prev) => [
         ...prev,
         {
           sender: 'coach',
-          text: `Focus on executing '${userText}' today with total discipline. Live synthesis will reconnect shortly.`
+          text: `Focus on executing '${userText}' today with total discipline. Database sync will reconnect shortly.`
         }
       ]);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    try {
+      await clearCoachHistory();
+      setChatLog([{ sender: 'coach', text: message }]);
+      setErrorMessage(null);
+    } catch (err) {
+      console.warn('Clear history failed:', err.message);
+      setErrorMessage('Failed to clear chat history.');
     }
   };
 
@@ -77,7 +117,28 @@ const AICoachCard = ({
           </div>
         </div>
 
-        <span className="neural-badge">Neural v4.2</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {chatLog.length > 1 && (
+            <button
+              onClick={handleClearHistory}
+              title="Clear chat history"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-tertiary)',
+                cursor: 'pointer',
+                fontSize: '12px',
+                padding: '2px 4px',
+                transition: 'color 0.2s'
+              }}
+              onMouseOver={(e) => (e.target.style.color = '#FBBF24')}
+              onMouseOut={(e) => (e.target.style.color = 'var(--text-tertiary)')}
+            >
+              🗑️
+            </button>
+          )}
+          <span className="neural-badge">Neural v4.2</span>
+        </div>
       </div>
 
       {errorMessage && (
@@ -88,7 +149,7 @@ const AICoachCard = ({
 
       {/* Chat / Message Display */}
       <div className="coach-message-box">
-        {chatLog.slice(-3).map((msg, index) => (
+        {chatLog.slice(-5).map((msg, index) => (
           <div key={index} className={`message-bubble ${msg.sender}`}>
             <p>{msg.text}</p>
           </div>

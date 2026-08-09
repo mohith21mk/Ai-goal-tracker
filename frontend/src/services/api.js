@@ -123,3 +123,21 @@ export async function sendCoachMessage(prompt) {
   }
   return response.json();
 }
+
+export async function getCoachHistory(limit = 50) {
+  const response = await fetch(`${API_BASE_URL}/api/coach/history?limit=${limit}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch chat history: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function clearCoachHistory() {
+  const response = await fetch(`${API_BASE_URL}/api/coach/history`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to clear chat history: ${response.statusText}`);
+  }
+  return response.json();
+}
