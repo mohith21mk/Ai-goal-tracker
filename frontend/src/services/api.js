@@ -141,3 +141,73 @@ export async function clearCoachHistory() {
   }
   return response.json();
 }
+
+export async function getHabits() {
+  const response = await fetch(`${API_BASE_URL}/api/habits`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch habits: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getHabitStats() {
+  const response = await fetch(`${API_BASE_URL}/api/habits/stats`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch habit stats: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function createHabit(data) {
+  const response = await fetch(`${API_BASE_URL}/api/habits`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to create habit: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function updateHabit(id, data) {
+  const response = await fetch(`${API_BASE_URL}/api/habits/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to update habit: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function deleteHabit(id) {
+  const response = await fetch(`${API_BASE_URL}/api/habits/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete habit: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function toggleHabit(id, dateStr) {
+  const response = await fetch(`${API_BASE_URL}/api/habits/${id}/toggle`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ date: dateStr }),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to toggle habit: ${response.statusText}`);
+  }
+  return response.json();
+}

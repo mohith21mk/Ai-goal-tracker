@@ -99,7 +99,6 @@ def init_db() -> None:
     )
     conn.commit()
 
-    # Check existing column names in missions table via PRAGMA
     cursor.execute("PRAGMA table_info(missions)")
     existing_columns = [col["name"] for col in cursor.fetchall()]
 
@@ -115,11 +114,9 @@ def init_db() -> None:
         cursor.execute("ALTER TABLE missions ADD COLUMN completed_at TIMESTAMP NULL")
         conn.commit()
 
-    # Backfill completed_at timestamp for existing completed missions if missing
     cursor.execute("UPDATE missions SET completed_at = CURRENT_TIMESTAMP WHERE completed = 1 AND completed_at IS NULL")
     conn.commit()
 
-    # Seed initial missions if missions table is completely empty
     cursor.execute("SELECT COUNT(*) FROM missions")
     count = cursor.fetchone()[0]
 
@@ -140,7 +137,6 @@ def init_db() -> None:
         )
         conn.commit()
     else:
-        # Safely associate any existing unassigned missions without modifying completed state or title
         cursor.execute(
             "UPDATE missions SET user_id = ?, goal_id = ? WHERE user_id IS NULL",
             (demo_user_id, default_goal_id),
@@ -162,5 +158,60 @@ def init_db() -> None:
     )
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_user_created ON messages(user_id, created_at, id)")
     conn.commit()
+
+    # 5. Create habits & habit_logs tables
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS habits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            category TEXT DEFAULT 'general',
+            frequency TEXT DEFAULT 'daily',
+            target_days_per_week INTEGER DEFAULT 7,
+            status TEXT DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS habit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            habit_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            completed_date TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(habit_id) REFERENCES habits(id) ON DELETE CASCADE,
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            UNIQUE(habit_id, completed_date)
+        )
+        """
+    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_date ON habit_logs(habit_id, completed_date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_habit_logs_user_date ON habit_logs(user_id, completed_date)")
+    conn.commit()
+
+    # Seed default habits if empty
+    cursor.execute("SELECT COUNT(*) FROM habits WHERE user_id = ?", (demo_user_id,))
+    habit_count = cursor.fetchone()[0]
+
+    if habit_count == 0:
+        default_habits = [
+            (demo_user_id, "Hydration Protocol (3L Water)", "Maintain optimal cellular hydration throughout the day", "wellness", "daily", 7, "active"),
+            (demo_user_id, "10k Daily Steps", "Daily movement and cardiovascular health conditioning", "fitness", "daily", 7, "active"),
+            (demo_user_id, "60-Min AI Deep Learning", "Dedicated focus block on machine learning and system architecture", "learning", "daily", 6, "active"),
+            (demo_user_id, "Cold Shower Conditioning", "Vagus nerve stimulation and mental fortitude training", "mindset", "daily", 5, "active"),
+        ]
+        cursor.executemany(
+            """
+            INSERT INTO habits (user_id, title, description, category, frequency, target_days_per_week, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            default_habits,
+        )
+        conn.commit()
 
     conn.close()

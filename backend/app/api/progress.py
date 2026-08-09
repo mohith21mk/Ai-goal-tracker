@@ -4,6 +4,7 @@ from typing import Any, Dict
 from fastapi import APIRouter
 
 from ..database import get_connection
+from ..services.habits import get_aggregate_habit_stats, get_demo_user_id
 
 router = APIRouter()
 
@@ -65,9 +66,16 @@ async def compute_telemetry() -> Dict[str, Any]:
                 else:
                     break
 
-    # 5. Consistency Score = 50% mission completion rate + 50% streak component
+    # 5. Habit Telemetry & Consistency Score Combination
+    demo_user_id = get_demo_user_id()
+    habit_stats = get_aggregate_habit_stats(demo_user_id)
+    habit_weekly_pct = habit_stats.get("overall_7day_completion_pct", 0)
+
     streak_component = min(streak_days * 10, 100)
-    consistency = round((mission_percentage * 0.5) + (streak_component * 0.5))
+    if habit_stats.get("total_active_habits", 0) > 0:
+        consistency = round((mission_percentage * 0.5) + (streak_component * 0.3) + (habit_weekly_pct * 0.2))
+    else:
+        consistency = round((mission_percentage * 0.5) + (streak_component * 0.5))
 
     # 6. Goals Telemetry
     cursor.execute("SELECT COUNT(*) FROM goals")
@@ -103,6 +111,7 @@ async def compute_telemetry() -> Dict[str, Any]:
             "active": active_goals,
             "completed": completed_goals,
         },
+        "habits": habit_stats,
     }
 
 
