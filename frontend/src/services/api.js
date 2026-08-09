@@ -271,3 +271,154 @@ export async function deleteJournalEntry(id) {
   }
   return response.json();
 }
+
+// -------------------------------------------------------------------
+// Life Blueprint API Service Helpers (Phase 8)
+// -------------------------------------------------------------------
+
+export async function getBlueprints() {
+  const response = await fetch(`${API_BASE_URL}/api/blueprints`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch blueprints: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getActiveBlueprint() {
+  const response = await fetch(`${API_BASE_URL}/api/blueprints/active`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch active blueprint: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getBlueprint(id) {
+  const response = await fetch(`${API_BASE_URL}/api/blueprints/${id}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch blueprint details: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function createBlueprint(data) {
+  const response = await fetch(`${API_BASE_URL}/api/blueprints`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to create blueprint: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function updateBlueprint(id, data) {
+  const response = await fetch(`${API_BASE_URL}/api/blueprints/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to update blueprint: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function activateBlueprint(id) {
+  const response = await fetch(`${API_BASE_URL}/api/blueprints/${id}/activate`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to activate blueprint: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function deleteBlueprint(id) {
+  const response = await fetch(`${API_BASE_URL}/api/blueprints/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete blueprint: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function createBlueprintPhase(blueprintId, data) {
+  const response = await fetch(`${API_BASE_URL}/api/blueprints/${blueprintId}/phases`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to create phase: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function updateBlueprintPhase(phaseId, data) {
+  const response = await fetch(`${API_BASE_URL}/api/blueprints/phases/${phaseId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to update phase: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function deleteBlueprintPhase(phaseId) {
+  const response = await fetch(`${API_BASE_URL}/api/blueprints/phases/${phaseId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete phase: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function createBlueprintMilestone(phaseId, data) {
+  const response = await fetch(`${API_BASE_URL}/api/blueprints/phases/${phaseId}/milestones`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to create milestone: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function toggleBlueprintMilestone(milestoneId) {
+  const response = await fetch(`${API_BASE_URL}/api/blueprints/milestones/${milestoneId}/toggle`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to toggle milestone: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function deleteBlueprintMilestone(milestoneId) {
+  const response = await fetch(`${API_BASE_URL}/api/blueprints/milestones/${milestoneId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete milestone: ${response.statusText}`);
+  }
+  return response.json();
+}

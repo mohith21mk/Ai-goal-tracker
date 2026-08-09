@@ -4,6 +4,7 @@ from typing import Any, Dict
 from fastapi import APIRouter
 
 from ..database import get_connection
+from ..services.blueprints import get_blueprint_telemetry
 from ..services.habits import get_aggregate_habit_stats, get_demo_user_id
 from ..services.journal import compute_journal_stats
 
@@ -106,6 +107,9 @@ async def compute_telemetry() -> Dict[str, Any]:
     # 7. Growth Index = 60% mission completion + 40% goal completion
     growth_index = round((mission_percentage * 0.6) + (goal_completion_comp * 0.4))
 
+    # 8. Life Blueprint Telemetry
+    blueprint_telemetry = get_blueprint_telemetry(demo_user_id)
+
     conn.close()
 
     return {
@@ -132,6 +136,7 @@ async def compute_telemetry() -> Dict[str, Any]:
             "avg_energy_7d": journal_stats.get("avg_energy_7d", 0.0),
             "latest_mood": journal_stats.get("latest_mood", None),
         },
+        "blueprint": blueprint_telemetry,
     }
 
 

@@ -1,17 +1,17 @@
 import './MasteryPlanCard.css';
 
-const MasteryPlanCard = ({ activeGoal, linkedMissions = [] }) => {
-  const goalTitle = activeGoal?.title || 'Phase 3: Financial & Physical Mastery';
-  const goalCategory = activeGoal?.category ? activeGoal.category.toUpperCase() : 'ACTIVE BLUEPRINT';
+const MasteryPlanCard = ({ activeGoal, linkedMissions = [], telemetryBlueprint = null }) => {
+  const goalTitle = telemetryBlueprint?.current_phase || activeGoal?.title || 'Phase 2: AI & Machine Learning';
+  const goalCategory = telemetryBlueprint?.title ? 'ACTIVE BLUEPRINT' : activeGoal?.category ? activeGoal.category.toUpperCase() : 'ACTIVE BLUEPRINT';
   
-  const completedMissions = linkedMissions.filter(m => m.completed).length;
-  const totalMissions = linkedMissions.length;
-  
-  const progressPercent = totalMissions > 0 
-    ? Math.round((completedMissions / totalMissions) * 100) 
-    : 60;
+  const completedMestones = telemetryBlueprint?.completed_milestones ?? linkedMissions.filter(m => m.completed).length;
+  const totalMestones = telemetryBlueprint?.total_milestones ?? linkedMissions.length;
 
-  const nextStepText = activeGoal?.description || 'Build 6-Month Emergency Fund';
+  const progressPercent = telemetryBlueprint?.progress_percentage ?? (totalMestones > 0
+    ? Math.round((completedMestones / totalMestones) * 100)
+    : 38);
+
+  const nextStepText = telemetryBlueprint?.next_milestone || activeGoal?.description || 'Build AI Project Portfolio';
 
   return (
     <div className="mastery-plan-card glass-panel">
@@ -45,7 +45,7 @@ const MasteryPlanCard = ({ activeGoal, linkedMissions = [] }) => {
         <div className="milestone-info">
           <span className="milestone-phase font-display">{goalTitle}</span>
           <span className="steps-count">
-            {totalMissions > 0 ? `${completedMissions}/${totalMissions} Protocols` : '3/5 Steps Complete'}
+            {totalMestones > 0 ? `${completedMestones}/${totalMestones} Milestones` : '3/8 Milestones'}
           </span>
         </div>
 

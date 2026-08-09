@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import './HeroSection.css';
 
 const HeroSection = () => {
@@ -34,9 +35,9 @@ const HeroSection = () => {
               <polyline points="12 5 19 12 12 19"/>
             </svg>
           </button>
-          <button className="cta-secondary">
+          <Link to="/blueprint" className="cta-secondary" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
             <span>Explore Blueprint</span>
-          </button>
+          </Link>
         </div>
       </div>
 

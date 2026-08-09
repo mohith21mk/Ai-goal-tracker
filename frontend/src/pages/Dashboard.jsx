@@ -265,7 +265,7 @@ const Dashboard = () => {
             />
 
             {/* 3. Mastery Plan */}
-            <MasteryPlanCard activeGoal={activeGoal} linkedMissions={activeGoalMissions} />
+            <MasteryPlanCard activeGoal={activeGoal} linkedMissions={activeGoalMissions} telemetryBlueprint={telemetry.blueprint} />
 
             {/* 4. Today's Reflection */}
             <div className="reflection-card glass-panel">

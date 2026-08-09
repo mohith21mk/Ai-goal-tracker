@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Goals from './pages/Goals';
 import Habits from './pages/Habits';
 import Journal from './pages/Journal';
+import Blueprint from './pages/Blueprint';
 
 import './styles/globals.css';
 
@@ -18,6 +19,7 @@ function App() {
         <Route path="/habits" element={<Habits />} />
         <Route path="/streaks" element={<Habits />} />
         <Route path="/journal" element={<Journal />} />
+        <Route path="/blueprint" element={<Blueprint />} />
         <Route path="/landing" element={<Landing />} />
       </Routes>
     </BrowserRouter>

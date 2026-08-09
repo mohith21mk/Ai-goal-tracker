@@ -58,6 +58,18 @@ def init_db() -> None:
     )
     conn.commit()
 
+    # Evolve goals table safely if blueprint_id or milestone_id are missing
+    cursor.execute("PRAGMA table_info(goals)")
+    existing_goal_cols = [col["name"] for col in cursor.fetchall()]
+
+    if "blueprint_id" not in existing_goal_cols:
+        cursor.execute("ALTER TABLE goals ADD COLUMN blueprint_id INTEGER NULL")
+        conn.commit()
+
+    if "milestone_id" not in existing_goal_cols:
+        cursor.execute("ALTER TABLE goals ADD COLUMN milestone_id INTEGER NULL")
+        conn.commit()
+
     # Seed default goal if no goals exist for demo user
     cursor.execute("SELECT id FROM goals WHERE user_id = ?", (demo_user_id,))
     goal_row = cursor.fetchone()
@@ -238,5 +250,161 @@ def init_db() -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_journal_user_date ON journal_entries(user_id, entry_date)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_journal_user_created ON journal_entries(user_id, created_at DESC)")
     conn.commit()
+
+    # 7. Create Life Blueprint Tables (Phase 8)
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS life_blueprints (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            vision TEXT,
+            target_date TEXT,
+            status TEXT DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS blueprint_areas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            blueprint_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            icon TEXT DEFAULT '🎯',
+            position INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(blueprint_id) REFERENCES life_blueprints(id) ON DELETE CASCADE,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS blueprint_phases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            blueprint_id INTEGER NOT NULL,
+            area_id INTEGER,
+            title TEXT NOT NULL,
+            description TEXT,
+            phase_number INTEGER NOT NULL,
+            status TEXT DEFAULT 'pending',
+            position INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(blueprint_id) REFERENCES life_blueprints(id) ON DELETE CASCADE,
+            FOREIGN KEY(area_id) REFERENCES blueprint_areas(id) ON DELETE SET NULL
+        )
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS blueprint_milestones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            phase_id INTEGER NOT NULL,
+            blueprint_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            target_date TEXT,
+            completed INTEGER DEFAULT 0,
+            completed_at TIMESTAMP NULL,
+            position INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(phase_id) REFERENCES blueprint_phases(id) ON DELETE CASCADE,
+            FOREIGN KEY(blueprint_id) REFERENCES life_blueprints(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_blueprints_user ON life_blueprints(user_id, status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_phases_blueprint ON blueprint_phases(blueprint_id, phase_number)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_milestones_phase ON blueprint_milestones(phase_id, position)")
+    conn.commit()
+
+    # Seed default initial blueprint if empty
+    cursor.execute("SELECT COUNT(*) FROM life_blueprints WHERE user_id = ?", (demo_user_id,))
+    blueprint_count = cursor.fetchone()[0]
+
+    if blueprint_count == 0:
+        cursor.execute(
+            """
+            INSERT INTO life_blueprints (user_id, title, description, vision, target_date, status)
+            VALUES (?, ?, ?, ?, ?, 'active')
+            """,
+            (
+                demo_user_id,
+                "Become an AI Engineer by 2028",
+                "Comprehensive strategic roadmap to master software engineering, data structures, machine learning, and AI application architecture.",
+                "Placement-ready AI Engineer building production-grade intelligent systems.",
+                "2028-06-30",
+            ),
+        )
+        conn.commit()
+        bp_id = cursor.lastrowid
+
+        # Seed Life Areas
+        areas = [
+            (bp_id, demo_user_id, "Career & Engineering", "Software & AI technical mastery", "💻", 1),
+            (bp_id, demo_user_id, "Mindset & Leadership", "Cognitive clarity & resilience", "🧠", 2),
+            (bp_id, demo_user_id, "Health & Fitness", "Physical energy & stamina", "⚡", 3),
+        ]
+        cursor.executemany(
+            """
+            INSERT INTO blueprint_areas (blueprint_id, user_id, name, description, icon, position)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            areas,
+        )
+        conn.commit()
+
+        # Seed Phases
+        phases = [
+            (bp_id, 1, "Phase 1: Foundation & Core CS", "Master Python, DSA, git, and backend fundamentals", 1, "completed", 1),
+            (bp_id, 2, "Phase 2: AI & Machine Learning", "Deep dive into ML models, neural networks, and LLM orchestration", 2, "active", 2),
+            (bp_id, 3, "Phase 3: Portfolio & Placement Mastery", "Build flagship AI applications, system design, and mock interviews", 3, "pending", 3),
+        ]
+        phase_ids = []
+        for p in phases:
+            cursor.execute(
+                """
+                INSERT INTO blueprint_phases (blueprint_id, area_id, title, description, phase_number, status, position)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                p,
+            )
+            conn.commit()
+            phase_ids.append(cursor.lastrowid)
+
+        # Seed Milestones
+        milestones = [
+            (phase_ids[0], bp_id, "Master Python & Object-Oriented Design", "Complete core OOP & data structures", "2026-03-31", 1, "2026-03-30 10:00:00", 1),
+            (phase_ids[0], bp_id, "Build REST APIs with FastAPI & SQLite", "Design production-grade backend API layers", "2026-06-30", 1, "2026-06-25 14:00:00", 2),
+            (phase_ids[1], bp_id, "Learn ML Fundamentals & Scikit-Learn", "Understand regression, classification, and model evaluation", "2026-11-30", 1, "2026-08-01 09:00:00", 1),
+            (phase_ids[1], bp_id, "Build LLM Orchestration Applications", "Integrate Gemini REST APIs, prompt engineering, and agentic workflows", "2027-03-31", 0, None, 2),
+            (phase_ids[1], bp_id, "Master PyTorch & Deep Neural Networks", "Implement vision and transformer architectures from scratch", "2027-08-31", 0, None, 3),
+            (phase_ids[2], bp_id, "Deploy Flagship AI Web Platform", "Full-stack deployment with CI/CD, database, and real-time inference", "2027-12-31", 0, None, 1),
+            (phase_ids[2], bp_id, "Complete 50+ Advanced DSA Mock Interviews", "High-pressure problem solving and system design practice", "2028-04-30", 0, None, 2),
+        ]
+        cursor.executemany(
+            """
+            INSERT INTO blueprint_milestones (phase_id, blueprint_id, title, description, target_date, completed, completed_at, position)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            milestones,
+        )
+        conn.commit()
+
+        # Link default active goal to blueprint phase 2
+        cursor.execute("UPDATE goals SET blueprint_id = ?, milestone_id = ? WHERE id = ?", (bp_id, milestones[3][0], default_goal_id))
+        conn.commit()
 
     conn.close()
