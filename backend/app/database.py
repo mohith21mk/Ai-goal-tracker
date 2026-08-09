@@ -214,4 +214,29 @@ def init_db() -> None:
         )
         conn.commit()
 
+    # 6. Create journal_entries table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS journal_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            entry_date TEXT NOT NULL,
+            mood TEXT NOT NULL DEFAULT 'focused',
+            energy_level INTEGER NOT NULL DEFAULT 7 CHECK(energy_level BETWEEN 1 AND 10),
+            wins_text TEXT,
+            challenges_text TEXT,
+            learnings_text TEXT,
+            growth_next_text TEXT,
+            ai_analysis TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            UNIQUE(user_id, entry_date)
+        )
+        """
+    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_journal_user_date ON journal_entries(user_id, entry_date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_journal_user_created ON journal_entries(user_id, created_at DESC)")
+    conn.commit()
+
     conn.close()

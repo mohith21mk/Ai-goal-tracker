@@ -211,3 +211,63 @@ export async function toggleHabit(id, dateStr) {
   }
   return response.json();
 }
+
+export async function getTodayJournal() {
+  const response = await fetch(`${API_BASE_URL}/api/journal/today`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch today's journal: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function saveJournalEntry(data) {
+  const response = await fetch(`${API_BASE_URL}/api/journal`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to save journal entry: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getJournalHistory(limit = 30) {
+  const response = await fetch(`${API_BASE_URL}/api/journal/history?limit=${limit}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch journal history: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getJournalStats() {
+  const response = await fetch(`${API_BASE_URL}/api/journal/stats`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch journal stats: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function analyzeJournalEntry(id) {
+  const response = await fetch(`${API_BASE_URL}/api/journal/${id}/analyze`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to analyze journal entry: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function deleteJournalEntry(id) {
+  const response = await fetch(`${API_BASE_URL}/api/journal/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete journal entry: ${response.statusText}`);
+  }
+  return response.json();
+}

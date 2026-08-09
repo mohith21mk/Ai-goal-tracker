@@ -5,6 +5,7 @@ from fastapi import APIRouter
 
 from ..database import get_connection
 from ..services.habits import get_aggregate_habit_stats, get_demo_user_id
+from ..services.journal import compute_journal_stats
 
 router = APIRouter()
 
@@ -12,6 +13,8 @@ router = APIRouter()
 async def compute_telemetry() -> Dict[str, Any]:
     conn = get_connection()
     cursor = conn.cursor()
+
+    demo_user_id = get_demo_user_id()
 
     # 1. Missions Telemetry
     cursor.execute("SELECT COUNT(*) FROM missions")
@@ -25,14 +28,26 @@ async def compute_telemetry() -> Dict[str, Any]:
     # Discipline Score = overall completion rate (0-100)
     discipline_score = mission_percentage
 
-    # 2. Mindset Strength = mindset completed / mindset total * 100
+    # 2. Mindset Strength = mindset completed / mindset total * 100 + progressive journal bonus
     cursor.execute("SELECT COUNT(*) FROM missions WHERE category = 'mindset'")
     total_mindset = cursor.fetchone()[0]
 
     cursor.execute("SELECT COUNT(*) FROM missions WHERE category = 'mindset' AND completed = 1")
     completed_mindset = cursor.fetchone()[0]
 
-    mindset_strength = round((completed_mindset / total_mindset) * 100) if total_mindset > 0 else 0
+    mindset_base = round((completed_mindset / total_mindset) * 100) if total_mindset > 0 else 0
+
+    journal_stats = compute_journal_stats(demo_user_id)
+    journal_streak = journal_stats.get("reflection_streak", 0)
+
+    if journal_stats.get("total_entries", 0) > 0:
+        journal_bonus = (
+            min(journal_streak * 5, 15)
+            + round(journal_stats.get("avg_energy_7d", 7) * 0.5)
+        )
+        mindset_strength = min(mindset_base + journal_bonus, 100)
+    else:
+        mindset_strength = mindset_base
 
     # 3. XP Earned = SUM(xp_reward) for completed missions
     cursor.execute("SELECT SUM(xp_reward) FROM missions WHERE completed = 1")
@@ -66,8 +81,7 @@ async def compute_telemetry() -> Dict[str, Any]:
                 else:
                     break
 
-    # 5. Habit Telemetry & Consistency Score Combination
-    demo_user_id = get_demo_user_id()
+    # 5. Habit Telemetry & Refined Consistency Score Combination (50% Mission + 30% Streak + 20% Habit)
     habit_stats = get_aggregate_habit_stats(demo_user_id)
     habit_weekly_pct = habit_stats.get("overall_7day_completion_pct", 0)
 
@@ -112,6 +126,12 @@ async def compute_telemetry() -> Dict[str, Any]:
             "completed": completed_goals,
         },
         "habits": habit_stats,
+        "journal": {
+            "total_entries": journal_stats.get("total_entries", 0),
+            "journal_streak": journal_stats.get("reflection_streak", 0),
+            "avg_energy_7d": journal_stats.get("avg_energy_7d", 0.0),
+            "latest_mood": journal_stats.get("latest_mood", None),
+        },
     }
 
 

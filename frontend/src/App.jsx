@@ -4,6 +4,7 @@ import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Goals from './pages/Goals';
 import Habits from './pages/Habits';
+import Journal from './pages/Journal';
 
 import './styles/globals.css';
 
@@ -16,6 +17,7 @@ function App() {
         <Route path="/goals" element={<Goals />} />
         <Route path="/habits" element={<Habits />} />
         <Route path="/streaks" element={<Habits />} />
+        <Route path="/journal" element={<Journal />} />
         <Route path="/landing" element={<Landing />} />
       </Routes>
     </BrowserRouter>
