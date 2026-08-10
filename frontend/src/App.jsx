@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
+import Missions from './pages/Missions';
 import Goals from './pages/Goals';
 import Habits from './pages/Habits';
 import Journal from './pages/Journal';
@@ -15,6 +16,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/missions" element={<Missions />} />
         <Route path="/goals" element={<Goals />} />
         <Route path="/habits" element={<Habits />} />
         <Route path="/streaks" element={<Habits />} />

@@ -1,13 +1,75 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { searchApplication } from '../services/api';
 import './TopBar.css';
 
 const TopBar = ({ user }) => {
   const [searchValue, setSearchValue] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const searchInputRef = useRef(null);
+  const navigate = useNavigate();
 
   const displayName = user?.full_name || user?.email ? `${user.full_name || user.email}` : 'Mohith';
 
+  // Debounced search logic (250ms)
+  useEffect(() => {
+    const trimmed = searchValue.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await searchApplication(trimmed);
+        setSearchResults(results);
+        setIsDropdownOpen(true);
+      } catch (err) {
+        console.error('Search failed:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchValue]);
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setSearchValue(val);
+    if (!val.trim()) {
+      setSearchResults(null);
+      setIsDropdownOpen(false);
+    }
+  };
+
+  // Keyboard shortcut listener (Ctrl+K / Cmd+K)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+        }
+      } else if (e.key === 'Escape') {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleResultClick = (route) => {
+    setIsDropdownOpen(false);
+    setSearchValue('');
+    navigate(route);
+  };
+
   return (
-    <header className="topbar-container">
+    <header className="topbar-container" style={{ position: 'relative' }}>
       {/* Search Input Field */}
       <div className="topbar-search glass-panel">
         <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -15,14 +77,131 @@ const TopBar = ({ user }) => {
           <line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <input
+          ref={searchInputRef}
           type="text"
-          placeholder="Search goals, habits, insights..."
+          placeholder="Search habits, goals, missions, blueprint..."
           value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
+          onChange={handleInputChange}
+          onFocus={() => { if (searchResults && searchResults.count > 0) setIsDropdownOpen(true); }}
           className="search-input"
         />
         <kbd className="search-shortcut">⌘K</kbd>
       </div>
+
+      {/* Live Search Results Dropdown */}
+      {isDropdownOpen && searchResults && (
+        <div style={{
+          position: 'absolute',
+          top: '60px',
+          left: '0',
+          width: '460px',
+          maxHeight: '420px',
+          overflowY: 'auto',
+          background: 'rgba(7, 20, 38, 0.95)',
+          backdropFilter: 'blur(16px)',
+          border: '1px solid var(--cyan)',
+          borderRadius: '16px',
+          boxShadow: '0 0 30px rgba(56, 189, 248, 0.3)',
+          padding: '16px',
+          zIndex: 999,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--cyan)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              {isSearching ? 'Searching...' : `Found ${searchResults.count} Results`}
+            </span>
+            <button onClick={() => setIsDropdownOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '12px' }}>
+              Esc to close
+            </button>
+          </div>
+
+          {searchResults.count === 0 ? (
+            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+              No matches found for "{searchValue}"
+            </div>
+          ) : (
+            <>
+              {/* Habits */}
+              {searchResults.habits?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '600', marginBottom: '6px' }}>⚡ HABITS ({searchResults.habits.length})</div>
+                  {searchResults.habits.map(h => (
+                    <div
+                      key={h.id}
+                      onClick={() => handleResultClick('/habits')}
+                      style={{ padding: '8px 12px', background: 'rgba(10, 22, 40, 0.6)', borderRadius: '8px', cursor: 'pointer', marginBottom: '4px', transition: 'background 0.2s' }}
+                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'rgba(10, 22, 40, 0.6)'}
+                    >
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{h.title}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{h.category} • {h.status}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Goals */}
+              {searchResults.goals?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '600', marginBottom: '6px' }}>🎯 GOALS ({searchResults.goals.length})</div>
+                  {searchResults.goals.map(g => (
+                    <div
+                      key={g.id}
+                      onClick={() => handleResultClick('/goals')}
+                      style={{ padding: '8px 12px', background: 'rgba(10, 22, 40, 0.6)', borderRadius: '8px', cursor: 'pointer', marginBottom: '4px' }}
+                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'rgba(10, 22, 40, 0.6)'}
+                    >
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{g.title}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{g.category} • {g.status}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Missions */}
+              {searchResults.missions?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '600', marginBottom: '6px' }}>📋 MISSIONS ({searchResults.missions.length})</div>
+                  {searchResults.missions.map(m => (
+                    <div
+                      key={m.id}
+                      onClick={() => handleResultClick('/missions')}
+                      style={{ padding: '8px 12px', background: 'rgba(10, 22, 40, 0.6)', borderRadius: '8px', cursor: 'pointer', marginBottom: '4px' }}
+                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'rgba(10, 22, 40, 0.6)'}
+                    >
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{m.title}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{m.category || 'general'} • {m.completed ? 'Completed' : 'Pending'}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Blueprint Milestones */}
+              {searchResults.milestones?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '600', marginBottom: '6px' }}>🗺️ MILESTONES ({searchResults.milestones.length})</div>
+                  {searchResults.milestones.map(ms => (
+                    <div
+                      key={ms.id}
+                      onClick={() => handleResultClick('/blueprint')}
+                      style={{ padding: '8px 12px', background: 'rgba(10, 22, 40, 0.6)', borderRadius: '8px', cursor: 'pointer', marginBottom: '4px' }}
+                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'rgba(10, 22, 40, 0.6)'}
+                    >
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{ms.title}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Target: {ms.target_date || 'N/A'}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Right User & AI Status Area */}
       <div className="topbar-actions">

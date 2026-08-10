@@ -272,10 +272,6 @@ export async function deleteJournalEntry(id) {
   return response.json();
 }
 
-// -------------------------------------------------------------------
-// Life Blueprint API Service Helpers (Phase 8)
-// -------------------------------------------------------------------
-
 export async function getBlueprints() {
   const response = await fetch(`${API_BASE_URL}/api/blueprints`);
   if (!response.ok) {
@@ -419,6 +415,15 @@ export async function deleteBlueprintMilestone(milestoneId) {
   });
   if (!response.ok) {
     throw new Error(`Failed to delete milestone: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function searchApplication(query) {
+  const encoded = encodeURIComponent(query);
+  const response = await fetch(`${API_BASE_URL}/api/search?q=${encoded}`);
+  if (!response.ok) {
+    throw new Error(`Failed to execute search: ${response.statusText}`);
   }
   return response.json();
 }

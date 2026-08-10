@@ -8,7 +8,6 @@ from typing import Dict, Any, List
 from pathlib import Path
 
 from ..config import settings
-from ..api.progress import compute_telemetry
 
 DB_PATH = Path(__file__).resolve().parent.parent / "app.db"
 
@@ -30,15 +29,23 @@ def get_db_context() -> Dict[str, Any]:
     user_name = user_row["full_name"] if user_row else "Mohith"
 
     # Fetch active goals
-    cursor.execute("SELECT title, category, status FROM goals WHERE status = 'active'")
+    cursor.execute("SELECT title, category FROM goals WHERE status = 'active' LIMIT 2")
     goal_rows = cursor.fetchall()
     goals = [dict(r) for r in goal_rows]
+
+    # Fetch fast mission summary
+    cursor.execute("SELECT COUNT(*), SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) FROM missions")
+    m_row = cursor.fetchone()
+    total_missions = m_row[0] if m_row else 0
+    completed_missions = m_row[1] if m_row and m_row[1] else 0
 
     conn.close()
     return {
         "user_id": user_id,
         "user_name": user_name,
-        "goals": goals
+        "goals": goals,
+        "total_missions": total_missions,
+        "completed_missions": completed_missions,
     }
 
 
@@ -56,7 +63,6 @@ def save_chat_message(user_id: int, sender: str, content: str) -> int:
 
 
 def fetch_chat_history(user_id: int, limit: int = 50) -> List[Dict[str, Any]]:
-    # Clamp limit between 1 and 100
     safe_limit = min(max(1, limit), 100)
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -93,102 +99,104 @@ def _call_gemini_rest_api(gemini_url: str, payload: dict) -> Dict[str, Any]:
         headers={"Content-Type": "application/json"},
         method="POST"
     )
-    with urllib.request.urlopen(req, timeout=12.0) as response:
+    with urllib.request.urlopen(req, timeout=6.0) as response:
         resp_bytes = response.read()
         return json.loads(resp_bytes.decode("utf-8"))
 
 
 async def generate_coaching_response(user_message: str) -> Dict[str, Any]:
-    # 1. Gather live database context
+    # 1. Gather fast lightweight context in single DB call
     context = get_db_context()
     user_id = context["user_id"]
     user_name = context["user_name"]
     goals = context["goals"]
-    goals_text = ", ".join([f"'{g['title']}' ({g['category']})" for g in goals]) if goals else "Personal Growth"
+    goals_text = ", ".join([f"'{g['title']}'" for g in goals]) if goals else "Personal Mastery"
+    completed_missions = context["completed_missions"]
+    total_missions = context["total_missions"]
 
-    # Save incoming user message to SQLite DB
+    # Save user prompt
     try:
         save_chat_message(user_id, "user", user_message)
     except Exception as err:
-        raise RuntimeError(f"Database persistence error saving user prompt: {err}")
-
-    try:
-        telemetry = await compute_telemetry()
-    except Exception:
-        telemetry = {
-            "discipline_score": 60,
-            "mindset_strength": 0,
-            "consistency": 35,
-            "growth_index": 36,
-            "streak_days": 1,
-            "xp_earned": 45,
-            "mission_completion": {"completed": 3, "total": 5, "percentage": 60}
-        }
-
-    discipline = telemetry.get("discipline_score", 60)
-    consistency = telemetry.get("consistency", 35)
-    streak = telemetry.get("streak_days", 1)
-    comp_pct = telemetry.get("mission_completion", {}).get("percentage", 60)
-    completed_count = telemetry.get("mission_completion", {}).get("completed", 3)
-    total_count = telemetry.get("mission_completion", {}).get("total", 5)
+        raise RuntimeError(f"Database error saving prompt: {err}")
 
     api_key = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY", "")
 
-    # 2. Handle missing or placeholder API Key gracefully
+    # Fallback response if API key is not configured
     if not api_key or api_key.startswith("your_") or api_key == "placeholder":
         fallback_reply = (
-            f"Action locked in for '{user_message}', {user_name}! "
-            f"Your current discipline score is {discipline}/100 with {completed_count}/{total_count} protocols complete. "
-            f"Keep focusing on '{goals_text}' with total execution today."
+            f"Focus locked in on '{user_message}', {user_name}! "
+            f"You have completed {completed_missions}/{total_missions} protocols today. "
+            f"Stay executing on '{goals_text}' with total discipline."
         )
         try:
             save_chat_message(user_id, "coach", fallback_reply)
         except Exception as err:
-            raise RuntimeError(f"Database persistence error saving fallback coach reply: {err}")
+            raise RuntimeError(f"Database error saving fallback reply: {err}")
 
         return {
             "reply": fallback_reply,
             "context_used": True,
             "live_llm": False,
-            "note": "Live Gemini API synthesis is in preview mode. Add GEMINI_API_KEY to backend/.env for live LLM responses."
+            "note": "Add GEMINI_API_KEY to backend/.env for live LLM response."
         }
 
-    # 3. Build structured prompt for Gemini
-    system_prompt = (
-        f"You are AI Coach, a supportive, highly strategic, and disciplined personal growth coach for the Mastery Key Coach system.\n"
-        f"User Profile: {user_name}\n"
-        f"Active Goals: {goals_text}\n"
-        f"Discipline Telemetry: Score = {discipline}/100, Consistency = {consistency}/100, Active Streak = {streak} days.\n"
-        f"Daily Mission Completion: {completed_count}/{total_count} ({comp_pct}%).\n\n"
-        f"Instructions:\n"
-        f"- Provide a direct, motivating, 2-4 sentence coaching response.\n"
-        f"- Reference their goal or telemetry where appropriate.\n"
-        f"- Tone: Concise, inspiring, futuristic, disciplined, and actionable.\n\n"
-        f"User Input: {user_message}"
+    # 2. Fetch last 6 turns of conversation history for multi-turn context
+    recent_history = fetch_chat_history(user_id, limit=6)
+
+    # 3. Construct System Instructions & Multi-Turn Contents Payload
+    system_instruction = (
+        f"You are AI Coach, an elite, highly intelligent, disciplined personal growth and engineering mentor for {user_name}.\n"
+        f"User Active Goals: {goals_text}\n"
+        f"Today's Protocol Progress: {completed_missions}/{total_missions} completed.\n\n"
+        f"GROUNDING INSTRUCTIONS:\n"
+        f"1. Answer the user's explicit question FIRST, directly, accurately, and concisely (2-4 sentences).\n"
+        f"2. Use personal mastery context ONLY when directly relevant to the user's prompt.\n"
+        f"3. If the user asks a general knowledge or technical question, answer it clearly without forcing telemetry mentions.\n"
+        f"4. Tone: Concise, inspiring, structured, disciplined, and practical."
     )
 
-    candidate_models = ["gemini-flash-latest", "gemini-2.0-flash", "gemini-pro-latest"]
-    configured_model = getattr(settings, "GEMINI_MODEL", "gemini-flash-latest")
-    if configured_model in candidate_models:
-        candidate_models.remove(configured_model)
-    candidate_models.insert(0, configured_model)
+    contents = []
+    # Add system context turn
+    contents.append({
+        "role": "user",
+        "parts": [{"text": f"System Context: {system_instruction}"}]
+    })
+    contents.append({
+        "role": "model",
+        "parts": [{"text": f"Understood. I am ready to coach {user_name} with direct, accurate, and disciplined guidance."}]
+    })
+
+    # Add historical multi-turn messages
+    for msg in recent_history:
+        role = "user" if msg["sender"] == "user" else "model"
+        # Skip the prompt we just inserted if already in history
+        if msg["content"] == user_message and role == "user":
+            continue
+        contents.append({
+            "role": role,
+            "parts": [{"text": msg["content"]}]
+        })
+
+    # Append current user prompt
+    contents.append({
+        "role": "user",
+        "parts": [{"text": user_message}]
+    })
 
     payload = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [{"text": system_prompt}]
-            }
-        ],
+        "contents": contents,
         "generationConfig": {
-            "temperature": 0.7,
-            "maxOutputTokens": 300
+            "temperature": 0.5,
+            "maxOutputTokens": 250
         }
     }
 
-    last_error = None
+    # Fast model selection
+    candidate_models = ["gemini-flash-latest", "gemini-2.0-flash"]
     reply_text = None
     used_model = None
+    last_error = None
 
     for model_name in candidate_models:
         gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
@@ -203,10 +211,7 @@ async def generate_coaching_response(user_message: str) -> Dict[str, Any]:
                     break
         except urllib.error.HTTPError as err:
             last_error = f"HTTP {err.code}: {err.reason}"
-            if err.code in (404, 400):
-                continue
-            elif err.code == 429:
-                await asyncio.sleep(1.0)
+            if err.code in (404, 400, 429):
                 continue
         except Exception as err:
             last_error = str(err)
@@ -214,16 +219,16 @@ async def generate_coaching_response(user_message: str) -> Dict[str, Any]:
 
     if not reply_text:
         reply_text = (
-            f"Focus locked on '{user_message}', {user_name}! "
-            f"Your discipline is currently at {discipline}/100 with {completed_count}/{total_count} daily protocols complete. "
-            f"Stay relentless on your active goal '{goals_text}'."
+            f"Executing on '{user_message}', {user_name}! "
+            f"Protocols completed today: {completed_missions}/{total_missions}. "
+            f"Keep focusing on '{goals_text}' with relentless consistency."
         )
 
-    # Save coach reply to SQLite DB
+    # Save coach reply
     try:
         save_chat_message(user_id, "coach", reply_text)
     except Exception as err:
-        raise RuntimeError(f"Database persistence error saving coach response: {err}")
+        raise RuntimeError(f"Database error saving coach reply: {err}")
 
     return {
         "reply": reply_text,
