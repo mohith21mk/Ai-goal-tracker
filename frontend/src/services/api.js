@@ -517,3 +517,11 @@ export async function createCommunityComment(id, data) {
   }
   return response.json();
 }
+
+export async function getDailyReflection() {
+  const response = await fetch(`${API_BASE_URL}/api/reflection/daily`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch daily reflection: ${response.statusText}`);
+  }
+  return response.json();
+}

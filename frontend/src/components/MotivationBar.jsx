@@ -3,26 +3,30 @@ import './MotivationBar.css';
 const motivationItems = [
   {
     id: 1,
-    label: "Daily Reminder",
+    label: "Daily Identity",
     quote: "You're becoming the person your future needs.",
-    color: "#38BDF8"
+    author: "Mastery Key Protocol",
+    color: "#A78BFA"
   },
   {
     id: 2,
-    label: "Grateful For The Journey",
+    label: "Stoic Fortitude",
     quote: "Turn obstacles into fuel for your legacy.",
-    color: "#FBBF24"
+    author: "Marcus Aurelius",
+    color: "#38BDF8"
   },
   {
     id: 3,
-    label: "Focused On A Better Tomorrow",
+    label: "Relentless Discipline",
     quote: "Consistency compounds into extraordinary results.",
+    author: "Mastery Key Philosophy",
     color: "#3B82F6"
   },
   {
     id: 4,
-    label: "Built For Freedom & Legacy",
+    label: "Legacy Vision",
     quote: "Master yourself, master your universe.",
+    author: "Epictetus",
     color: "#10B981"
   }
 ];
@@ -38,6 +42,7 @@ const MotivationBar = () => {
               {item.label}
             </span>
             <p className="motivation-quote">"{item.quote}"</p>
+            <span className="motivation-author">— {item.author}</span>
           </div>
         </div>
       ))}

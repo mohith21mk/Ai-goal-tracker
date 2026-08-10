@@ -2,7 +2,7 @@ from typing import Any, Dict
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import auth, blueprints, coach, community, goals, habits, journal, missions, progress, search, settings, users
+from .api import auth, blueprints, coach, community, goals, habits, journal, missions, progress, reflection, search, settings, users
 from .api.progress import compute_telemetry
 from .database import init_db
 
@@ -34,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(search.router, prefix="/api/search", tags=["search"])
     app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
     app.include_router(community.router, prefix="/api/community", tags=["community"])
+    app.include_router(reflection.router, prefix="/api/reflection", tags=["reflection"])
 
     @app.get("/api/telemetry", response_model=Dict[str, Any], tags=["telemetry"])
     async def get_telemetry() -> Dict[str, Any]:

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import HeroSection from '../components/HeroSection';
@@ -8,7 +9,7 @@ import AICoachCard from '../components/AICoachCard';
 import MasteryPlanCard from '../components/MasteryPlanCard';
 import MissionCard from '../components/MissionCard';
 import MotivationBar from '../components/MotivationBar';
-import { getMissions, toggleMission, getProgress, getTelemetry, getUser, getGoals } from '../services/api';
+import { getMissions, toggleMission, getProgress, getTelemetry, getUser, getGoals, getDailyReflection } from '../services/api';
 import './Dashboard.css';
 
 const defaultFallbackMissions = [
@@ -32,17 +33,24 @@ const Dashboard = () => {
   });
   const [user, setUser] = useState(null);
   const [goals, setGoals] = useState([]);
+  const [reflectionData, setReflectionData] = useState({
+    reflection: '"Small choices today create extraordinary tomorrows."',
+    date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    highlight_metric: 'Daily Protocol',
+    highlight_color: '#38BDF8'
+  });
   const [loading, setLoading] = useState(true);
   const [backendConnected, setBackendConnected] = useState(false);
 
   useEffect(() => {
     async function loadBackendData() {
       try {
-        const [missionsData, telemetryRes, userRes, goalsRes] = await Promise.all([
+        const [missionsData, telemetryRes, userRes, goalsRes, reflectionRes] = await Promise.all([
           getMissions().catch(() => null),
           getTelemetry().catch(() => null),
           getUser().catch(() => null),
           getGoals().catch(() => null),
+          getDailyReflection().catch(() => null),
         ]);
 
         if (Array.isArray(missionsData) && missionsData.length > 0) {
@@ -61,6 +69,7 @@ const Dashboard = () => {
 
         if (userRes) setUser(userRes);
         if (Array.isArray(goalsRes)) setGoals(goalsRes);
+        if (reflectionRes) setReflectionData(reflectionRes);
 
         setBackendConnected(true);
       } catch (err) {
@@ -87,13 +96,15 @@ const Dashboard = () => {
           m.id === id ? { ...m, ...updatedMission } : m
         ));
 
-        const [freshTelemetry, freshProgress] = await Promise.all([
+        const [freshTelemetry, freshProgress, freshReflection] = await Promise.all([
           getTelemetry().catch(() => null),
-          getProgress().catch(() => null)
+          getProgress().catch(() => null),
+          getDailyReflection().catch(() => null)
         ]);
 
         if (freshTelemetry) setTelemetry(freshTelemetry);
         if (freshProgress) setProgressData(freshProgress);
+        if (freshReflection) setReflectionData(freshReflection);
       } catch (err) {
         console.error('Error toggling mission on server:', err.message);
       }
@@ -245,7 +256,7 @@ const Dashboard = () => {
               </div>
             </section>
 
-            {/* Bottom Motivation Bar */}
+            {/* Bottom Motivation Bar (Quote Cards) */}
             <MotivationBar />
           </main>
 
@@ -270,15 +281,17 @@ const Dashboard = () => {
             {/* 4. Today's Reflection */}
             <div className="reflection-card glass-panel">
               <div className="reflection-header">
-                <span className="reflection-tag">DAILY REFLECTION</span>
-                <span className="reflection-date font-display">May 28, 2024</span>
+                <span className="reflection-tag" style={{ color: reflectionData.highlight_color || 'var(--cyan)' }}>
+                  DAILY REFLECTION • {reflectionData.highlight_metric || 'DISCIPLINE'}
+                </span>
+                <span className="reflection-date font-display">{reflectionData.date}</span>
               </div>
               <h3 className="reflection-title font-serif">
-                "Small choices today create extraordinary tomorrows."
+                "{reflectionData.reflection.replace(/^"|"$/g, '')}"
               </h3>
-              <button className="reflection-cta-btn">
+              <Link to="/journal" className="reflection-cta-btn" style={{ textDecoration: 'none' }}>
                 <span>Write Reflection →</span>
-              </button>
+              </Link>
             </div>
           </aside>
         </div>
