@@ -21,7 +21,11 @@ const Settings = () => {
       try {
         const s = await getSettings();
         if (isMounted && s) {
-          setTheme(s.theme || 'dark');
+          const loadedTheme = s.theme || 'dark';
+          setTheme(loadedTheme);
+          document.documentElement.setAttribute('data-theme', loadedTheme);
+          localStorage.setItem('theme', loadedTheme);
+
           setNotificationsEnabled(Boolean(s.notifications_enabled));
           setCoachStyle(s.coach_style || 'strategic');
           setDailyReminderTime(s.daily_reminder_time || '08:00');
@@ -42,6 +46,19 @@ const Settings = () => {
     };
   }, []);
 
+  const handleThemeChange = (newTheme) => {
+    setTheme(newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+  };
+
+  const handleNotificationToggle = (checked) => {
+    setNotificationsEnabled(checked);
+    if (checked && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  };
+
   const handleSaveSettings = async (e) => {
     if (e) e.preventDefault();
     setSaving(true);
@@ -57,14 +74,18 @@ const Settings = () => {
       });
 
       if (updated) {
-        setTheme(updated.theme);
+        const nextTheme = updated.theme || theme;
+        setTheme(nextTheme);
+        document.documentElement.setAttribute('data-theme', nextTheme);
+        localStorage.setItem('theme', nextTheme);
+
         setNotificationsEnabled(Boolean(updated.notifications_enabled));
         setCoachStyle(updated.coach_style);
         setDailyReminderTime(updated.daily_reminder_time);
         setProfileVisibility(updated.profile_visibility);
       }
 
-      setStatusMessage({ type: 'success', text: 'Settings updated and saved successfully!' });
+      setStatusMessage({ type: 'success', text: 'Settings updated and live application synchronized!' });
     } catch (err) {
       console.error('Failed to update settings:', err);
       setStatusMessage({ type: 'error', text: err.message || 'Failed to save settings.' });
@@ -117,14 +138,14 @@ const Settings = () => {
                     <div className="segmented-control">
                       <button
                         type="button"
-                        onClick={() => setTheme('dark')}
+                        onClick={() => handleThemeChange('dark')}
                         className={`segmented-btn ${theme === 'dark' ? 'active' : ''}`}
                       >
                         🌙 Dark Cyberpunk
                       </button>
                       <button
                         type="button"
-                        onClick={() => setTheme('light')}
+                        onClick={() => handleThemeChange('light')}
                         className={`segmented-btn ${theme === 'light' ? 'active' : ''}`}
                       >
                         ☀️ Light Mode
@@ -171,7 +192,7 @@ const Settings = () => {
                     <input
                       type="checkbox"
                       checked={notificationsEnabled}
-                      onChange={(e) => setNotificationsEnabled(e.target.checked)}
+                      onChange={(e) => handleNotificationToggle(e.target.checked)}
                       style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                     />
                   </div>
@@ -185,6 +206,15 @@ const Settings = () => {
                       onChange={(e) => setDailyReminderTime(e.target.value)}
                       className="settings-input"
                     />
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                      {notificationsEnabled
+                        ? `⚡ In-App Protocol Reminder set for ${dailyReminderTime} ${
+                            typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
+                              ? '(Browser Push Granted)'
+                              : '(In-App Protocol Active)'
+                          }`
+                        : 'Reminders currently disabled.'}
+                    </div>
                   </div>
                 </div>
 
@@ -204,7 +234,7 @@ const Settings = () => {
                       className="settings-select"
                     >
                       <option value="public">Public (Visible in Community Feed)</option>
-                      <option value="private">Private (Isolated to local device)</option>
+                      <option value="private">Private (Masked as Anonymous Member)</option>
                     </select>
                   </div>
                 </div>
@@ -213,7 +243,7 @@ const Settings = () => {
               {/* Save Footer */}
               <div className="settings-save-footer glass-panel">
                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  All changes persist cleanly to your SQLite database.
+                  All changes persist cleanly to your SQLite database and update live.
                 </div>
                 <button
                   type="submit"

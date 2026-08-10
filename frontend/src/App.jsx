@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 import Landing from './pages/Landing';
@@ -10,10 +11,34 @@ import Journal from './pages/Journal';
 import Blueprint from './pages/Blueprint';
 import Settings from './pages/Settings';
 import Community from './pages/Community';
+import { getSettings } from './services/api';
 
 import './styles/globals.css';
 
+// Immediate theme bootstrap from localStorage to prevent render flicker
+const savedTheme = localStorage.getItem('theme') || 'dark';
+document.documentElement.setAttribute('data-theme', savedTheme);
+
 function App() {
+  useEffect(() => {
+    let isMounted = true;
+    async function syncBackendTheme() {
+      try {
+        const s = await getSettings();
+        if (isMounted && s && s.theme) {
+          document.documentElement.setAttribute('data-theme', s.theme);
+          localStorage.setItem('theme', s.theme);
+        }
+      } catch (err) {
+        console.warn('Could not sync theme settings from backend:', err);
+      }
+    }
+    syncBackendTheme();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>

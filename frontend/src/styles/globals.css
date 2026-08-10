@@ -20,6 +20,30 @@
   --border-glow: rgba(56, 189, 248, 0.3);
 }
 
+/* Light Theme Variable Overrides */
+html[data-theme="light"] {
+  --dark-bg: #F8FAFC;
+  --mid-bg: #F1F5F9;
+  --card-bg: rgba(255, 255, 255, 0.85);
+  --cyan: #0284C7;
+  --cyan-glow: rgba(2, 132, 199, 0.25);
+  --primary-blue: #2563EB;
+  --dark-blue: #1D4ED8;
+  --blue-glow: rgba(37, 99, 235, 0.2);
+  --accent-gold: #D97706;
+  --gold-glow: rgba(217, 119, 6, 0.2);
+  --success: #059669;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-tertiary: #64748B;
+  --border-subtle: rgba(148, 163, 184, 0.28);
+  --border-glow: rgba(2, 132, 199, 0.3);
+}
+
+html[data-theme="light"] body {
+  background: radial-gradient(circle at 50% -20%, #E2E8F0 0%, #F8FAFC 70%);
+}
+
 /* Reset & Base Styles */
 * {
   margin: 0;

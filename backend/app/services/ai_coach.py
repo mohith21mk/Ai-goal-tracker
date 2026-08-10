@@ -39,6 +39,11 @@ def get_db_context() -> Dict[str, Any]:
     total_missions = m_row[0] if m_row else 0
     completed_missions = m_row[1] if m_row and m_row[1] else 0
 
+    # Fetch coach style from user settings
+    cursor.execute("SELECT coach_style FROM user_settings WHERE user_id = ?", (user_id,))
+    s_row = cursor.fetchone()
+    coach_style = s_row["coach_style"] if s_row and s_row["coach_style"] else "strategic"
+
     conn.close()
     return {
         "user_id": user_id,
@@ -46,6 +51,7 @@ def get_db_context() -> Dict[str, Any]:
         "goals": goals,
         "total_missions": total_missions,
         "completed_missions": completed_missions,
+        "coach_style": coach_style,
     }
 
 
@@ -206,6 +212,14 @@ async def generate_coaching_response(user_message: str) -> Dict[str, Any]:
     # 3. Fetch last 6 turns of conversation history for multi-turn context
     recent_history = fetch_chat_history(user_id, limit=6)
 
+    coach_style = context.get("coach_style", "strategic")
+    style_directives = {
+        "strategic": "Tone & Style: Strategic, direct, analytical, data-driven, precise.",
+        "empathetic": "Tone & Style: Empathetic, supportive, encouraging, understanding, emotionally intelligent.",
+        "relentless": "Tone & Style: Relentless, high-intensity, non-negotiable execution, demanding peak performance, zero excuses."
+    }
+    tone_directive = style_directives.get(str(coach_style).lower(), style_directives["strategic"])
+
     # 4. Construct System Instructions & Multi-Turn Contents Payload
     system_instruction = (
         f"You are AI Coach, an elite, highly intelligent, disciplined personal growth and engineering mentor for {user_name}.\n"
@@ -217,7 +231,7 @@ async def generate_coaching_response(user_message: str) -> Dict[str, Any]:
         f"2. When the user asks about their tasks, missions, goals, habits, or progress, use the EXACT data provided above. List them by name. Never invent data.\n"
         f"3. If the user asks a general knowledge or technical question, answer it clearly without forcing personal data mentions.\n"
         f"4. Always finish your sentences completely. Never stop mid-sentence.\n"
-        f"5. Tone: Concise, inspiring, structured, disciplined, and practical."
+        f"5. {tone_directive}"
     )
 
     contents = []

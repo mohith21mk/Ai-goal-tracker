@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { searchApplication } from '../services/api';
+import { searchApplication, getSettings } from '../services/api';
 import './TopBar.css';
 
 const TopBar = ({ user }) => {
@@ -8,10 +8,25 @@ const TopBar = ({ user }) => {
   const [searchResults, setSearchResults] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [settings, setSettings] = useState(null);
   const searchInputRef = useRef(null);
   const navigate = useNavigate();
 
   const displayName = user?.full_name || user?.email ? `${user.full_name || user.email}` : 'Mohith';
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadTopBarSettings() {
+      try {
+        const s = await getSettings();
+        if (isMounted && s) setSettings(s);
+      } catch (err) {
+        console.warn('TopBar settings sync warning:', err);
+      }
+    }
+    loadTopBarSettings();
+    return () => { isMounted = false; };
+  }, []);
 
   // Debounced search logic (250ms)
   useEffect(() => {
@@ -66,6 +81,13 @@ const TopBar = ({ user }) => {
     setIsDropdownOpen(false);
     setSearchValue('');
     navigate(route);
+  };
+
+  const handleThemeToggleQuick = () => {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
   };
 
   return (
@@ -205,6 +227,42 @@ const TopBar = ({ user }) => {
 
       {/* Right User & AI Status Area */}
       <div className="topbar-actions">
+        {/* Quick Theme Switch Button */}
+        <button
+          onClick={handleThemeToggleQuick}
+          title="Toggle Theme"
+          style={{
+            padding: '6px 10px',
+            background: 'rgba(10, 22, 40, 0.6)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: '9999px',
+            color: 'var(--text-primary)',
+            fontSize: '12px',
+            cursor: 'pointer'
+          }}
+        >
+          🌓 Theme
+        </button>
+
+        {/* Active Notification Protocol Indicator */}
+        {settings?.notifications_enabled && (
+          <div style={{
+            fontSize: '11px',
+            fontWeight: '600',
+            color: 'var(--cyan)',
+            padding: '4px 10px',
+            background: 'rgba(56, 189, 248, 0.1)',
+            border: '1px solid rgba(56, 189, 248, 0.25)',
+            borderRadius: '9999px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            <span>🔔</span>
+            <span>{settings.daily_reminder_time || '08:00'} Protocol</span>
+          </div>
+        )}
+
         {/* AI Coach Online Pill */}
         <div className="ai-status-pill">
           <span className="pulsing-dot" />
