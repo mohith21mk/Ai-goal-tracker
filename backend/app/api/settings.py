@@ -1,11 +1,10 @@
 import re
 from typing import Any, Dict, Optional
-
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, validator
 
-from ..services.habits import get_demo_user_id
 from ..services.settings import get_or_create_user_settings, update_user_settings
+from .auth import get_current_user
 
 router = APIRouter()
 
@@ -44,14 +43,17 @@ class SettingsUpdateRequest(BaseModel):
 
 
 @router.get("", response_model=Dict[str, Any])
-async def get_settings() -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def get_settings(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    user_id = current_user["id"]
     return get_or_create_user_settings(user_id)
 
 
 @router.patch("", response_model=Dict[str, Any])
-async def patch_settings(payload: SettingsUpdateRequest) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def patch_settings(
+    payload: SettingsUpdateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     updates = payload.dict(exclude_unset=True)
 
     if not updates:

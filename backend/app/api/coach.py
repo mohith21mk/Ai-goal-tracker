@@ -1,13 +1,13 @@
 from typing import Any, Dict
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from ..services.ai_coach import (
-    generate_coaching_response,
-    fetch_chat_history,
     delete_chat_history,
-    get_db_context,
+    fetch_chat_history,
+    generate_coaching_response,
 )
+from .auth import get_current_user
 
 router = APIRouter()
 
@@ -17,10 +17,14 @@ class ChatRequest(BaseModel):
 
 
 @router.get("/history", response_model=Dict[str, Any])
-async def get_history(limit: int = Query(default=50, ge=1, le=100)) -> Dict[str, Any]:
+async def get_history(
+    limit: int = Query(default=50, ge=1, le=100),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
     try:
-        context = get_db_context()
-        user_id = context["user_id"]
+        if not isinstance(limit, int):
+            limit = int(getattr(limit, "default", 50))
+        user_id = current_user["id"]
         messages = fetch_chat_history(user_id=user_id, limit=limit)
         return {"messages": messages, "count": len(messages)}
     except Exception as err:
@@ -28,10 +32,9 @@ async def get_history(limit: int = Query(default=50, ge=1, le=100)) -> Dict[str,
 
 
 @router.delete("/history", response_model=Dict[str, Any])
-async def clear_history() -> Dict[str, Any]:
+async def clear_history(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     try:
-        context = get_db_context()
-        user_id = context["user_id"]
+        user_id = current_user["id"]
         deleted_count = delete_chat_history(user_id=user_id)
         return {"message": "Chat history cleared successfully", "deleted_count": deleted_count}
     except Exception as err:
@@ -39,12 +42,16 @@ async def clear_history() -> Dict[str, Any]:
 
 
 @router.post("/chat", response_model=Dict[str, Any])
-async def chat_with_coach(payload: ChatRequest) -> Dict[str, Any]:
+async def chat_with_coach(
+    payload: ChatRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
     if not payload.message or not payload.message.strip():
         raise HTTPException(status_code=400, detail="Message prompt cannot be empty")
 
+    user_id = current_user["id"]
     try:
-        response_data = await generate_coaching_response(payload.message.strip())
+        response_data = await generate_coaching_response(payload.message.strip(), user_id)
         return response_data
     except RuntimeError as err:
         raise HTTPException(status_code=500, detail=str(err))

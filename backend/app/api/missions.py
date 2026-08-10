@@ -1,9 +1,9 @@
 from typing import Any, Dict, List, Optional
-
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..database import get_connection
+from .auth import get_current_user
 
 router = APIRouter()
 
@@ -24,25 +24,31 @@ def format_mission_row(row: Any) -> Dict[str, Any]:
 
 
 @router.get("", response_model=List[Dict[str, Any]])
-async def list_missions() -> List[Dict[str, Any]]:
+async def list_missions(current_user: Dict[str, Any] = Depends(get_current_user)) -> List[Dict[str, Any]]:
+    user_id = current_user["id"]
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM missions ORDER BY id ASC")
+    cursor.execute("SELECT * FROM missions WHERE user_id = ? ORDER BY id ASC", (user_id,))
     rows = cursor.fetchall()
     conn.close()
     return [format_mission_row(row) for row in rows]
 
 
 @router.post("", response_model=Dict[str, Any])
-async def create_mission(mission_in: MissionCreateRequest) -> Dict[str, Any]:
+async def create_mission(
+    mission_in: MissionCreateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO missions (title, description, category, time, difficulty, xp_reward, completed)
-        VALUES (?, ?, ?, ?, ?, ?, 0)
+        INSERT INTO missions (user_id, title, description, category, time, difficulty, xp_reward, completed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
         """,
         (
+            user_id,
             mission_in.title,
             mission_in.description,
             mission_in.category or "general",
@@ -60,10 +66,14 @@ async def create_mission(mission_in: MissionCreateRequest) -> Dict[str, Any]:
 
 
 @router.patch("/{mission_id}/toggle", response_model=Dict[str, Any])
-async def toggle_mission(mission_id: int) -> Dict[str, Any]:
+async def toggle_mission(
+    mission_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM missions WHERE id = ?", (mission_id,))
+    cursor.execute("SELECT * FROM missions WHERE id = ? AND user_id = ?", (mission_id, user_id))
     row = cursor.fetchone()
 
     if not row:
@@ -73,13 +83,13 @@ async def toggle_mission(mission_id: int) -> Dict[str, Any]:
     new_completed = 0 if row["completed"] else 1
     if new_completed == 1:
         cursor.execute(
-            "UPDATE missions SET completed = 1, completed_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (mission_id,),
+            "UPDATE missions SET completed = 1, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
+            (mission_id, user_id),
         )
     else:
         cursor.execute(
-            "UPDATE missions SET completed = 0, completed_at = NULL WHERE id = ?",
-            (mission_id,),
+            "UPDATE missions SET completed = 0, completed_at = NULL WHERE id = ? AND user_id = ?",
+            (mission_id, user_id),
         )
     conn.commit()
 

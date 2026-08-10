@@ -1,19 +1,22 @@
-from typing import Any, Dict, List
-from fastapi import APIRouter, Query
+from typing import Any, Dict
+from fastapi import APIRouter, Depends, Query
 
 from ..database import get_connection
-from ..services.habits import get_demo_user_id
+from .auth import get_current_user
 
 router = APIRouter()
 
 
 @router.get("", response_model=Dict[str, Any])
-async def search_application(q: str = Query(default="", min_length=1)) -> Dict[str, Any]:
+async def search_application(
+    q: str = Query(default="", min_length=1),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
     query_str = q.strip()
     if not query_str:
         return {"habits": [], "goals": [], "missions": [], "milestones": [], "journal": [], "count": 0}
 
-    user_id = get_demo_user_id()
+    user_id = current_user["id"]
     pattern = f"%{query_str}%"
 
     conn = get_connection()
@@ -48,7 +51,7 @@ async def search_application(q: str = Query(default="", min_length=1)) -> Dict[s
         """
         SELECT id, title, description, category, completed
         FROM missions
-        WHERE (user_id = ? OR user_id IS NULL) AND (title LIKE ? OR description LIKE ?)
+        WHERE user_id = ? AND (title LIKE ? OR description LIKE ?)
         LIMIT 10
         """,
         (user_id, pattern, pattern),

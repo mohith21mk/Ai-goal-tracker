@@ -1,17 +1,17 @@
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..services.habits import (
-    get_demo_user_id,
-    get_user_habits,
-    get_habit_by_id,
     create_habit,
-    update_habit,
     delete_habit,
-    toggle_habit_log,
     get_aggregate_habit_stats,
+    get_habit_by_id,
+    get_user_habits,
+    toggle_habit_log,
+    update_habit,
 )
+from .auth import get_current_user
 
 router = APIRouter()
 
@@ -38,20 +38,23 @@ class ToggleRequest(BaseModel):
 
 
 @router.get("", response_model=List[Dict[str, Any]])
-async def list_habits() -> List[Dict[str, Any]]:
-    user_id = get_demo_user_id()
+async def list_habits(current_user: Dict[str, Any] = Depends(get_current_user)) -> List[Dict[str, Any]]:
+    user_id = current_user["id"]
     return get_user_habits(user_id)
 
 
 @router.get("/stats", response_model=Dict[str, Any])
-async def get_stats() -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def get_stats(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    user_id = current_user["id"]
     return get_aggregate_habit_stats(user_id)
 
 
 @router.post("", response_model=Dict[str, Any])
-async def create_new_habit(payload: HabitCreate) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def create_new_habit(
+    payload: HabitCreate,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     try:
         new_habit = create_habit(user_id, payload.model_dump())
         return new_habit
@@ -60,8 +63,11 @@ async def create_new_habit(payload: HabitCreate) -> Dict[str, Any]:
 
 
 @router.get("/{habit_id}", response_model=Dict[str, Any])
-async def get_single_habit(habit_id: int) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def get_single_habit(
+    habit_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     habit = get_habit_by_id(habit_id, user_id)
     if not habit:
         raise HTTPException(status_code=404, detail=f"Habit {habit_id} not found.")
@@ -69,8 +75,12 @@ async def get_single_habit(habit_id: int) -> Dict[str, Any]:
 
 
 @router.patch("/{habit_id}", response_model=Dict[str, Any])
-async def update_existing_habit(habit_id: int, payload: HabitUpdate) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def update_existing_habit(
+    habit_id: int,
+    payload: HabitUpdate,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     updated = update_habit(habit_id, user_id, payload.model_dump(exclude_unset=True))
     if not updated:
         raise HTTPException(status_code=404, detail=f"Habit {habit_id} not found.")
@@ -78,8 +88,11 @@ async def update_existing_habit(habit_id: int, payload: HabitUpdate) -> Dict[str
 
 
 @router.delete("/{habit_id}", response_model=Dict[str, str])
-async def remove_habit(habit_id: int) -> Dict[str, str]:
-    user_id = get_demo_user_id()
+async def remove_habit(
+    habit_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, str]:
+    user_id = current_user["id"]
     deleted = delete_habit(habit_id, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Habit {habit_id} not found.")
@@ -87,8 +100,12 @@ async def remove_habit(habit_id: int) -> Dict[str, str]:
 
 
 @router.post("/{habit_id}/toggle", response_model=Dict[str, Any])
-async def toggle_habit_completion(habit_id: int, payload: ToggleRequest) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def toggle_habit_completion(
+    habit_id: int,
+    payload: ToggleRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     try:
         result = toggle_habit_log(habit_id, user_id, payload.date)
         return result

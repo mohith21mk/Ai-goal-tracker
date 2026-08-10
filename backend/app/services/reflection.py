@@ -8,25 +8,24 @@ from .habits import get_aggregate_habit_stats, get_demo_user_id
 from .journal import compute_journal_stats
 
 
-def generate_daily_reflection() -> Dict[str, Any]:
+def generate_daily_reflection(user_id: int) -> Dict[str, Any]:
     conn = get_connection()
     cursor = conn.cursor()
-    demo_user_id = get_demo_user_id()
 
     # 1. Gather Missions Data
-    cursor.execute("SELECT COUNT(*) FROM missions")
+    cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ?", (user_id,))
     total_missions = cursor.fetchone()[0] or 0
 
-    cursor.execute("SELECT COUNT(*) FROM missions WHERE completed = 1")
+    cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ? AND completed = 1", (user_id,))
     completed_missions = cursor.fetchone()[0] or 0
 
     pending_missions = max(0, total_missions - completed_missions)
     mission_pct = round((completed_missions / total_missions) * 100) if total_missions > 0 else 0
 
     # 2. XP Earned
-    cursor.execute("SELECT SUM(xp_reward) FROM missions WHERE completed = 1")
+    cursor.execute("SELECT SUM(xp_reward) FROM missions WHERE user_id = ? AND completed = 1", (user_id,))
     xp_row = cursor.fetchone()[0]
-    xp_earned = int(xp_row) if xp_row is not None else 35
+    xp_earned = int(xp_row) if xp_row is not None else 0
 
     # 3. Mission Streak
     cursor.execute(
@@ -56,12 +55,12 @@ def generate_daily_reflection() -> Dict[str, Any]:
                     break
 
     # 4. Habits Data
-    habit_stats = get_aggregate_habit_stats(demo_user_id)
+    habit_stats = get_aggregate_habit_stats(user_id)
     completed_habits_today = habit_stats.get("today_completed_count", 0)
     current_habit_streak = habit_stats.get("longest_active_streak", 0)
 
     # 5. Blueprint Data
-    blueprint_telemetry = get_blueprint_telemetry(demo_user_id)
+    blueprint_telemetry = get_blueprint_telemetry(user_id)
     active_blueprint = blueprint_telemetry.get("active_blueprint")
     blueprint_phase = "Phase 1: Foundation"
     blueprint_progress = 0

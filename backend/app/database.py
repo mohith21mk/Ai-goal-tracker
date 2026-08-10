@@ -21,24 +21,134 @@ def init_db() -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
             full_name TEXT NOT NULL,
+            username TEXT UNIQUE,
+            password_hash TEXT,
+            is_active INTEGER DEFAULT 1,
+            mkc_id TEXT UNIQUE,
+            avatar_initials TEXT,
+            bio TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
 
+    # Safely migrate existing database schema if columns are missing
+    cursor.execute("PRAGMA table_info(users)")
+    existing_cols = [r["name"] for r in cursor.fetchall()]
+    if "mkc_id" not in existing_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN mkc_id TEXT")
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_mkc_id ON users(mkc_id)")
+    if "avatar_initials" not in existing_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN avatar_initials TEXT")
+    if "bio" not in existing_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN bio TEXT")
+    if "username" not in existing_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN username TEXT")
+    if "password_hash" not in existing_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+    if "is_active" not in existing_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1")
+    conn.commit()
+
+    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_lower ON users(LOWER(username))")
+    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON users(LOWER(email))")
+    conn.commit()
+
+    # 1.5 Create app_sessions table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS app_sessions (
+            token TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+        """
+    )
+    conn.commit()
+
     # Seed demo user if users table is empty
     cursor.execute("SELECT id FROM users WHERE email = ?", ("demo@masterykeycoach.com",))
     user_row = cursor.fetchone()
+
+    # Import hash helper for demo user migration
+    from .services.auth import hash_password
+
     if not user_row:
+        default_pwd_hash = hash_password("Password123!")
         cursor.execute(
-            "INSERT INTO users (email, full_name) VALUES (?, ?)",
-            ("demo@masterykeycoach.com", "Mohith"),
+            "INSERT INTO users (email, full_name, username, password_hash, avatar_initials) VALUES (?, ?, ?, ?, ?)",
+            ("demo@masterykeycoach.com", "Mohith", "mohith_ai", default_pwd_hash, "MK"),
         )
         conn.commit()
         cursor.execute("SELECT id FROM users WHERE email = ?", ("demo@masterykeycoach.com",))
         user_row = cursor.fetchone()
+    else:
+        # Migrate existing demo user if username or password_hash is missing
+        cursor.execute("SELECT username, password_hash FROM users WHERE email = ?", ("demo@masterykeycoach.com",))
+        demo_cols = cursor.fetchone()
+        if demo_cols:
+            if not demo_cols["username"]:
+                cursor.execute("UPDATE users SET username = 'mohith_ai' WHERE email = ?", ("demo@masterykeycoach.com",))
+            if not demo_cols["password_hash"]:
+                cursor.execute("UPDATE users SET password_hash = ? WHERE email = ?", (hash_password("Password123!"), "demo@masterykeycoach.com"))
+            conn.commit()
 
     demo_user_id = user_row["id"]
+
+    # Populate persistent unique MKC ID and initials for users if empty
+    cursor.execute("SELECT id, email, full_name, created_at, mkc_id, avatar_initials, bio FROM users")
+    all_users = cursor.fetchall()
+    import random
+    import string
+
+    for u in all_users:
+        u_id = u["id"]
+        u_mkc_id = u["mkc_id"]
+        u_initials = u["avatar_initials"]
+        u_name = u["full_name"] or "User"
+
+        updates = []
+        params = []
+
+        if not u_mkc_id:
+            created_str = str(u["created_at"] or "")
+            year = "2026"
+            if len(created_str) >= 4 and created_str[:4].isdigit():
+                year = created_str[:4]
+
+            while True:
+                rnd_hex = "".join(random.choices(string.hexdigits.upper()[:16], k=6))
+                candidate_id = f"MKC-{year}-{rnd_hex}"
+                cursor.execute("SELECT id FROM users WHERE mkc_id = ?", (candidate_id,))
+                if not cursor.fetchone():
+                    u_mkc_id = candidate_id
+                    break
+
+            updates.append("mkc_id = ?")
+            params.append(u_mkc_id)
+
+        if not u_initials:
+            parts = u_name.strip().split()
+            if len(parts) >= 2:
+                derived_initials = (parts[0][0] + parts[-1][0]).upper()
+            elif len(parts) == 1:
+                derived_initials = parts[0][:2].upper()
+            else:
+                derived_initials = "MK"
+            updates.append("avatar_initials = ?")
+            params.append(derived_initials)
+
+        if u["bio"] is None:
+            updates.append("bio = ?")
+            params.append("AI Engineering & Full-Stack Systems Mastery")
+
+        if updates:
+            params.append(u_id)
+            cursor.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", params)
+
+    conn.commit()
 
     # 2. Create goals table
     cursor.execute(

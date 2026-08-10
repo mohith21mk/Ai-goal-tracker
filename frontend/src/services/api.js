@@ -1,15 +1,95 @@
 const API_BASE_URL = 'http://localhost:8000';
 
+async function apiFetch(endpoint, options = {}) {
+  const defaultHeaders = options.body ? { 'Content-Type': 'application/json' } : {};
+  const config = {
+    credentials: 'include',
+    ...options,
+    headers: {
+      ...defaultHeaders,
+      ...options.headers,
+    },
+  };
+  return fetch(`${API_BASE_URL}${endpoint}`, config);
+}
+
+// -------------------------------------------------------------------
+// AUTHENTICATION APIs
+// -------------------------------------------------------------------
+
+export async function checkUsernameAvailability(username) {
+  const response = await apiFetch(`/api/auth/check-username?username=${encodeURIComponent(username)}`);
+  if (!response.ok) {
+    return { available: false, username, reason: 'Failed to validate username' };
+  }
+  return response.json();
+}
+
+export async function registerUser(data) {
+  const response = await apiFetch('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || 'Registration failed.');
+  }
+  return response.json();
+}
+
+export async function loginUser(data) {
+  const response = await apiFetch('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || 'Invalid username/email or password.');
+  }
+  return response.json();
+}
+
+export async function logoutUser() {
+  const response = await apiFetch('/api/auth/logout', {
+    method: 'POST',
+  });
+  return response.json();
+}
+
+export async function getCurrentUser() {
+  const response = await apiFetch('/api/auth/me');
+  if (!response.ok) {
+    return null;
+  }
+  return response.json();
+}
+
+// -------------------------------------------------------------------
+// USER & TELEMETRY APIs
+// -------------------------------------------------------------------
+
 export async function getUser() {
-  const response = await fetch(`${API_BASE_URL}/api/users`);
+  const response = await apiFetch('/api/users');
   if (!response.ok) {
     throw new Error(`Failed to fetch user profile: ${response.statusText}`);
   }
   return response.json();
 }
 
+export async function updateUser(data) {
+  const response = await apiFetch('/api/users', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to update user profile: ${response.statusText}`);
+  }
+  return response.json();
+}
+
 export async function getMissions() {
-  const response = await fetch(`${API_BASE_URL}/api/missions`);
+  const response = await apiFetch('/api/missions');
   if (!response.ok) {
     throw new Error(`Failed to fetch missions: ${response.statusText}`);
   }
@@ -17,11 +97,8 @@ export async function getMissions() {
 }
 
 export async function createMission(data) {
-  const response = await fetch(`${API_BASE_URL}/api/missions`, {
+  const response = await apiFetch('/api/missions', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
@@ -31,7 +108,7 @@ export async function createMission(data) {
 }
 
 export async function toggleMission(id) {
-  const response = await fetch(`${API_BASE_URL}/api/missions/${id}/toggle`, {
+  const response = await apiFetch(`/api/missions/${id}/toggle`, {
     method: 'PATCH',
   });
   if (!response.ok) {
@@ -41,7 +118,7 @@ export async function toggleMission(id) {
 }
 
 export async function getProgress() {
-  const response = await fetch(`${API_BASE_URL}/api/progress`);
+  const response = await apiFetch('/api/progress');
   if (!response.ok) {
     throw new Error(`Failed to fetch progress telemetry: ${response.statusText}`);
   }
@@ -49,7 +126,7 @@ export async function getProgress() {
 }
 
 export async function getTelemetry() {
-  const response = await fetch(`${API_BASE_URL}/api/telemetry`);
+  const response = await apiFetch('/api/telemetry');
   if (!response.ok) {
     throw new Error(`Failed to fetch dashboard telemetry: ${response.statusText}`);
   }
@@ -57,7 +134,7 @@ export async function getTelemetry() {
 }
 
 export async function getGoals() {
-  const response = await fetch(`${API_BASE_URL}/api/goals`);
+  const response = await apiFetch('/api/goals');
   if (!response.ok) {
     throw new Error(`Failed to fetch goals: ${response.statusText}`);
   }
@@ -65,11 +142,8 @@ export async function getGoals() {
 }
 
 export async function createGoal(data) {
-  const response = await fetch(`${API_BASE_URL}/api/goals`, {
+  const response = await apiFetch('/api/goals', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
@@ -78,20 +152,9 @@ export async function createGoal(data) {
   return response.json();
 }
 
-export async function getGoal(id) {
-  const response = await fetch(`${API_BASE_URL}/api/goals/${id}`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch goal: ${response.statusText}`);
-  }
-  return response.json();
-}
-
 export async function updateGoal(id, data) {
-  const response = await fetch(`${API_BASE_URL}/api/goals/${id}`, {
+  const response = await apiFetch(`/api/goals/${id}`, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
@@ -101,7 +164,7 @@ export async function updateGoal(id, data) {
 }
 
 export async function deleteGoal(id) {
-  const response = await fetch(`${API_BASE_URL}/api/goals/${id}`, {
+  const response = await apiFetch(`/api/goals/${id}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
@@ -110,30 +173,30 @@ export async function deleteGoal(id) {
   return response.json();
 }
 
-export async function sendCoachMessage(prompt) {
-  const response = await fetch(`${API_BASE_URL}/api/coach/chat`, {
+export async function sendAICoachMessage(message) {
+  const response = await apiFetch('/api/coach/chat', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ message: prompt }),
+    body: JSON.stringify({ message }),
   });
   if (!response.ok) {
-    throw new Error(`Failed to get coaching response: ${response.statusText}`);
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `AI Coach error: ${response.statusText}`);
   }
   return response.json();
 }
+export const sendCoachMessage = sendAICoachMessage;
 
-export async function getCoachHistory(limit = 50) {
-  const response = await fetch(`${API_BASE_URL}/api/coach/history?limit=${limit}`);
+export async function getAICoachHistory() {
+  const response = await apiFetch('/api/coach/history');
   if (!response.ok) {
     throw new Error(`Failed to fetch chat history: ${response.statusText}`);
   }
   return response.json();
 }
+export const getCoachHistory = getAICoachHistory;
 
-export async function clearCoachHistory() {
-  const response = await fetch(`${API_BASE_URL}/api/coach/history`, {
+export async function clearAICoachHistory() {
+  const response = await apiFetch('/api/coach/history', {
     method: 'DELETE',
   });
   if (!response.ok) {
@@ -141,9 +204,10 @@ export async function clearCoachHistory() {
   }
   return response.json();
 }
+export const clearCoachHistory = clearAICoachHistory;
 
 export async function getHabits() {
-  const response = await fetch(`${API_BASE_URL}/api/habits`);
+  const response = await apiFetch('/api/habits');
   if (!response.ok) {
     throw new Error(`Failed to fetch habits: ${response.statusText}`);
   }
@@ -151,7 +215,7 @@ export async function getHabits() {
 }
 
 export async function getHabitStats() {
-  const response = await fetch(`${API_BASE_URL}/api/habits/stats`);
+  const response = await apiFetch('/api/habits/stats');
   if (!response.ok) {
     throw new Error(`Failed to fetch habit stats: ${response.statusText}`);
   }
@@ -159,11 +223,8 @@ export async function getHabitStats() {
 }
 
 export async function createHabit(data) {
-  const response = await fetch(`${API_BASE_URL}/api/habits`, {
+  const response = await apiFetch('/api/habits', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
@@ -174,21 +235,19 @@ export async function createHabit(data) {
 }
 
 export async function updateHabit(id, data) {
-  const response = await fetch(`${API_BASE_URL}/api/habits/${id}`, {
+  const response = await apiFetch(`/api/habits/${id}`, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error(`Failed to update habit: ${response.statusText}`);
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to update habit: ${response.statusText}`);
   }
   return response.json();
 }
 
 export async function deleteHabit(id) {
-  const response = await fetch(`${API_BASE_URL}/api/habits/${id}`, {
+  const response = await apiFetch(`/api/habits/${id}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
@@ -198,11 +257,8 @@ export async function deleteHabit(id) {
 }
 
 export async function toggleHabit(id, dateStr) {
-  const response = await fetch(`${API_BASE_URL}/api/habits/${id}/toggle`, {
+  const response = await apiFetch(`/api/habits/${id}/toggle`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify({ date: dateStr }),
   });
   if (!response.ok) {
@@ -213,30 +269,15 @@ export async function toggleHabit(id, dateStr) {
 }
 
 export async function getTodayJournal() {
-  const response = await fetch(`${API_BASE_URL}/api/journal/today`);
+  const response = await apiFetch('/api/journal/today');
   if (!response.ok) {
-    throw new Error(`Failed to fetch today's journal: ${response.statusText}`);
-  }
-  return response.json();
-}
-
-export async function saveJournalEntry(data) {
-  const response = await fetch(`${API_BASE_URL}/api/journal`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.detail || `Failed to save journal entry: ${response.statusText}`);
+    throw new Error(`Failed to fetch today journal: ${response.statusText}`);
   }
   return response.json();
 }
 
 export async function getJournalHistory(limit = 30) {
-  const response = await fetch(`${API_BASE_URL}/api/journal/history?limit=${limit}`);
+  const response = await apiFetch(`/api/journal/history?limit=${limit}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch journal history: ${response.statusText}`);
   }
@@ -244,26 +285,40 @@ export async function getJournalHistory(limit = 30) {
 }
 
 export async function getJournalStats() {
-  const response = await fetch(`${API_BASE_URL}/api/journal/stats`);
+  const response = await apiFetch('/api/journal/stats');
   if (!response.ok) {
     throw new Error(`Failed to fetch journal stats: ${response.statusText}`);
   }
   return response.json();
 }
 
-export async function analyzeJournalEntry(id) {
-  const response = await fetch(`${API_BASE_URL}/api/journal/${id}/analyze`, {
+export async function saveJournal(data) {
+  const response = await apiFetch('/api/journal', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to save journal: ${response.statusText}`);
+  }
+  return response.json();
+}
+export const saveJournalEntry = saveJournal;
+
+export async function analyzeJournal(entryId) {
+  const response = await apiFetch(`/api/journal/${entryId}/analyze`, {
     method: 'POST',
   });
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.detail || `Failed to analyze journal entry: ${response.statusText}`);
+    throw new Error(errBody.detail || `Failed to analyze journal: ${response.statusText}`);
   }
   return response.json();
 }
+export const analyzeJournalEntry = analyzeJournal;
 
-export async function deleteJournalEntry(id) {
-  const response = await fetch(`${API_BASE_URL}/api/journal/${id}`, {
+export async function deleteJournal(entryId) {
+  const response = await apiFetch(`/api/journal/${entryId}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
@@ -271,37 +326,35 @@ export async function deleteJournalEntry(id) {
   }
   return response.json();
 }
-
-export async function getBlueprints() {
-  const response = await fetch(`${API_BASE_URL}/api/blueprints`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch blueprints: ${response.statusText}`);
-  }
-  return response.json();
-}
+export const deleteJournalEntry = deleteJournal;
 
 export async function getActiveBlueprint() {
-  const response = await fetch(`${API_BASE_URL}/api/blueprints/active`);
+  const response = await apiFetch('/api/blueprints/active');
   if (!response.ok) {
     throw new Error(`Failed to fetch active blueprint: ${response.statusText}`);
   }
   return response.json();
 }
 
-export async function getBlueprint(id) {
-  const response = await fetch(`${API_BASE_URL}/api/blueprints/${id}`);
+export async function getAllBlueprints() {
+  const response = await apiFetch('/api/blueprints');
   if (!response.ok) {
-    throw new Error(`Failed to fetch blueprint details: ${response.statusText}`);
+    throw new Error(`Failed to fetch blueprints: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getBlueprintById(id) {
+  const response = await apiFetch(`/api/blueprints/${id}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch blueprint ${id}: ${response.statusText}`);
   }
   return response.json();
 }
 
 export async function createBlueprint(data) {
-  const response = await fetch(`${API_BASE_URL}/api/blueprints`, {
+  const response = await apiFetch('/api/blueprints', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
@@ -312,70 +365,64 @@ export async function createBlueprint(data) {
 }
 
 export async function updateBlueprint(id, data) {
-  const response = await fetch(`${API_BASE_URL}/api/blueprints/${id}`, {
+  const response = await apiFetch(`/api/blueprints/${id}`, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error(`Failed to update blueprint: ${response.statusText}`);
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to update blueprint: ${response.statusText}`);
   }
   return response.json();
 }
 
 export async function activateBlueprint(id) {
-  const response = await fetch(`${API_BASE_URL}/api/blueprints/${id}/activate`, {
+  const response = await apiFetch(`/api/blueprints/${id}/activate`, {
     method: 'POST',
   });
   if (!response.ok) {
-    throw new Error(`Failed to activate blueprint: ${response.statusText}`);
+    throw new Error(`Failed to activate blueprint ${id}: ${response.statusText}`);
   }
   return response.json();
 }
 
 export async function deleteBlueprint(id) {
-  const response = await fetch(`${API_BASE_URL}/api/blueprints/${id}`, {
+  const response = await apiFetch(`/api/blueprints/${id}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
-    throw new Error(`Failed to delete blueprint: ${response.statusText}`);
+    throw new Error(`Failed to delete blueprint ${id}: ${response.statusText}`);
   }
   return response.json();
 }
 
-export async function createBlueprintPhase(blueprintId, data) {
-  const response = await fetch(`${API_BASE_URL}/api/blueprints/${blueprintId}/phases`, {
+export async function createPhase(blueprintId, data) {
+  const response = await apiFetch(`/api/blueprints/${blueprintId}/phases`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.detail || `Failed to create phase: ${response.statusText}`);
+    throw new Error(errBody.detail || `Failed to add phase: ${response.statusText}`);
   }
   return response.json();
 }
+export const createBlueprintPhase = createPhase;
 
-export async function updateBlueprintPhase(phaseId, data) {
-  const response = await fetch(`${API_BASE_URL}/api/blueprints/phases/${phaseId}`, {
+export async function updatePhase(phaseId, data) {
+  const response = await apiFetch(`/api/blueprints/phases/${phaseId}`, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error(`Failed to update phase: ${response.statusText}`);
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to update phase: ${response.statusText}`);
   }
   return response.json();
 }
 
-export async function deleteBlueprintPhase(phaseId) {
-  const response = await fetch(`${API_BASE_URL}/api/blueprints/phases/${phaseId}`, {
+export async function deletePhase(phaseId) {
+  const response = await apiFetch(`/api/blueprints/phases/${phaseId}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
@@ -383,24 +430,23 @@ export async function deleteBlueprintPhase(phaseId) {
   }
   return response.json();
 }
+export const deleteBlueprintPhase = deletePhase;
 
-export async function createBlueprintMilestone(phaseId, data) {
-  const response = await fetch(`${API_BASE_URL}/api/blueprints/phases/${phaseId}/milestones`, {
+export async function createMilestone(phaseId, data) {
+  const response = await apiFetch(`/api/blueprints/phases/${phaseId}/milestones`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.detail || `Failed to create milestone: ${response.statusText}`);
+    throw new Error(errBody.detail || `Failed to add milestone: ${response.statusText}`);
   }
   return response.json();
 }
+export const createBlueprintMilestone = createMilestone;
 
-export async function toggleBlueprintMilestone(milestoneId) {
-  const response = await fetch(`${API_BASE_URL}/api/blueprints/milestones/${milestoneId}/toggle`, {
+export async function toggleMilestone(milestoneId) {
+  const response = await apiFetch(`/api/blueprints/milestones/${milestoneId}/toggle`, {
     method: 'POST',
   });
   if (!response.ok) {
@@ -408,9 +454,10 @@ export async function toggleBlueprintMilestone(milestoneId) {
   }
   return response.json();
 }
+export const toggleBlueprintMilestone = toggleMilestone;
 
-export async function deleteBlueprintMilestone(milestoneId) {
-  const response = await fetch(`${API_BASE_URL}/api/blueprints/milestones/${milestoneId}`, {
+export async function deleteMilestone(milestoneId) {
+  const response = await apiFetch(`/api/blueprints/milestones/${milestoneId}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
@@ -418,18 +465,18 @@ export async function deleteBlueprintMilestone(milestoneId) {
   }
   return response.json();
 }
+export const deleteBlueprintMilestone = deleteMilestone;
 
 export async function searchApplication(query) {
-  const encoded = encodeURIComponent(query);
-  const response = await fetch(`${API_BASE_URL}/api/search?q=${encoded}`);
+  const response = await apiFetch(`/api/search?q=${encodeURIComponent(query)}`);
   if (!response.ok) {
-    throw new Error(`Failed to execute search: ${response.statusText}`);
+    throw new Error(`Search failed: ${response.statusText}`);
   }
   return response.json();
 }
 
 export async function getSettings() {
-  const response = await fetch(`${API_BASE_URL}/api/settings`);
+  const response = await apiFetch('/api/settings');
   if (!response.ok) {
     throw new Error(`Failed to fetch settings: ${response.statusText}`);
   }
@@ -437,11 +484,8 @@ export async function getSettings() {
 }
 
 export async function updateSettings(data) {
-  const response = await fetch(`${API_BASE_URL}/api/settings`, {
+  const response = await apiFetch('/api/settings', {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
@@ -451,9 +495,8 @@ export async function updateSettings(data) {
   return response.json();
 }
 
-export async function getCommunityPosts(category) {
-  const url = category ? `${API_BASE_URL}/api/community/posts?category=${encodeURIComponent(category)}` : `${API_BASE_URL}/api/community/posts`;
-  const response = await fetch(url);
+export async function getCommunityPosts(category = 'all') {
+  const response = await apiFetch(`/api/community/posts?category=${category}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch community posts: ${response.statusText}`);
   }
@@ -461,32 +504,30 @@ export async function getCommunityPosts(category) {
 }
 
 export async function createCommunityPost(data) {
-  const response = await fetch(`${API_BASE_URL}/api/community/posts`, {
+  const response = await apiFetch('/api/community/posts', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.detail || `Failed to create community post: ${response.statusText}`);
+    throw new Error(errBody.detail || `Failed to create post: ${response.statusText}`);
   }
   return response.json();
 }
 
 export async function deleteCommunityPost(id) {
-  const response = await fetch(`${API_BASE_URL}/api/community/posts/${id}`, {
+  const response = await apiFetch(`/api/community/posts/${id}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
-    throw new Error(`Failed to delete community post: ${response.statusText}`);
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to delete post: ${response.statusText}`);
   }
   return response.json();
 }
 
 export async function toggleCommunityLike(id) {
-  const response = await fetch(`${API_BASE_URL}/api/community/posts/${id}/like`, {
+  const response = await apiFetch(`/api/community/posts/${id}/like`, {
     method: 'POST',
   });
   if (!response.ok) {
@@ -496,7 +537,7 @@ export async function toggleCommunityLike(id) {
 }
 
 export async function getCommunityComments(id) {
-  const response = await fetch(`${API_BASE_URL}/api/community/posts/${id}/comments`);
+  const response = await apiFetch(`/api/community/posts/${id}/comments`);
   if (!response.ok) {
     throw new Error(`Failed to fetch post comments: ${response.statusText}`);
   }
@@ -504,11 +545,8 @@ export async function getCommunityComments(id) {
 }
 
 export async function createCommunityComment(id, data) {
-  const response = await fetch(`${API_BASE_URL}/api/community/posts/${id}/comments`, {
+  const response = await apiFetch(`/api/community/posts/${id}/comments`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
@@ -519,7 +557,7 @@ export async function createCommunityComment(id, data) {
 }
 
 export async function getDailyReflection() {
-  const response = await fetch(`${API_BASE_URL}/api/reflection/daily`);
+  const response = await apiFetch('/api/reflection/daily');
   if (!response.ok) {
     throw new Error(`Failed to fetch daily reflection: ${response.statusText}`);
   }

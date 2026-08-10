@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Optional
-
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, validator
 
 from ..database import get_connection
@@ -12,7 +11,7 @@ from ..services.community import (
     list_community_posts,
     toggle_community_like,
 )
-from ..services.habits import get_demo_user_id
+from .auth import get_current_user
 
 router = APIRouter()
 
@@ -51,25 +50,35 @@ class CommentCreateRequest(BaseModel):
         return s
 
 
-def get_demo_author_name(user_id: int) -> str:
+def get_author_display_name(user_id: int) -> str:
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT full_name FROM users WHERE id = ?", (user_id,))
+    cursor.execute("SELECT full_name, username FROM users WHERE id = ?", (user_id,))
     row = cursor.fetchone()
     conn.close()
-    return row["full_name"] if row else "Mohith"
+    if row:
+        return row["full_name"] or f"@{row['username']}"
+    return "Member"
 
 
 @router.get("/posts", response_model=List[Dict[str, Any]])
-async def get_posts(category: Optional[str] = Query(default=None)) -> List[Dict[str, Any]]:
-    user_id = get_demo_user_id()
+async def get_posts(
+    category: Optional[str] = Query(default=None),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> List[Dict[str, Any]]:
+    if not isinstance(category, str) and category is not None:
+        category = getattr(category, "default", None)
+    user_id = current_user["id"]
     return list_community_posts(user_id=user_id, category=category)
 
 
 @router.post("/posts", response_model=Dict[str, Any])
-async def create_post(payload: PostCreateRequest) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
-    author_name = get_demo_author_name(user_id)
+async def create_post(
+    payload: PostCreateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
+    author_name = get_author_display_name(user_id)
     return create_community_post(
         user_id=user_id,
         author_name=author_name,
@@ -79,8 +88,11 @@ async def create_post(payload: PostCreateRequest) -> Dict[str, Any]:
 
 
 @router.delete("/posts/{post_id}", response_model=Dict[str, Any])
-async def delete_post(post_id: int) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def delete_post(
+    post_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     try:
         success = delete_community_post(user_id=user_id, post_id=post_id)
         if not success:
@@ -93,8 +105,11 @@ async def delete_post(post_id: int) -> Dict[str, Any]:
 
 
 @router.post("/posts/{post_id}/like", response_model=Dict[str, Any])
-async def toggle_like(post_id: int) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def toggle_like(
+    post_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     try:
         return toggle_community_like(user_id=user_id, post_id=post_id)
     except ValueError as err:
@@ -104,7 +119,10 @@ async def toggle_like(post_id: int) -> Dict[str, Any]:
 
 
 @router.get("/posts/{post_id}/comments", response_model=List[Dict[str, Any]])
-async def get_comments(post_id: int) -> List[Dict[str, Any]]:
+async def get_comments(
+    post_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> List[Dict[str, Any]]:
     try:
         return list_community_comments(post_id=post_id)
     except ValueError as err:
@@ -112,9 +130,13 @@ async def get_comments(post_id: int) -> List[Dict[str, Any]]:
 
 
 @router.post("/posts/{post_id}/comments", response_model=Dict[str, Any])
-async def add_comment(post_id: int, payload: CommentCreateRequest) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
-    author_name = get_demo_author_name(user_id)
+async def add_comment(
+    post_id: int,
+    payload: CommentCreateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
+    author_name = get_author_display_name(user_id)
     try:
         return create_community_comment(
             user_id=user_id,

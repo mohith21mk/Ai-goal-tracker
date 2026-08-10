@@ -1,5 +1,5 @@
 from typing import Any, Dict, Optional
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from ..services.blueprints import (
@@ -17,7 +17,7 @@ from ..services.blueprints import (
     update_blueprint,
     update_phase,
 )
-from ..services.habits import get_demo_user_id
+from .auth import get_current_user
 
 router = APIRouter()
 
@@ -58,25 +58,28 @@ class MilestoneCreateSchema(BaseModel):
 
 
 @router.get("", response_model=Dict[str, Any])
-async def get_all_blueprints() -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def get_all_blueprints(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    user_id = current_user["id"]
     blueprints = list_blueprints(user_id)
     return {"blueprints": blueprints, "count": len(blueprints)}
 
 
 @router.get("/active", response_model=Dict[str, Any])
-async def get_active_blueprint_endpoint() -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def get_active_blueprint_endpoint(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    user_id = current_user["id"]
     bp = get_active_blueprint(user_id)
     return {"blueprint": bp}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_new_blueprint(payload: BlueprintCreateSchema) -> Dict[str, Any]:
+async def create_new_blueprint(
+    payload: BlueprintCreateSchema,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
     if not payload.title.strip():
         raise HTTPException(status_code=400, detail="Blueprint title is required.")
 
-    user_id = get_demo_user_id()
+    user_id = current_user["id"]
     bp = create_blueprint(
         user_id=user_id,
         title=payload.title,
@@ -89,8 +92,11 @@ async def create_new_blueprint(payload: BlueprintCreateSchema) -> Dict[str, Any]
 
 
 @router.get("/{blueprint_id}")
-async def get_blueprint_by_id(blueprint_id: int) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def get_blueprint_by_id(
+    blueprint_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     bp = get_blueprint(user_id, blueprint_id)
     if not bp:
         raise HTTPException(status_code=404, detail="Blueprint not found.")
@@ -98,8 +104,12 @@ async def get_blueprint_by_id(blueprint_id: int) -> Dict[str, Any]:
 
 
 @router.patch("/{blueprint_id}")
-async def update_blueprint_endpoint(blueprint_id: int, payload: BlueprintUpdateSchema) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def update_blueprint_endpoint(
+    blueprint_id: int,
+    payload: BlueprintUpdateSchema,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     bp = update_blueprint(
         user_id=user_id,
         blueprint_id=blueprint_id,
@@ -115,8 +125,11 @@ async def update_blueprint_endpoint(blueprint_id: int, payload: BlueprintUpdateS
 
 
 @router.post("/{blueprint_id}/activate")
-async def activate_blueprint_endpoint(blueprint_id: int) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def activate_blueprint_endpoint(
+    blueprint_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     bp = activate_blueprint(user_id, blueprint_id)
     if not bp:
         raise HTTPException(status_code=404, detail="Blueprint not found.")
@@ -124,8 +137,11 @@ async def activate_blueprint_endpoint(blueprint_id: int) -> Dict[str, Any]:
 
 
 @router.delete("/{blueprint_id}")
-async def delete_blueprint_endpoint(blueprint_id: int) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def delete_blueprint_endpoint(
+    blueprint_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     success = delete_blueprint(user_id, blueprint_id)
     if not success:
         raise HTTPException(status_code=404, detail="Blueprint not found.")
@@ -137,11 +153,15 @@ async def delete_blueprint_endpoint(blueprint_id: int) -> Dict[str, Any]:
 # -------------------------------------------------------------------
 
 @router.post("/{blueprint_id}/phases", status_code=status.HTTP_201_CREATED)
-async def create_phase_endpoint(blueprint_id: int, payload: PhaseCreateSchema) -> Dict[str, Any]:
+async def create_phase_endpoint(
+    blueprint_id: int,
+    payload: PhaseCreateSchema,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
     if not payload.title.strip():
         raise HTTPException(status_code=400, detail="Phase title is required.")
 
-    user_id = get_demo_user_id()
+    user_id = current_user["id"]
     bp = create_phase(
         user_id=user_id,
         blueprint_id=blueprint_id,
@@ -156,8 +176,12 @@ async def create_phase_endpoint(blueprint_id: int, payload: PhaseCreateSchema) -
 
 
 @router.patch("/phases/{phase_id}")
-async def update_phase_endpoint(phase_id: int, payload: PhaseUpdateSchema) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def update_phase_endpoint(
+    phase_id: int,
+    payload: PhaseUpdateSchema,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     bp = update_phase(
         user_id=user_id,
         phase_id=phase_id,
@@ -171,8 +195,11 @@ async def update_phase_endpoint(phase_id: int, payload: PhaseUpdateSchema) -> Di
 
 
 @router.delete("/phases/{phase_id}")
-async def delete_phase_endpoint(phase_id: int) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def delete_phase_endpoint(
+    phase_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     success = delete_phase(user_id, phase_id)
     if not success:
         raise HTTPException(status_code=404, detail="Phase not found.")
@@ -184,11 +211,15 @@ async def delete_phase_endpoint(phase_id: int) -> Dict[str, Any]:
 # -------------------------------------------------------------------
 
 @router.post("/phases/{phase_id}/milestones", status_code=status.HTTP_201_CREATED)
-async def create_milestone_endpoint(phase_id: int, payload: MilestoneCreateSchema) -> Dict[str, Any]:
+async def create_milestone_endpoint(
+    phase_id: int,
+    payload: MilestoneCreateSchema,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
     if not payload.title.strip():
         raise HTTPException(status_code=400, detail="Milestone title is required.")
 
-    user_id = get_demo_user_id()
+    user_id = current_user["id"]
     bp = create_milestone(
         user_id=user_id,
         phase_id=phase_id,
@@ -202,8 +233,11 @@ async def create_milestone_endpoint(phase_id: int, payload: MilestoneCreateSchem
 
 
 @router.post("/milestones/{milestone_id}/toggle")
-async def toggle_milestone_endpoint(milestone_id: int) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def toggle_milestone_endpoint(
+    milestone_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     bp = toggle_milestone(user_id, milestone_id)
     if not bp:
         raise HTTPException(status_code=404, detail="Milestone not found.")
@@ -211,8 +245,11 @@ async def toggle_milestone_endpoint(milestone_id: int) -> Dict[str, Any]:
 
 
 @router.delete("/milestones/{milestone_id}")
-async def delete_milestone_endpoint(milestone_id: int) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def delete_milestone_endpoint(
+    milestone_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     success = delete_milestone(user_id, milestone_id)
     if not success:
         raise HTTPException(status_code=404, detail="Milestone not found.")

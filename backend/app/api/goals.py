@@ -1,9 +1,9 @@
 from typing import Any, Dict, List, Optional
-
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..database import get_connection
+from .auth import get_current_user
 
 router = APIRouter()
 
@@ -23,19 +23,11 @@ class GoalUpdateRequest(BaseModel):
     target_date: Optional[str] = None
 
 
-def get_demo_user_id(cursor: Any) -> int:
-    cursor.execute("SELECT id FROM users WHERE email = ?", ("demo@masterykeycoach.com",))
-    row = cursor.fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail="Demo user not found")
-    return row["id"]
-
-
 @router.get("", response_model=List[Dict[str, Any]])
-async def list_goals() -> List[Dict[str, Any]]:
+async def list_goals(current_user: Dict[str, Any] = Depends(get_current_user)) -> List[Dict[str, Any]]:
+    user_id = current_user["id"]
     conn = get_connection()
     cursor = conn.cursor()
-    user_id = get_demo_user_id(cursor)
     cursor.execute("SELECT * FROM goals WHERE user_id = ? ORDER BY id ASC", (user_id,))
     rows = cursor.fetchall()
     conn.close()
@@ -43,10 +35,13 @@ async def list_goals() -> List[Dict[str, Any]]:
 
 
 @router.post("", response_model=Dict[str, Any])
-async def create_goal(goal_in: GoalCreateRequest) -> Dict[str, Any]:
+async def create_goal(
+    goal_in: GoalCreateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     conn = get_connection()
     cursor = conn.cursor()
-    user_id = get_demo_user_id(cursor)
 
     cursor.execute(
         """
@@ -71,10 +66,14 @@ async def create_goal(goal_in: GoalCreateRequest) -> Dict[str, Any]:
 
 
 @router.get("/{goal_id}", response_model=Dict[str, Any])
-async def get_goal(goal_id: int) -> Dict[str, Any]:
+async def get_goal(
+    goal_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM goals WHERE id = ?", (goal_id,))
+    cursor.execute("SELECT * FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
     row = cursor.fetchone()
     conn.close()
 
@@ -85,10 +84,15 @@ async def get_goal(goal_id: int) -> Dict[str, Any]:
 
 
 @router.patch("/{goal_id}", response_model=Dict[str, Any])
-async def update_goal(goal_id: int, goal_in: GoalUpdateRequest) -> Dict[str, Any]:
+async def update_goal(
+    goal_id: int,
+    goal_in: GoalUpdateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM goals WHERE id = ?", (goal_id,))
+    cursor.execute("SELECT * FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
     row = cursor.fetchone()
 
     if not row:
@@ -106,9 +110,9 @@ async def update_goal(goal_id: int, goal_in: GoalUpdateRequest) -> Dict[str, Any
         """
         UPDATE goals
         SET title = ?, description = ?, category = ?, status = ?, target_date = ?
-        WHERE id = ?
+        WHERE id = ? AND user_id = ?
         """,
-        (updated_title, updated_desc, updated_cat, updated_status, updated_date, goal_id),
+        (updated_title, updated_desc, updated_cat, updated_status, updated_date, goal_id, user_id),
     )
     conn.commit()
 
@@ -119,10 +123,14 @@ async def update_goal(goal_id: int, goal_in: GoalUpdateRequest) -> Dict[str, Any
 
 
 @router.delete("/{goal_id}")
-async def delete_goal(goal_id: int) -> Dict[str, Any]:
+async def delete_goal(
+    goal_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM goals WHERE id = ?", (goal_id,))
+    cursor.execute("SELECT * FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
     row = cursor.fetchone()
 
     if not row:
@@ -130,8 +138,8 @@ async def delete_goal(goal_id: int) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"Goal with ID {goal_id} not found")
 
     # Decouple missions from goal before deletion
-    cursor.execute("UPDATE missions SET goal_id = NULL WHERE goal_id = ?", (goal_id,))
-    cursor.execute("DELETE FROM goals WHERE id = ?", (goal_id,))
+    cursor.execute("UPDATE missions SET goal_id = NULL WHERE goal_id = ? AND user_id = ?", (goal_id, user_id))
+    cursor.execute("DELETE FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
     conn.commit()
     conn.close()
 

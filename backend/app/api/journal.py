@@ -1,18 +1,18 @@
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 
 from ..services.journal import (
-    get_demo_user_id,
-    get_today_journal_entry,
-    get_journal_entry_by_id,
-    upsert_journal_entry,
-    get_journal_history,
-    delete_journal_entry,
     compute_journal_stats,
+    delete_journal_entry,
     generate_journal_ai_analysis,
+    get_journal_entry_by_id,
+    get_journal_history,
+    get_today_journal_entry,
+    upsert_journal_entry,
 )
+from .auth import get_current_user
 
 router = APIRouter()
 
@@ -59,36 +59,41 @@ class JournalUpsertRequest(BaseModel):
 
 
 @router.get("/today", response_model=Dict[str, Any])
-async def fetch_today_entry() -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def fetch_today_entry(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    user_id = current_user["id"]
     entry = get_today_journal_entry(user_id)
     return {"entry": entry}
 
 
 @router.get("/history", response_model=Dict[str, Any])
-async def fetch_history(limit: int = 30) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def fetch_history(
+    limit: int = 30,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     safe_limit = max(1, min(100, limit))
     entries = get_journal_history(user_id, safe_limit)
     return {"entries": entries, "count": len(entries)}
 
 
 @router.get("/stats", response_model=Dict[str, Any])
-async def fetch_stats() -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def fetch_stats(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    user_id = current_user["id"]
     return compute_journal_stats(user_id)
 
 
 @router.post("", response_model=Dict[str, Any])
-async def save_journal_reflection(payload: JournalUpsertRequest) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def save_journal_reflection(
+    payload: JournalUpsertRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     try:
         data = payload.model_dump()
         should_analyze = data.pop("analyze", False)
 
         saved_entry = upsert_journal_entry(user_id, data)
 
-        # Generate AI analysis ONLY when explicitly requested (analyze = True)
         if should_analyze:
             try:
                 analysis_res = await generate_journal_ai_analysis(saved_entry["id"], user_id)
@@ -104,8 +109,11 @@ async def save_journal_reflection(payload: JournalUpsertRequest) -> Dict[str, An
 
 
 @router.post("/{entry_id}/analyze", response_model=Dict[str, Any])
-async def analyze_entry(entry_id: int) -> Dict[str, Any]:
-    user_id = get_demo_user_id()
+async def analyze_entry(
+    entry_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
     try:
         result = await generate_journal_ai_analysis(entry_id, user_id)
         return result
@@ -116,8 +124,11 @@ async def analyze_entry(entry_id: int) -> Dict[str, Any]:
 
 
 @router.delete("/{entry_id}", response_model=Dict[str, str])
-async def remove_entry(entry_id: int) -> Dict[str, str]:
-    user_id = get_demo_user_id()
+async def remove_entry(
+    entry_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, str]:
+    user_id = current_user["id"]
     deleted = delete_journal_entry(entry_id, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Journal entry {entry_id} not found.")

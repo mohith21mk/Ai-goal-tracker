@@ -18,23 +18,22 @@ def get_db_connection() -> sqlite3.Connection:
     return conn
 
 
-def get_db_context() -> Dict[str, Any]:
+def get_db_context(user_id: int) -> Dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Fetch demo user ID and name
-    cursor.execute("SELECT id, full_name FROM users WHERE email = ?", ("demo@masterykeycoach.com",))
+    # Fetch user details
+    cursor.execute("SELECT id, full_name, username FROM users WHERE id = ?", (user_id,))
     user_row = cursor.fetchone()
-    user_id = user_row["id"] if user_row else 1
-    user_name = user_row["full_name"] if user_row else "Mohith"
+    user_name = (user_row["full_name"] if user_row and user_row["full_name"] else f"@{user_row['username']}") if user_row else "Member"
 
-    # Fetch active goals
-    cursor.execute("SELECT title, category FROM goals WHERE status = 'active' LIMIT 5")
+    # Fetch active goals for this user
+    cursor.execute("SELECT title, category FROM goals WHERE user_id = ? AND status = 'active' LIMIT 5", (user_id,))
     goal_rows = cursor.fetchall()
     goals = [dict(r) for r in goal_rows]
 
-    # Fetch fast mission summary
-    cursor.execute("SELECT COUNT(*), SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) FROM missions")
+    # Fetch fast mission summary for this user
+    cursor.execute("SELECT COUNT(*), SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) FROM missions WHERE user_id = ?", (user_id,))
     m_row = cursor.fetchone()
     total_missions = m_row[0] if m_row else 0
     completed_missions = m_row[1] if m_row and m_row[1] else 0
@@ -148,9 +147,9 @@ def _call_gemini_rest_api(gemini_url: str, payload: dict) -> Dict[str, Any]:
         return json.loads(resp_bytes.decode("utf-8"))
 
 
-async def generate_coaching_response(user_message: str) -> Dict[str, Any]:
+async def generate_coaching_response(user_message: str, user_id: int) -> Dict[str, Any]:
     # 1. Gather fast lightweight context in single DB call
-    context = get_db_context()
+    context = get_db_context(user_id)
     user_id = context["user_id"]
     user_name = context["user_name"]
     goals = context["goals"]

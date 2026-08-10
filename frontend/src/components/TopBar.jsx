@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { searchApplication, getSettings } from '../services/api';
+import { searchApplication, getSettings, getUser } from '../services/api';
 import './TopBar.css';
 
 const TopBar = ({ user }) => {
@@ -9,24 +9,33 @@ const TopBar = ({ user }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [settings, setSettings] = useState(null);
+  const [userProfile, setUserProfile] = useState(user || null);
   const searchInputRef = useRef(null);
   const navigate = useNavigate();
 
-  const displayName = user?.full_name || user?.email ? `${user.full_name || user.email}` : 'Mohith';
-
   useEffect(() => {
     let isMounted = true;
-    async function loadTopBarSettings() {
+    async function loadTopBarData() {
       try {
-        const s = await getSettings();
-        if (isMounted && s) setSettings(s);
+        const [s, u] = await Promise.all([
+          getSettings().catch(() => null),
+          getUser().catch(() => null),
+        ]);
+        if (isMounted) {
+          if (s) setSettings(s);
+          if (u) setUserProfile(u);
+        }
       } catch (err) {
         console.warn('TopBar settings sync warning:', err);
       }
     }
-    loadTopBarSettings();
+    loadTopBarData();
     return () => { isMounted = false; };
   }, []);
+
+  const displayName = userProfile?.full_name || user?.full_name || 'Mohith K';
+  const usernameDisplay = userProfile?.username ? `@${userProfile.username}` : (user?.username ? `@${user.username}` : '@mohith_ai');
+  const avatarInitials = userProfile?.avatar_initials || 'MK';
 
   // Debounced search logic (250ms)
   useEffect(() => {
@@ -270,18 +279,18 @@ const TopBar = ({ user }) => {
         </div>
 
         {/* User Profile & Badge */}
-        <div className="user-profile-wrapper glass-panel">
+        <div
+          onClick={() => navigate('/profile')}
+          className="user-profile-wrapper glass-panel"
+          style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+          title="View & Edit Identity Profile"
+        >
           <div className="user-level-badge">
             <span className="badge-star">⚡</span>
-            <span className="badge-text">{displayName} | Level 8 Champion</span>
+            <span className="badge-text">{displayName} • {usernameDisplay}</span>
           </div>
-          <div className="avatar-wrapper">
-            <svg width="32" height="32" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="18" cy="18" r="17" fill="#071426" stroke="#38BDF8" strokeWidth="1.5"/>
-              <circle cx="18" cy="13" r="6" fill="#38BDF8" fillOpacity="0.8"/>
-              <path d="M7 30C7 24.4772 11.4772 20 17 20H19C24.5228 20 29 24.4772 29 30V32H7V30Z" fill="#3B82F6" fillOpacity="0.6"/>
-            </svg>
-            <span className="avatar-online-dot" />
+          <div className="avatar-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.15)', border: '1px solid var(--cyan)', color: 'var(--cyan)', fontWeight: '700', fontSize: '12px' }}>
+            {avatarInitials}
           </div>
         </div>
       </div>
