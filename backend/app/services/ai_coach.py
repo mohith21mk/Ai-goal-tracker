@@ -29,7 +29,7 @@ def get_db_context() -> Dict[str, Any]:
     user_name = user_row["full_name"] if user_row else "Mohith"
 
     # Fetch active goals
-    cursor.execute("SELECT title, category FROM goals WHERE status = 'active' LIMIT 2")
+    cursor.execute("SELECT title, category FROM goals WHERE status = 'active' LIMIT 5")
     goal_rows = cursor.fetchall()
     goals = [dict(r) for r in goal_rows]
 
@@ -47,6 +47,44 @@ def get_db_context() -> Dict[str, Any]:
         "total_missions": total_missions,
         "completed_missions": completed_missions,
     }
+
+
+def get_detailed_context(user_id: int) -> Dict[str, Any]:
+    """Fetch richer app data for data-aware questions (missions, habits, goals)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # All missions with status
+    cursor.execute("SELECT title, completed FROM missions ORDER BY id ASC")
+    missions = [dict(r) for r in cursor.fetchall()]
+
+    # Active goals with details
+    cursor.execute("SELECT title, category, status FROM goals ORDER BY id ASC LIMIT 10")
+    goals = [dict(r) for r in cursor.fetchall()]
+
+    # Habits with status
+    cursor.execute("SELECT title, frequency, status FROM habits ORDER BY id ASC LIMIT 10")
+    habits = [dict(r) for r in cursor.fetchall()]
+
+    conn.close()
+    return {
+        "missions": missions,
+        "goals": goals,
+        "habits": habits,
+    }
+
+
+def _needs_app_data(message: str) -> bool:
+    """Lightweight intent detection: does the question reference personal app data?"""
+    lower = message.lower()
+    data_keywords = [
+        "task", "mission", "goal", "habit", "streak", "progress",
+        "remaining", "pending", "incomplete", "completed", "done",
+        "today", "focus", "priority", "what should i",
+        "how many", "how much", "list my", "show my", "what are my",
+        "what are they", "what is my", "tell me my",
+    ]
+    return any(kw in lower for kw in data_keywords)
 
 
 def save_chat_message(user_id: int, sender: str, content: str) -> int:
@@ -99,7 +137,7 @@ def _call_gemini_rest_api(gemini_url: str, payload: dict) -> Dict[str, Any]:
         headers={"Content-Type": "application/json"},
         method="POST"
     )
-    with urllib.request.urlopen(req, timeout=6.0) as response:
+    with urllib.request.urlopen(req, timeout=25.0) as response:
         resp_bytes = response.read()
         return json.loads(resp_bytes.decode("utf-8"))
 
@@ -141,19 +179,45 @@ async def generate_coaching_response(user_message: str) -> Dict[str, Any]:
             "note": "Add GEMINI_API_KEY to backend/.env for live LLM response."
         }
 
-    # 2. Fetch last 6 turns of conversation history for multi-turn context
+    # 2. Build richer context if the question references app data
+    detailed_context_block = ""
+    if _needs_app_data(user_message):
+        detailed = get_detailed_context(user_id)
+        # Format missions
+        if detailed["missions"]:
+            pending = [m["title"] for m in detailed["missions"] if not m["completed"]]
+            done = [m["title"] for m in detailed["missions"] if m["completed"]]
+            detailed_context_block += f"\n\nUSER'S CURRENT MISSIONS ({len(pending)} pending, {len(done)} completed):\n"
+            for i, t in enumerate(pending, 1):
+                detailed_context_block += f"  {i}. [PENDING] {t}\n"
+            for i, t in enumerate(done, len(pending) + 1):
+                detailed_context_block += f"  {i}. [DONE] {t}\n"
+        # Format goals
+        if detailed["goals"]:
+            detailed_context_block += f"\nUSER'S GOALS:\n"
+            for g in detailed["goals"]:
+                detailed_context_block += f"  - {g['title']} ({g['category']}, {g['status']})\n"
+        # Format habits
+        if detailed["habits"]:
+            detailed_context_block += f"\nUSER'S HABITS:\n"
+            for h in detailed["habits"]:
+                detailed_context_block += f"  - {h['title']} ({h['frequency']}, status: {h['status']})\n"
+
+    # 3. Fetch last 6 turns of conversation history for multi-turn context
     recent_history = fetch_chat_history(user_id, limit=6)
 
-    # 3. Construct System Instructions & Multi-Turn Contents Payload
+    # 4. Construct System Instructions & Multi-Turn Contents Payload
     system_instruction = (
         f"You are AI Coach, an elite, highly intelligent, disciplined personal growth and engineering mentor for {user_name}.\n"
         f"User Active Goals: {goals_text}\n"
-        f"Today's Protocol Progress: {completed_missions}/{total_missions} completed.\n\n"
+        f"Today's Protocol Progress: {completed_missions}/{total_missions} completed.\n"
+        f"{detailed_context_block}\n"
         f"GROUNDING INSTRUCTIONS:\n"
-        f"1. Answer the user's explicit question FIRST, directly, accurately, and concisely (2-4 sentences).\n"
-        f"2. Use personal mastery context ONLY when directly relevant to the user's prompt.\n"
-        f"3. If the user asks a general knowledge or technical question, answer it clearly without forcing telemetry mentions.\n"
-        f"4. Tone: Concise, inspiring, structured, disciplined, and practical."
+        f"1. Answer the user's explicit question FIRST, directly, accurately, and completely.\n"
+        f"2. When the user asks about their tasks, missions, goals, habits, or progress, use the EXACT data provided above. List them by name. Never invent data.\n"
+        f"3. If the user asks a general knowledge or technical question, answer it clearly without forcing personal data mentions.\n"
+        f"4. Always finish your sentences completely. Never stop mid-sentence.\n"
+        f"5. Tone: Concise, inspiring, structured, disciplined, and practical."
     )
 
     contents = []
@@ -164,36 +228,41 @@ async def generate_coaching_response(user_message: str) -> Dict[str, Any]:
     })
     contents.append({
         "role": "model",
-        "parts": [{"text": f"Understood. I am ready to coach {user_name} with direct, accurate, and disciplined guidance."}]
+        "parts": [{"text": f"Understood. I am ready to coach {user_name} with direct, accurate, and disciplined guidance using your real data."}]
     })
 
-    # Add historical multi-turn messages
+    # Add historical multi-turn messages — use ID-based dedup, not content matching
+    current_msg_ids = set()
     for msg in recent_history:
         role = "user" if msg["sender"] == "user" else "model"
-        # Skip the prompt we just inserted if already in history
-        if msg["content"] == user_message and role == "user":
+        msg_id = msg.get("id")
+        if msg_id in current_msg_ids:
             continue
+        current_msg_ids.add(msg_id)
         contents.append({
             "role": role,
             "parts": [{"text": msg["content"]}]
         })
 
-    # Append current user prompt
-    contents.append({
-        "role": "user",
-        "parts": [{"text": user_message}]
-    })
+    # Append current user prompt (the one we just saved is in history,
+    # but we add it explicitly to ensure it's the final turn)
+    # Check if the last content entry is already this exact user message
+    if not contents or contents[-1].get("role") != "user" or contents[-1]["parts"][0]["text"] != user_message:
+        contents.append({
+            "role": "user",
+            "parts": [{"text": user_message}]
+        })
 
     payload = {
         "contents": contents,
         "generationConfig": {
             "temperature": 0.5,
-            "maxOutputTokens": 250
+            "maxOutputTokens": 2048
         }
     }
 
     # Fast model selection
-    candidate_models = ["gemini-flash-latest", "gemini-2.0-flash"]
+    candidate_models = ["gemini-2.0-flash", "gemini-flash-latest"]
     reply_text = None
     used_model = None
     last_error = None
@@ -203,12 +272,39 @@ async def generate_coaching_response(user_message: str) -> Dict[str, Any]:
         try:
             data = await asyncio.to_thread(_call_gemini_rest_api, gemini_url, payload)
             candidates = data.get("candidates", [])
-            if candidates and "content" in candidates[0]:
-                parts = candidates[0]["content"].get("parts", [])
-                if parts and "text" in parts[0]:
-                    reply_text = parts[0]["text"].strip()
-                    used_model = model_name
-                    break
+            if not candidates:
+                last_error = "No candidates returned by model"
+                continue
+
+            candidate = candidates[0]
+            finish_reason = candidate.get("finishReason", "")
+
+            # Extract full text from all parts
+            content_obj = candidate.get("content", {})
+            parts = content_obj.get("parts", [])
+            full_text_parts = [p["text"] for p in parts if "text" in p]
+            extracted_text = "".join(full_text_parts).strip()
+
+            if not extracted_text:
+                last_error = f"Empty response from {model_name}"
+                continue
+
+            # Handle responses that hit MAX_TOKENS — trim to last complete sentence
+            if finish_reason == "MAX_TOKENS":
+                if extracted_text and extracted_text[-1] not in ".!?)\"'":
+                    # Trim to last punctuation mark
+                    last_punct = max(
+                        extracted_text.rfind('.'),
+                        extracted_text.rfind('!'),
+                        extracted_text.rfind('?'),
+                    )
+                    if last_punct > 50:
+                        extracted_text = extracted_text[:last_punct + 1].strip()
+
+            reply_text = extracted_text
+            used_model = model_name
+            break
+
         except urllib.error.HTTPError as err:
             last_error = f"HTTP {err.code}: {err.reason}"
             if err.code in (404, 400, 429):

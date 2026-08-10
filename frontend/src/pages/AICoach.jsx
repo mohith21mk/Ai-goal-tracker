@@ -1,0 +1,222 @@
+import { useState, useEffect, useRef } from 'react';
+import Sidebar from '../components/Sidebar';
+import TopBar from '../components/TopBar';
+import { sendCoachMessage, getCoachHistory, clearCoachHistory } from '../services/api';
+import './AICoach.css';
+
+const SUGGESTIONS = [
+  '🎯 What should I focus on today?',
+  '📊 Analyze my current progress',
+  '🧠 Give me a mindset reset',
+  '⚡ How do I build consistency?',
+  '🏆 Help me set a stretch goal',
+];
+
+const AICoach = () => {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const chatEndRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const scrollToBottom = () => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Load persisted conversation history on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function loadHistory() {
+      try {
+        const data = await getCoachHistory(50);
+        if (isMounted && data && Array.isArray(data.messages) && data.messages.length > 0) {
+          setMessages(data.messages.map((m) => ({
+            sender: m.sender,
+            text: m.content,
+            time: m.created_at || null,
+          })));
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.warn('Could not load chat history:', err.message);
+          setError('Historical chat sync unavailable. Live coach is ready.');
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    loadHistory();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Auto-scroll when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, sending]);
+
+  const handleSend = async (text) => {
+    const userText = (text || input).trim();
+    if (!userText || sending) return;
+
+    setMessages((prev) => [...prev, { sender: 'user', text: userText, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+    setInput('');
+    setSending(true);
+    setError(null);
+
+    try {
+      const data = await sendCoachMessage(userText);
+      const reply = data.reply || 'Execute with discipline today.';
+      setMessages((prev) => [...prev, { sender: 'coach', text: reply, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+    } catch (err) {
+      console.error('AI Coach error:', err);
+      setError('Failed to get a response. Please try again.');
+      setMessages((prev) => [...prev, {
+        sender: 'coach',
+        text: `Focus on executing "${userText}" today with total discipline. Connection will restore shortly.`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }]);
+    } finally {
+      setSending(false);
+      inputRef.current?.focus();
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    handleSend();
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    handleSend(suggestion);
+  };
+
+  const handleClearHistory = async () => {
+    if (!window.confirm('Clear your entire coaching conversation history?')) return;
+    try {
+      await clearCoachHistory();
+      setMessages([]);
+      setError(null);
+    } catch (err) {
+      console.error('Clear history failed:', err);
+      setError('Failed to clear chat history.');
+    }
+  };
+
+  return (
+    <div className="app-shell">
+      <Sidebar />
+      <div className="main-viewport">
+        <TopBar />
+        <div className="coach-page-container">
+          {/* Header */}
+          <div className="coach-page-header">
+            <div className="coach-page-header-left">
+              <h1 className="font-serif">AI Coach</h1>
+              <p>Your elite personal growth mentor — ask anything, get disciplined guidance.</p>
+            </div>
+            <div className="coach-page-header-right">
+              <div className="coach-page-status">
+                <span className="coach-page-status-dot online" />
+                <span className="coach-page-status-text">
+                  {sending ? 'Analyzing...' : 'Online & Ready'}
+                </span>
+              </div>
+              <span className="coach-page-model-badge">Neural v4.2</span>
+              {messages.length > 0 && (
+                <button onClick={handleClearHistory} className="coach-page-clear-btn">
+                  🗑️ Clear History
+                </button>
+              )}
+            </div>
+          </div>
+
+          {error && (
+            <div className="coach-page-error">⚠️ {error}</div>
+          )}
+
+          {/* Chat Messages Area */}
+          <div className="coach-chat-area">
+            {loading ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+                Loading conversation history...
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="coach-empty-state">
+                <div className="coach-empty-icon">🤖</div>
+                <h3>Start Your Coaching Session</h3>
+                <p>Ask your AI Coach anything — from daily focus priorities and goal strategy to mindset resets and progress analysis.</p>
+              </div>
+            ) : (
+              messages.map((msg, idx) => (
+                <div key={idx} className={`coach-msg from-${msg.sender}`}>
+                  <div className="coach-msg-avatar">
+                    {msg.sender === 'coach' ? '🤖' : '👤'}
+                  </div>
+                  <div>
+                    <div className="coach-msg-bubble">{msg.text}</div>
+                    {msg.time && <div className="coach-msg-time">{msg.time}</div>}
+                  </div>
+                </div>
+              ))
+            )}
+
+            {/* Typing indicator */}
+            {sending && (
+              <div className="coach-typing-indicator">
+                <div className="coach-msg-avatar" style={{
+                  width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 16, background: 'linear-gradient(135deg, rgba(56,189,248,0.15), rgba(59,130,246,0.15))',
+                  border: '1px solid rgba(56,189,248,0.3)', flexShrink: 0
+                }}>🤖</div>
+                <div className="coach-typing-dots">
+                  <span /><span /><span />
+                </div>
+              </div>
+            )}
+
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Input Bar */}
+          <form onSubmit={handleSubmit} className="coach-input-bar">
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder="Ask your AI Coach anything..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              disabled={sending}
+              className="coach-page-input"
+            />
+            <button
+              type="submit"
+              disabled={sending || !input.trim()}
+              className="coach-page-send-btn"
+            >
+              {sending ? 'Analyzing...' : 'Send →'}
+            </button>
+          </form>
+
+          {/* Quick Suggestion Chips */}
+          <div className="coach-suggestions-bar">
+            {SUGGESTIONS.map((s) => (
+              <button
+                key={s}
+                onClick={() => handleSuggestionClick(s)}
+                disabled={sending}
+                className="coach-suggestion-chip"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AICoach;

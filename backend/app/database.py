@@ -407,4 +407,75 @@ def init_db() -> None:
         cursor.execute("UPDATE goals SET blueprint_id = ?, milestone_id = ? WHERE id = ?", (bp_id, milestones[3][0], default_goal_id))
         conn.commit()
 
+    # 13. Create user_settings table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER UNIQUE NOT NULL,
+            theme TEXT DEFAULT 'dark',
+            notifications_enabled INTEGER DEFAULT 1,
+            coach_style TEXT DEFAULT 'strategic',
+            daily_reminder_time TEXT DEFAULT '08:00',
+            profile_visibility TEXT DEFAULT 'public',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+    # 14. Create community_posts table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS community_posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            author_name TEXT NOT NULL,
+            content TEXT NOT NULL,
+            category TEXT DEFAULT 'general',
+            likes_count INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+    # 15. Create community_likes table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS community_likes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(post_id, user_id),
+            FOREIGN KEY(post_id) REFERENCES community_posts(id) ON DELETE CASCADE,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+    # 16. Create community_comments table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS community_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            author_name TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(post_id) REFERENCES community_posts(id) ON DELETE CASCADE,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+    # Indexes for Community
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_posts_created ON community_posts(created_at DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_likes_post_user ON community_likes(post_id, user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_comments_post ON community_comments(post_id, created_at ASC)")
+    conn.commit()
+
     conn.close()

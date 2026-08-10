@@ -427,3 +427,93 @@ export async function searchApplication(query) {
   }
   return response.json();
 }
+
+export async function getSettings() {
+  const response = await fetch(`${API_BASE_URL}/api/settings`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch settings: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function updateSettings(data) {
+  const response = await fetch(`${API_BASE_URL}/api/settings`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to update settings: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getCommunityPosts(category) {
+  const url = category ? `${API_BASE_URL}/api/community/posts?category=${encodeURIComponent(category)}` : `${API_BASE_URL}/api/community/posts`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch community posts: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function createCommunityPost(data) {
+  const response = await fetch(`${API_BASE_URL}/api/community/posts`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to create community post: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function deleteCommunityPost(id) {
+  const response = await fetch(`${API_BASE_URL}/api/community/posts/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete community post: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function toggleCommunityLike(id) {
+  const response = await fetch(`${API_BASE_URL}/api/community/posts/${id}/like`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to toggle post like: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getCommunityComments(id) {
+  const response = await fetch(`${API_BASE_URL}/api/community/posts/${id}/comments`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch post comments: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function createCommunityComment(id, data) {
+  const response = await fetch(`${API_BASE_URL}/api/community/posts/${id}/comments`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to add comment: ${response.statusText}`);
+  }
+  return response.json();
+}

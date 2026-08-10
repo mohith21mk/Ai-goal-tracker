@@ -22,7 +22,7 @@ const rawNavItems = [
       <circle cx="12" cy="12" r="2"/>
     </svg>
   )},
-  { id: 'coach', label: 'AI Coach', path: '#coach', icon: (
+  { id: 'coach', label: 'AI Coach', path: '/coach', icon: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2a8 8 0 0 1 8 8v4a4 4 0 0 1-4 4h-1l-2 3-2-3H9a4 4 0 0 1-4-4v-4a8 8 0 0 1 8-8z"/>
       <circle cx="9" cy="10" r="1"/>
@@ -54,13 +54,13 @@ const rawNavItems = [
       <polyline points="2 12 12 17 22 12"/>
     </svg>
   )},
-  { id: 'settings', label: 'Settings', path: '#settings', icon: (
+  { id: 'settings', label: 'Settings', path: '/settings', icon: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3"/>
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
     </svg>
   )},
-  { id: 'community', label: 'Community', path: '#community', icon: (
+  { id: 'community', label: 'Community', path: '/community', icon: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
       <circle cx="9" cy="7" r="4"/>
@@ -103,12 +103,18 @@ const Sidebar = () => {
             ? location.pathname === '/goals'
             : item.id === 'missions'
             ? location.pathname === '/missions'
+            : item.id === 'coach'
+            ? location.pathname === '/coach'
             : item.id === 'streaks'
             ? location.pathname === '/habits' || location.pathname === '/streaks'
             : item.id === 'journal'
             ? location.pathname === '/journal'
             : item.id === 'blueprint'
             ? location.pathname === '/blueprint'
+            : item.id === 'settings'
+            ? location.pathname === '/settings'
+            : item.id === 'community'
+            ? location.pathname === '/community'
             : (location.pathname === '/' || location.pathname === '/dashboard') && item.id === 'dashboard';
 
           if (item.path.startsWith('/')) {
