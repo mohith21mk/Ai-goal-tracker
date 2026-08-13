@@ -128,19 +128,26 @@ def is_email_registered(email: str) -> bool:
     return row is not None
 
 
-def create_session(user_id: int) -> str:
-    """Create session token and store in app_sessions DB table."""
+def hash_token(token: str) -> str:
+    """Compute SHA-256 hash of a token for secure database storage."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def create_session(user_id: int, user_agent: Optional[str] = None, ip_address: Optional[str] = None) -> str:
+    """Create session token and store in app_sessions DB table with device metadata."""
     token = secrets.token_urlsafe(32)
-    expires_at = datetime.utcnow() + timedelta(days=SESSION_DURATION_DAYS)
+    now_dt = datetime.utcnow()
+    expires_at = now_dt + timedelta(days=SESSION_DURATION_DAYS)
+    now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO app_sessions (token, user_id, expires_at)
-        VALUES (?, ?, ?)
+        INSERT INTO app_sessions (token, user_id, last_seen_at, user_agent, ip_address, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (token, user_id, expires_at.strftime("%Y-%m-%d %H:%M:%S")),
+        (token, user_id, now_str, user_agent, ip_address, expires_at.strftime("%Y-%m-%d %H:%M:%S")),
     )
     conn.commit()
     conn.close()
@@ -149,31 +156,42 @@ def create_session(user_id: int) -> str:
 
 
 def get_user_from_session(token: str) -> Optional[Dict[str, Any]]:
-    """Retrieve user dictionary from valid session token."""
+    """Retrieve user dictionary from valid session token and update last_seen_at."""
     if not token:
         return None
 
     conn = get_connection()
     cursor = conn.cursor()
-    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    now_dt = datetime.utcnow()
+    now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     cursor.execute(
         """
-        SELECT s.user_id, u.*
+        SELECT s.user_id, s.revoked_at, u.*
         FROM app_sessions s
         JOIN users u ON u.id = s.user_id
-        WHERE s.token = ? AND s.expires_at > ? AND (u.is_active IS NULL OR u.is_active = 1)
+        WHERE s.token = ? AND s.expires_at > ? AND s.revoked_at IS NULL AND (u.is_active IS NULL OR u.is_active = 1)
         """,
         (token, now_str),
     )
     row = cursor.fetchone()
-    conn.close()
 
     if not row:
+        conn.close()
         return None
+
+    # Update last_seen_at timestamp periodically
+    try:
+        cursor.execute("UPDATE app_sessions SET last_seen_at = ? WHERE token = ?", (now_str, token))
+        conn.commit()
+    except Exception:
+        pass
+
+    conn.close()
 
     user_dict = dict(row)
     user_dict.pop("password_hash", None)
+    user_dict.pop("revoked_at", None)
     return user_dict
 
 
@@ -186,3 +204,272 @@ def delete_session(token: str) -> None:
     cursor.execute("DELETE FROM app_sessions WHERE token = ?", (token,))
     conn.commit()
     conn.close()
+
+
+def revoke_all_sessions(user_id: int, except_token: Optional[str] = None) -> int:
+    """Revoke all active sessions for a user, optionally preserving current_token."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+    if except_token:
+        cursor.execute(
+            """
+            UPDATE app_sessions
+            SET revoked_at = ?
+            WHERE user_id = ? AND token != ? AND revoked_at IS NULL
+            """,
+            (now_str, user_id, except_token),
+        )
+    else:
+        cursor.execute(
+            """
+            UPDATE app_sessions
+            SET revoked_at = ?
+            WHERE user_id = ? AND revoked_at IS NULL
+            """,
+            (now_str, user_id),
+        )
+
+    revoked_count = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return revoked_count
+
+
+def list_user_sessions(user_id: int, current_token: Optional[str] = None) -> list:
+    """List active sessions for user with sanitized metadata."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute(
+        """
+        SELECT token, last_seen_at, created_at, user_agent, ip_address
+        FROM app_sessions
+        WHERE user_id = ? AND expires_at > ? AND revoked_at IS NULL
+        ORDER BY last_seen_at DESC
+        """,
+        (user_id, now_str),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    sessions = []
+    for r in rows:
+        token_str = r["token"]
+        # Derive device info string from user_agent
+        ua = r["user_agent"] or "Unknown Device"
+        browser_info = "Web Browser"
+        if "Chrome" in ua:
+            browser_info = "Chrome Browser"
+        elif "Firefox" in ua:
+            browser_info = "Firefox Browser"
+        elif "Safari" in ua:
+            browser_info = "Safari Browser"
+        elif "Edge" in ua:
+            browser_info = "Edge Browser"
+
+        sessions.append({
+            "id": token_str[:12],  # Short non-secret identifier for UI
+            "device": browser_info,
+            "user_agent": ua,
+            "last_active": r["last_seen_at"] or r["created_at"],
+            "created_at": r["created_at"],
+            "is_current": token_str == current_token,
+        })
+    return sessions
+
+
+def revoke_session_by_id(user_id: int, session_id: str) -> bool:
+    """Revoke specific session by matching truncated identifier."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute(
+        """
+        SELECT token FROM app_sessions
+        WHERE user_id = ? AND token LIKE ? AND revoked_at IS NULL
+        """,
+        (user_id, f"{session_id}%"),
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return False
+
+    cursor.execute("UPDATE app_sessions SET revoked_at = ? WHERE token = ?", (now_str, row["token"]))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def create_password_reset_token(user_id: int) -> str:
+    """Create secure, random, single-use reset token (15-min expiry) and invalidate prior active tokens."""
+    token = secrets.token_urlsafe(32)
+    token_h = hash_token(token)
+    now_dt = datetime.utcnow()
+    expires_at = now_dt + timedelta(minutes=15)
+    now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    # Invalidate previous unused reset tokens for this user
+    cursor.execute(
+        "UPDATE password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL",
+        (now_str, user_id),
+    )
+    # Insert new token
+    cursor.execute(
+        """
+        INSERT INTO password_resets (user_id, token_hash, expires_at)
+        VALUES (?, ?, ?)
+        """,
+        (user_id, token_h, expires_at.strftime("%Y-%m-%d %H:%M:%S")),
+    )
+    conn.commit()
+    conn.close()
+
+    return token
+
+
+def verify_and_use_reset_token(token: str, new_password: str) -> bool:
+    """Verify reset token, mark as used, update password, and revoke ALL sessions for user."""
+    if not token or not new_password:
+        return False
+
+    token_h = hash_token(token)
+    now_dt = datetime.utcnow()
+    now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT id, user_id FROM password_resets
+        WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?
+        """,
+        (token_h, now_str),
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return False
+
+    reset_id = row["id"]
+    user_id = row["user_id"]
+
+    # Mark reset token as used immediately
+    cursor.execute("UPDATE password_resets SET used_at = ? WHERE id = ?", (now_str, reset_id))
+
+    # Update user password_hash
+    new_pwd_hash = hash_password(new_password)
+    cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_pwd_hash, user_id))
+    conn.commit()
+    conn.close()
+
+    # Revoke ALL existing sessions for user so other devices must log in again
+    revoke_all_sessions(user_id)
+    return True
+
+
+def create_email_verification_token(user_id: int, email: str) -> str:
+    """Create single-use email verification token (24-hr expiry)."""
+    token = secrets.token_urlsafe(32)
+    token_h = hash_token(token)
+    now_dt = datetime.utcnow()
+    expires_at = now_dt + timedelta(hours=24)
+    now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    # Invalidate previous unused verification tokens
+    cursor.execute(
+        "UPDATE email_verifications SET used_at = ? WHERE user_id = ? AND used_at IS NULL",
+        (now_str, user_id),
+    )
+    cursor.execute(
+        """
+        INSERT INTO email_verifications (user_id, email, token_hash, expires_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        (user_id, email.strip().lower(), token_h, expires_at.strftime("%Y-%m-%d %H:%M:%S")),
+    )
+    conn.commit()
+    conn.close()
+
+    return token
+
+
+def verify_email_token(token: str) -> bool:
+    """Verify email verification token, mark as used, update user email_verified."""
+    if not token:
+        return False
+
+    token_h = hash_token(token)
+    now_dt = datetime.utcnow()
+    now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT id, user_id, email FROM email_verifications
+        WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?
+        """,
+        (token_h, now_str),
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return False
+
+    verif_id = row["id"]
+    user_id = row["user_id"]
+
+    cursor.execute("UPDATE email_verifications SET used_at = ? WHERE id = ?", (now_str, verif_id))
+    cursor.execute("UPDATE users SET email_verified = 1, verified_at = ? WHERE id = ?", (now_str, user_id))
+    conn.commit()
+    conn.close()
+
+    return True
+
+
+def delete_user_account(user_id: int) -> None:
+    """Safely delete user account and clean up all associated records and sessions."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Revoke sessions & tokens
+    cursor.execute("DELETE FROM app_sessions WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM password_resets WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM email_verifications WHERE user_id = ?", (user_id,))
+
+    # Delete user content
+    cursor.execute("DELETE FROM user_settings WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM messages WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM habit_logs WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM habits WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM journal_entries WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM missions WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM goals WHERE user_id = ?", (user_id,))
+
+    # Delete life blueprint data
+    cursor.execute("DELETE FROM blueprint_milestones WHERE blueprint_id IN (SELECT id FROM life_blueprints WHERE user_id = ?)", (user_id,))
+    cursor.execute("DELETE FROM blueprint_phases WHERE blueprint_id IN (SELECT id FROM life_blueprints WHERE user_id = ?)", (user_id,))
+    cursor.execute("DELETE FROM blueprint_areas WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM life_blueprints WHERE user_id = ?", (user_id,))
+
+    # Delete community interactions
+    cursor.execute("DELETE FROM community_comments WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM community_likes WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM community_posts WHERE user_id = ?", (user_id,))
+
+    # Delete user record
+    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+

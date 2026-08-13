@@ -1,15 +1,20 @@
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 
 from ..database import get_connection
 from ..services.community import (
     create_community_comment,
     create_community_post,
+    delete_community_comment,
+    delete_community_like,
     delete_community_post,
+    get_post_by_id,
     list_community_comments,
     list_community_posts,
     toggle_community_like,
+    update_community_comment,
+    update_community_post,
 )
 from .auth import get_current_user
 
@@ -20,7 +25,8 @@ class PostCreateRequest(BaseModel):
     content: str
     category: Optional[str] = "general"
 
-    @validator("content")
+    @field_validator("content")
+    @classmethod
     def validate_content(cls, v: str) -> str:
         s = v.strip()
         if not s:
@@ -29,7 +35,8 @@ class PostCreateRequest(BaseModel):
             raise ValueError("Post content cannot exceed 1000 characters")
         return s
 
-    @validator("category")
+    @field_validator("category")
+    @classmethod
     def validate_category(cls, v: Optional[str]) -> str:
         cat = (v or "general").lower()
         if cat not in ("general", "wins", "mindset", "questions"):
@@ -37,10 +44,39 @@ class PostCreateRequest(BaseModel):
         return cat
 
 
+class PostUpdateRequest(BaseModel):
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, v: str) -> str:
+        s = v.strip()
+        if not s:
+            raise ValueError("Post content cannot be empty")
+        if len(s) > 1000:
+            raise ValueError("Post content cannot exceed 1000 characters")
+        return s
+
+
 class CommentCreateRequest(BaseModel):
     content: str
 
-    @validator("content")
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, v: str) -> str:
+        s = v.strip()
+        if not s:
+            raise ValueError("Comment content cannot be empty")
+        if len(s) > 500:
+            raise ValueError("Comment content cannot exceed 500 characters")
+        return s
+
+
+class CommentUpdateRequest(BaseModel):
+    content: str
+
+    @field_validator("content")
+    @classmethod
     def validate_content(cls, v: str) -> str:
         s = v.strip()
         if not s:
@@ -72,6 +108,17 @@ async def get_posts(
     return list_community_posts(user_id=user_id, category=category)
 
 
+@router.get("/posts/{post_id}", response_model=Dict[str, Any])
+async def get_single_post(
+    post_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    post = get_post_by_id(post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return post
+
+
 @router.post("/posts", response_model=Dict[str, Any])
 async def create_post(
     payload: PostCreateRequest,
@@ -85,6 +132,21 @@ async def create_post(
         content=payload.content,
         category=payload.category or "general",
     )
+
+
+@router.patch("/posts/{post_id}", response_model=Dict[str, Any])
+async def update_post(
+    post_id: int,
+    payload: PostUpdateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
+    try:
+        return update_community_post(user_id=user_id, post_id=post_id, content=payload.content)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You can only edit your own posts")
+    except ValueError as err:
+        raise HTTPException(status_code=404, detail=str(err))
 
 
 @router.delete("/posts/{post_id}", response_model=Dict[str, Any])
@@ -118,6 +180,18 @@ async def toggle_like(
         raise HTTPException(status_code=500, detail=f"Failed to toggle like: {err}")
 
 
+@router.delete("/posts/{post_id}/like", response_model=Dict[str, Any])
+async def unlike_post(
+    post_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
+    try:
+        return delete_community_like(user_id=user_id, post_id=post_id)
+    except ValueError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+
+
 @router.get("/posts/{post_id}/comments", response_model=List[Dict[str, Any]])
 async def get_comments(
     post_id: int,
@@ -148,3 +222,33 @@ async def add_comment(
         raise HTTPException(status_code=404, detail=str(err))
     except Exception as err:
         raise HTTPException(status_code=500, detail=f"Failed to add comment: {err}")
+
+
+@router.patch("/comments/{comment_id}", response_model=Dict[str, Any])
+async def update_comment(
+    comment_id: int,
+    payload: CommentUpdateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
+    try:
+        return update_community_comment(user_id=user_id, comment_id=comment_id, content=payload.content)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You can only edit your own comments")
+    except ValueError as err:
+        raise HTTPException(status_code=404, detail=str(err))
+
+
+@router.delete("/comments/{comment_id}", response_model=Dict[str, Any])
+async def delete_comment(
+    comment_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
+    try:
+        success = delete_community_comment(user_id=user_id, comment_id=comment_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Comment not found")
+        return {"message": "Comment deleted successfully", "id": comment_id}
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You can only delete your own comments")

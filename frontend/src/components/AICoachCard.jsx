@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { sendCoachMessage, getCoachHistory, clearCoachHistory } from '../services/api';
+import { Trash2, AlertTriangle, ArrowRight } from 'lucide-react';
 import './AICoachCard.css';
 
 const AICoachCard = ({
-  message = "You're not just dreaming— you're building. Every step today creates a stronger tomorrow.",
+  message = "What's on your mind today? Let's take your next big goal step by step.",
   coachName = "AI Coach",
   isOnline = true
 }) => {
@@ -13,6 +14,22 @@ const AICoachCard = ({
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+
+  const messageBoxRef = useRef(null);
+  const userScrolledUpRef = useRef(false);
+
+  const handleScroll = () => {
+    if (!messageBoxRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = messageBoxRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 40;
+    userScrolledUpRef.current = !isAtBottom;
+  };
+
+  useEffect(() => {
+    if (messageBoxRef.current && !userScrolledUpRef.current) {
+      messageBoxRef.current.scrollTop = messageBoxRef.current.scrollHeight;
+    }
+  }, [chatLog, isSubmitting]);
 
   // Load persisted conversation history on mount
   useEffect(() => {
@@ -48,6 +65,7 @@ const AICoachCard = ({
     const userText = promptInput.trim();
     if (!userText || isSubmitting) return;
 
+    userScrolledUpRef.current = false;
     setChatLog((prev) => [...prev, { sender: 'user', text: userText }]);
     setPromptInput('');
     setIsSubmitting(true);
@@ -55,7 +73,7 @@ const AICoachCard = ({
 
     try {
       const responseData = await sendCoachMessage(userText);
-      const coachReply = responseData.reply || `Action locked in for "${userText}". Execute with total discipline today.`;
+      const coachReply = responseData.reply || "I'm having trouble connecting to my AI brain right now. Give me another try in a moment.";
 
       setChatLog((prev) => [
         ...prev,
@@ -68,7 +86,7 @@ const AICoachCard = ({
         ...prev,
         {
           sender: 'coach',
-          text: `Focus on executing '${userText}' today with total discipline. Database sync will reconnect shortly.`
+          text: "I'm having trouble connecting to my AI brain right now. Give me another try in a moment."
         }
       ]);
     } finally {
@@ -112,7 +130,7 @@ const AICoachCard = ({
             <span className="coach-name font-display">{coachName}</span>
             <div className="coach-status">
               <span className={`status-dot ${isOnline ? 'online' : ''}`} />
-              <span className="status-text">{isSubmitting ? 'Analyzing Prompt...' : isOnline ? 'Online & Analyzing' : 'Offline'}</span>
+              <span className="status-text">{isSubmitting ? 'Thinking...' : isOnline ? 'Online & Active' : 'Offline'}</span>
             </div>
           </div>
         </div>
@@ -134,7 +152,7 @@ const AICoachCard = ({
               onMouseOver={(e) => (e.target.style.color = '#FBBF24')}
               onMouseOut={(e) => (e.target.style.color = 'var(--text-tertiary)')}
             >
-              🗑️
+              <Trash2 size={14} strokeWidth={1.8} />
             </button>
           )}
           <span className="neural-badge">Neural v4.2</span>
@@ -143,20 +161,20 @@ const AICoachCard = ({
 
       {errorMessage && (
         <div style={{ fontSize: '11px', color: '#FBBF24', padding: '4px 12px', background: 'rgba(251, 191, 36, 0.1)', borderRadius: '6px', margin: '4px 12px 0' }}>
-          ⚠️ {errorMessage}
+          <AlertTriangle size={14} strokeWidth={1.8} style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '4px' }} /> {errorMessage}
         </div>
       )}
 
       {/* Chat / Message Display */}
-      <div className="coach-message-box">
-        {chatLog.slice(-5).map((msg, index) => (
+      <div className="coach-message-box" ref={messageBoxRef} onScroll={handleScroll}>
+        {chatLog.map((msg, index) => (
           <div key={index} className={`message-bubble ${msg.sender}`}>
             <p>{msg.text}</p>
           </div>
         ))}
         {isSubmitting && (
           <div className="message-bubble coach">
-            <p style={{ fontStyle: 'italic', opacity: 0.8 }}>Synthesizing strategic coaching advice...</p>
+            <p style={{ fontStyle: 'italic', opacity: 0.8 }}>Formulating personalized advice...</p>
           </div>
         )}
       </div>
@@ -171,8 +189,9 @@ const AICoachCard = ({
           disabled={isSubmitting}
           className="coach-input"
         />
-        <button type="submit" disabled={isSubmitting || !promptInput.trim()} className="coach-send-btn">
-          <span>{isSubmitting ? 'Analyzing...' : 'Continue Conversation →'}</span>
+        <button type="submit" disabled={isSubmitting || !promptInput.trim()} className="coach-send-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <span>{isSubmitting ? 'Thinking...' : 'Continue Conversation'}</span>
+          {!isSubmitting && <ArrowRight size={14} strokeWidth={2} aria-hidden="true" />}
         </button>
       </form>
     </div>

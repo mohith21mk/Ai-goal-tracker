@@ -2,17 +2,23 @@
   padding: 20px;
   display: flex;
   flex-direction: column;
+  height: 380px;
+  max-height: 380px;
+  min-height: 0;
+  overflow: hidden;
   border-radius: 16px;
   background: rgba(10, 22, 40, 0.7);
   border: 1px solid var(--border-subtle);
   margin-bottom: 20px;
+  box-sizing: border-box;
 }
 
 .coach-card-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .avatar-section {
@@ -75,10 +81,28 @@
 }
 
 .coach-message-box {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  padding-right: 4px;
+  scroll-behavior: smooth;
+}
+
+.coach-message-box::-webkit-scrollbar {
+  width: 4px;
+}
+.coach-message-box::-webkit-scrollbar-track {
+  background: rgba(5, 11, 22, 0.4);
+  border-radius: 4px;
+}
+.coach-message-box::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.25);
+  border-radius: 4px;
 }
 
 .message-bubble {
@@ -86,6 +110,11 @@
   border-radius: 12px;
   font-size: 13px;
   line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: pre-wrap;
 }
 
 .message-bubble.coach {
@@ -103,6 +132,7 @@
 }
 
 .coach-input-form {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;

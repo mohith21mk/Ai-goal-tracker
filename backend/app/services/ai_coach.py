@@ -4,10 +4,12 @@ import sqlite3
 import urllib.request
 import urllib.error
 import asyncio
+import time
 from typing import Dict, Any, List
 from pathlib import Path
 
 from ..config import settings
+from .logger import logger
 
 DB_PATH = Path(__file__).resolve().parent.parent / "app.db"
 
@@ -55,27 +57,63 @@ def get_db_context(user_id: int) -> Dict[str, Any]:
 
 
 def get_detailed_context(user_id: int) -> Dict[str, Any]:
-    """Fetch richer app data for data-aware questions (missions, habits, goals)."""
+    """Fetch richer app data for data-aware questions (missions, habits, goals, journal, blueprint)."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
     # All missions with status
-    cursor.execute("SELECT title, completed FROM missions ORDER BY id ASC")
+    cursor.execute("SELECT id, title, completed FROM missions WHERE user_id = ? ORDER BY id ASC", (user_id,))
     missions = [dict(r) for r in cursor.fetchall()]
 
     # Active goals with details
-    cursor.execute("SELECT title, category, status FROM goals ORDER BY id ASC LIMIT 10")
+    cursor.execute("SELECT id, title, category, status FROM goals WHERE user_id = ? AND status = 'active' ORDER BY id ASC LIMIT 10", (user_id,))
     goals = [dict(r) for r in cursor.fetchall()]
 
     # Habits with status
-    cursor.execute("SELECT title, frequency, status FROM habits ORDER BY id ASC LIMIT 10")
+    cursor.execute("SELECT id, title, frequency, status FROM habits WHERE user_id = ? AND status = 'active' ORDER BY id ASC LIMIT 10", (user_id,))
     habits = [dict(r) for r in cursor.fetchall()]
+    
+    # Recent Habit Logs (last 7 days)
+    cursor.execute(
+        """
+        SELECT habit_id, completed_date 
+        FROM habit_logs 
+        WHERE user_id = ? 
+        ORDER BY completed_date DESC LIMIT 20
+        """, (user_id,)
+    )
+    habit_logs_raw = cursor.fetchall()
+    habit_logs = {}
+    for r in habit_logs_raw:
+        hid = r["habit_id"]
+        if hid not in habit_logs:
+            habit_logs[hid] = []
+        habit_logs[hid].append(r["completed_date"])
+    
+    # Recent Journal Entries
+    cursor.execute("SELECT entry_date, mood, energy_level, wins_text, challenges_text FROM journal_entries WHERE user_id = ? ORDER BY entry_date DESC LIMIT 3", (user_id,))
+    journals = [dict(r) for r in cursor.fetchall()]
+    
+    # Active Blueprint Phases
+    cursor.execute(
+        """
+        SELECT p.title, p.description, p.phase_number, p.status 
+        FROM blueprint_phases p
+        JOIN life_blueprints b ON p.blueprint_id = b.id
+        WHERE b.user_id = ? AND b.status = 'active' AND p.status = 'active'
+        ORDER BY p.phase_number ASC LIMIT 3
+        """, (user_id,)
+    )
+    blueprints = [dict(r) for r in cursor.fetchall()]
 
     conn.close()
     return {
         "missions": missions,
         "goals": goals,
         "habits": habits,
+        "habit_logs": habit_logs,
+        "journals": journals,
+        "blueprints": blueprints,
     }
 
 
@@ -87,7 +125,9 @@ def _needs_app_data(message: str) -> bool:
         "remaining", "pending", "incomplete", "completed", "done",
         "today", "focus", "priority", "what should i",
         "how many", "how much", "list my", "show my", "what are my",
-        "what are they", "what is my", "tell me my",
+        "what are they", "what is my", "tell me my", "journal", "mood",
+        "energy", "win", "challenge", "blueprint", "phase", "plan",
+        "do next", "recommend", "action"
     ]
     return any(kw in lower for kw in data_keywords)
 
@@ -134,6 +174,52 @@ def delete_chat_history(user_id: int) -> int:
     return deleted_count
 
 
+def log_ai_activity(user_id: int, action_type: str, target_id: int, status: str, latency_ms: int) -> None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO ai_activity_logs (user_id, action_type, target_id, status, latency_ms) VALUES (?, ?, ?, ?, ?)",
+            (user_id, action_type, target_id, status, latency_ms)
+        )
+        conn.commit()
+    except Exception as e:
+        print(f"Error logging AI activity: {e}")
+    finally:
+        conn.close()
+
+
+def validate_ai_action(action: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    if not action or action.get("type") == "NONE" or not action.get("type"):
+        return None
+    
+    action_type = action.get("type")
+    target_id = action.get("target_id")
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        if action_type in ["NAVIGATE_MISSION", "START_MISSION", "MARK_MISSION_COMPLETE"]:
+            if target_id:
+                cursor.execute("SELECT id FROM missions WHERE id = ? AND user_id = ?", (target_id, user_id))
+                if not cursor.fetchone():
+                    return None
+            return action
+        elif action_type in ["LOG_HABIT", "LOG_HABIT_COMPLETE"]:
+            if target_id:
+                cursor.execute("SELECT id FROM habits WHERE id = ? AND user_id = ?", (target_id, user_id))
+                if not cursor.fetchone():
+                    return None
+            return action
+        elif action_type in ["NAVIGATE_GOALS", "NAVIGATE_HABITS", "NAVIGATE_JOURNAL", "NAVIGATE_BLUEPRINT", "VIEW_PROGRESS"]:
+            return action
+        else:
+            return None
+    finally:
+        conn.close()
+
+
 def _call_gemini_rest_api(gemini_url: str, payload: dict) -> Dict[str, Any]:
     json_bytes = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
@@ -148,34 +234,45 @@ def _call_gemini_rest_api(gemini_url: str, payload: dict) -> Dict[str, Any]:
 
 
 async def generate_coaching_response(user_message: str, user_id: int) -> Dict[str, Any]:
-    # 1. Gather fast lightweight context in single DB call
+    from .rag_service import build_rag_coaching_prompt
+
+    logger.info(f"[AI Coach] Received chat message for user_id={user_id}: '{user_message}'")
+
+    # 1. Gather RAG Context & Passages
+    rag_data = build_rag_coaching_prompt(user_id, user_message)
+    retrieved_passages = rag_data.get("retrieved_passages", [])
+    logger.info(f"[AI Coach] Context retrieved: {len(retrieved_passages)} RAG passages")
+    
+    # 2. Gather fast lightweight context in single DB call
     context = get_db_context(user_id)
     user_id = context["user_id"]
     user_name = context["user_name"]
     goals = context["goals"]
-    goals_text = ", ".join([f"'{g['title']}'" for g in goals]) if goals else "Personal Mastery"
+    goals_text = ", ".join([f"'{g['title']}'" for g in goals]) if goals else "Personal Growth"
     completed_missions = context["completed_missions"]
     total_missions = context["total_missions"]
+
+    needs_app_data = _needs_app_data(user_message)
+    logger.info(f"[AI Coach] App data requirement detected: {needs_app_data}")
 
     # Save user prompt
     try:
         save_chat_message(user_id, "user", user_message)
     except Exception as err:
+        logger.error(f"[AI Coach] Database error saving prompt: {err}")
         raise RuntimeError(f"Database error saving prompt: {err}")
 
+    start_time = time.time()
     api_key = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY", "")
 
-    # Fallback response if API key is not configured
+    # Check API Key
     if not api_key or api_key.startswith("your_") or api_key == "placeholder":
-        fallback_reply = (
-            f"Focus locked in on '{user_message}', {user_name}! "
-            f"You have completed {completed_missions}/{total_missions} protocols today. "
-            f"Stay executing on '{goals_text}' with total discipline."
-        )
+        logger.warning(f"[AI Coach] AI_COACH_FALLBACK_TRIGGERED reason=GEMINI_API_KEY is not configured in environment")
+        fallback_reply = "I'm having trouble connecting to my AI brain right now. Give me another try in a moment."
         try:
             save_chat_message(user_id, "coach", fallback_reply)
         except Exception as err:
-            raise RuntimeError(f"Database error saving fallback reply: {err}")
+            logger.error(f"[AI Coach] Database error saving fallback reply: {err}")
 
         return {
             "reply": fallback_reply,
@@ -184,67 +281,84 @@ async def generate_coaching_response(user_message: str, user_id: int) -> Dict[st
             "note": "Add GEMINI_API_KEY to backend/.env for live LLM response."
         }
 
-    # 2. Build richer context if the question references app data
+    # Build RAG passages block for system prompt (internal context ONLY)
+    rag_context_snippets = []
+    for p in retrieved_passages[:5]:
+        rag_context_snippets.append(f"  - [{p['doc_type'].upper()}] {p['title']}: {p['content']}")
+    rag_block = "\n".join(rag_context_snippets) if rag_context_snippets else "None"
+
+    # Build richer context if the question references app data
     detailed_context_block = ""
-    if _needs_app_data(user_message):
+    if needs_app_data:
         detailed = get_detailed_context(user_id)
-        # Format missions
         if detailed["missions"]:
-            pending = [m["title"] for m in detailed["missions"] if not m["completed"]]
-            done = [m["title"] for m in detailed["missions"] if m["completed"]]
-            detailed_context_block += f"\n\nUSER'S CURRENT MISSIONS ({len(pending)} pending, {len(done)} completed):\n"
-            for i, t in enumerate(pending, 1):
-                detailed_context_block += f"  {i}. [PENDING] {t}\n"
-            for i, t in enumerate(done, len(pending) + 1):
-                detailed_context_block += f"  {i}. [DONE] {t}\n"
-        # Format goals
+            pending = [m for m in detailed["missions"] if not m["completed"]]
+            done = [m for m in detailed["missions"] if m["completed"]]
+            detailed_context_block += f"\nUSER'S MISSIONS ({len(pending)} pending, {len(done)} completed):\n"
+            for m in pending:
+                detailed_context_block += f"  - ID: {m['id']} | [PENDING] {m['title']}\n"
+            for m in done:
+                detailed_context_block += f"  - ID: {m['id']} | [DONE] {m['title']}\n"
         if detailed["goals"]:
             detailed_context_block += f"\nUSER'S GOALS:\n"
             for g in detailed["goals"]:
-                detailed_context_block += f"  - {g['title']} ({g['category']}, {g['status']})\n"
-        # Format habits
+                detailed_context_block += f"  - ID: {g['id']} | {g['title']} ({g['category']})\n"
         if detailed["habits"]:
             detailed_context_block += f"\nUSER'S HABITS:\n"
             for h in detailed["habits"]:
-                detailed_context_block += f"  - {h['title']} ({h['frequency']}, status: {h['status']})\n"
+                detailed_context_block += f"  - ID: {h['id']} | {h['title']} ({h['frequency']})\n"
 
-    # 3. Fetch last 6 turns of conversation history for multi-turn context
+    # Fetch last 6 turns of conversation history
     recent_history = fetch_chat_history(user_id, limit=6)
 
     coach_style = context.get("coach_style", "strategic")
     style_directives = {
-        "strategic": "Tone & Style: Strategic, direct, analytical, data-driven, precise.",
-        "empathetic": "Tone & Style: Empathetic, supportive, encouraging, understanding, emotionally intelligent.",
-        "relentless": "Tone & Style: Relentless, high-intensity, non-negotiable execution, demanding peak performance, zero excuses."
+        "strategic": "Tone & Style: Clear, practical, insightful, analytical, and structured.",
+        "empathetic": "Tone & Style: Empathetic, supportive, warm, understanding, and emotionally intelligent.",
+        "relentless": "Tone & Style: High-energy, motivating, action-oriented, focused, and direct."
     }
     tone_directive = style_directives.get(str(coach_style).lower(), style_directives["strategic"])
 
-    # 4. Construct System Instructions & Multi-Turn Contents Payload
+    # System Instructions for ChatGPT-Style Natural Conversational Mentor
     system_instruction = (
-        f"You are AI Coach, an elite, highly intelligent, disciplined personal growth and engineering mentor for {user_name}.\n"
-        f"User Active Goals: {goals_text}\n"
-        f"Today's Protocol Progress: {completed_missions}/{total_missions} completed.\n"
+        f"You are AI Coach, a warm, highly intelligent, calm, and practical personal mentor (like ChatGPT).\n"
+        f"\n"
+        f"USER BACKGROUND CONTEXT (Private internal context ONLY. NEVER output or leak raw context, IDs, database names, or metadata):\n"
+        f"- User Name: {user_name}\n"
+        f"- Primary Goals: {goals_text}\n"
+        f"- Task Progress Today: {completed_missions}/{total_missions} completed.\n"
+        f"Retrieved Passages:\n{rag_block}\n"
         f"{detailed_context_block}\n"
-        f"GROUNDING INSTRUCTIONS:\n"
-        f"1. Answer the user's explicit question FIRST, directly, accurately, and completely.\n"
-        f"2. When the user asks about their tasks, missions, goals, habits, or progress, use the EXACT data provided above. List them by name. Never invent data.\n"
-        f"3. If the user asks a general knowledge or technical question, answer it clearly without forcing personal data mentions.\n"
-        f"4. Always finish your sentences completely. Never stop mid-sentence.\n"
-        f"5. {tone_directive}"
+        f"\n"
+        f"CORE CONVERSATIONAL PRINCIPLES (THINK & ACT LIKE CHATGPT):\n"
+        f"1. NO MANDATORY RESPONSE STRUCTURE: Never force every reply to contain an acknowledgement, insight, action plan, motivation, bullet points, or a question at the end. Choose the response structure dynamically based entirely on what the user asked.\n"
+        f"2. SITUATION-AWARE RESPONSES:\n"
+        f"   - Casual / Greetings ('hey', 'what's up?', 'thanks', 'okay', 'cool'): Respond in 1-2 short, warm, natural human sentences (e.g. 'Hey! 👋 What's on your mind today?', 'You're welcome! Let me know whenever you want to dig into anything else.').\n"
+        f"   - Learning / Teaching ('teach me Python', 'explain recursion'): Teach naturally and progressively using intuitive analogies and concrete code examples.\n"
+        f"   - Technical / Coding ('why am I getting a CORS error?', 'reverse a string'): Answer the technical problem directly with clean code and concise explanation. Do NOT add motivational speeches.\n"
+        f"   - Frustration / Emotional ('I'm tired', 'I failed my exam'): Acknowledge feelings first with genuine empathy. Do NOT dump a productivity framework or task list.\n"
+        f"   - Motivation ('motivate me'): Give grounding, practical perspective rather than generic posters.\n"
+        f"   - Planning ('what should I study today?'): Help prioritize practical next steps based on user's known goals.\n"
+        f"   - Follow-Ups / Continuation ('I don't understand', 'why?', 'give another example'): Build seamlessly on the immediate prior turn without re-introducing yourself or restarting.\n"
+        f"   - Personal ('I feel like I'm wasting my time'): Respond like a thoughtful, caring human mentor, not an analytics dashboard.\n"
+        f"3. INVISIBLE RAG & ZERO CONTEXT LEAKAGE: Never display phrases like 'Insights retrieved:', 'MKC ID:', 'User Identity:', or 'Retrieved context:'. Mention personal goals or background ONLY when naturally relevant.\n"
+        f"4. NATURAL HUMAN LANGUAGE & ELIMINATE STOCK BUZZWORDS: Avoid habitual repetition of stock phrases like 'Absolutely', 'Let's break this down', 'Here's the thing', 'Stay consistent', 'Protocol', 'Discipline', 'Focus locked in'. Speak naturally.\n"
+        f"5. DO NOT OVERUSE NAME: Use {user_name}'s name only when naturally meaningful in conversation. Never start messages with '{user_name}!'.\n"
+        f"6. DYNAMIC RESPONSE LENGTH: Match response length to the complexity of the query. Simple queries get short answers; teaching and complex problems get thorough explanations.\n"
+        f"7. OUTPUT FORMAT: Return a valid JSON object matching: {{ 'reply': '...', 'action': ... }}."
     )
 
     contents = []
-    # Add system context turn
     contents.append({
         "role": "user",
         "parts": [{"text": f"System Context: {system_instruction}"}]
     })
     contents.append({
         "role": "model",
-        "parts": [{"text": f"Understood. I am ready to coach {user_name} with direct, accurate, and disciplined guidance using your real data."}]
+        "parts": [{"text": f"Understood. I am ready to converse naturally, warmly, and accurately as a supportive mentor for {user_name}."}]
     })
 
-    # Add historical multi-turn messages — use ID-based dedup, not content matching
+    # Historical multi-turn turns
     current_msg_ids = set()
     for msg in recent_history:
         role = "user" if msg["sender"] == "user" else "model"
@@ -257,9 +371,7 @@ async def generate_coaching_response(user_message: str, user_id: int) -> Dict[st
             "parts": [{"text": msg["content"]}]
         })
 
-    # Append current user prompt (the one we just saved is in history,
-    # but we add it explicitly to ensure it's the final turn)
-    # Check if the last content entry is already this exact user message
+    # Append current user prompt
     if not contents or contents[-1].get("role") != "user" or contents[-1]["parts"][0]["text"] != user_message:
         contents.append({
             "role": "user",
@@ -269,78 +381,128 @@ async def generate_coaching_response(user_message: str, user_id: int) -> Dict[st
     payload = {
         "contents": contents,
         "generationConfig": {
-            "temperature": 0.5,
-            "maxOutputTokens": 2048
+            "temperature": 0.6,
+            "maxOutputTokens": 2048,
+            "responseMimeType": "application/json",
+            "responseSchema": {
+                "type": "OBJECT",
+                "properties": {
+                    "reply": {
+                        "type": "STRING",
+                        "description": "Your coaching response text to show the user."
+                    },
+                    "action": {
+                        "type": "OBJECT",
+                        "description": "Optional actionable command for the user interface.",
+                        "properties": {
+                            "type": {
+                                "type": "STRING",
+                                "enum": ["NAVIGATE_MISSION", "START_MISSION", "MARK_MISSION_COMPLETE", "NAVIGATE_GOALS", "LOG_HABIT", "LOG_HABIT_COMPLETE", "NAVIGATE_JOURNAL", "NAVIGATE_BLUEPRINT", "VIEW_PROGRESS", "NONE"],
+                                "description": "The type of action. NONE if no action is needed."
+                            },
+                            "target_id": {
+                                "type": "INTEGER",
+                                "description": "The ID of the mission or habit if applicable."
+                            }
+                        }
+                    }
+                },
+                "required": ["reply"]
+            }
         }
     }
 
-    # Fast model selection
-    candidate_models = ["gemini-2.0-flash", "gemini-flash-latest"]
+    candidate_models = ["gemini-3.6-flash"
+    , "gemini-3.5", "gemini-3.6", "gemini-3.7"]
     reply_text = None
+    action_payload = None
     used_model = None
     last_error = None
+    action_status = "success"
 
     for model_name in candidate_models:
         gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        logger.info(f"[AI Coach] Sending LLM request to Gemini model '{model_name}'")
         try:
             data = await asyncio.to_thread(_call_gemini_rest_api, gemini_url, payload)
             candidates = data.get("candidates", [])
             if not candidates:
-                last_error = "No candidates returned by model"
+                last_error = f"No candidates returned by {model_name}"
+                logger.warning(f"[AI Coach] {last_error}")
                 continue
 
             candidate = candidates[0]
-            finish_reason = candidate.get("finishReason", "")
-
-            # Extract full text from all parts
             content_obj = candidate.get("content", {})
             parts = content_obj.get("parts", [])
-            full_text_parts = [p["text"] for p in parts if "text" in p]
+            full_text_parts = [p.get("text", "") for p in parts]
             extracted_text = "".join(full_text_parts).strip()
 
             if not extracted_text:
-                last_error = f"Empty response from {model_name}"
+                last_error = f"Empty text response from {model_name}"
+                logger.warning(f"[AI Coach] {last_error}")
                 continue
 
-            # Handle responses that hit MAX_TOKENS — trim to last complete sentence
-            if finish_reason == "MAX_TOKENS":
-                if extracted_text and extracted_text[-1] not in ".!?)\"'":
-                    # Trim to last punctuation mark
-                    last_punct = max(
-                        extracted_text.rfind('.'),
-                        extracted_text.rfind('!'),
-                        extracted_text.rfind('?'),
-                    )
-                    if last_punct > 50:
-                        extracted_text = extracted_text[:last_punct + 1].strip()
+            try:
+                parsed_response = json.loads(extracted_text)
+                reply_text = parsed_response.get("reply", "")
+                action_payload = parsed_response.get("action", None)
+            except json.JSONDecodeError:
+                reply_text = extracted_text
+                action_payload = None
 
-            reply_text = extracted_text
-            used_model = model_name
-            break
+            if reply_text:
+                used_model = model_name
+                logger.info(f"[AI Coach] LLM success with '{used_model}'. Response length: {len(reply_text)} chars")
+                break
 
         except urllib.error.HTTPError as err:
-            last_error = f"HTTP {err.code}: {err.reason}"
-            if err.code in (404, 400, 429):
-                continue
+            err_detail = ""
+            try:
+                err_detail = err.read().decode("utf-8")
+            except Exception:
+                pass
+            last_error = f"HTTP {err.code}: {err.reason} - {err_detail}"
+            logger.warning(f"[AI Coach] Model '{model_name}' HTTP error: {last_error}")
+            continue
         except Exception as err:
-            last_error = str(err)
+            last_error = f"Exception: {err}"
+            logger.warning(f"[AI Coach] Model '{model_name}' error: {last_error}")
             continue
 
+    if action_payload:
+        validated_action = validate_ai_action(action_payload, user_id)
+        if not validated_action and action_payload.get("type") and action_payload.get("type") != "NONE":
+            action_payload = None
+            action_status = "rejected"
+        else:
+            action_payload = validated_action
+
+    # If LLM failed, log explicit fallback trigger and return honest error
     if not reply_text:
-        reply_text = (
-            f"Executing on '{user_message}', {user_name}! "
-            f"Protocols completed today: {completed_missions}/{total_missions}. "
-            f"Keep focusing on '{goals_text}' with relentless consistency."
-        )
+        logger.warning(f"[AI Coach] AI_COACH_FALLBACK_TRIGGERED reason={last_error or 'All LLM candidate models failed'}")
+        reply_text = "I'm having trouble connecting to my AI brain right now. Give me another try in a moment."
 
     # Save coach reply
     try:
         save_chat_message(user_id, "coach", reply_text)
     except Exception as err:
+        logger.error(f"[AI Coach] Database error saving coach reply: {err}")
         raise RuntimeError(f"Database error saving coach reply: {err}")
+
+    end_time = time.time()
+    latency_ms = int((end_time - start_time) * 1000)
+
+    act_type = action_payload.get("type") if action_payload else None
+    act_target = action_payload.get("target_id") if action_payload else None
+
+    try:
+        log_ai_activity(user_id, act_type, act_target, action_status, latency_ms)
+    except Exception as e:
+        logger.warning(f"[AI Coach] Telemetry logging failed: {e}")
 
     return {
         "reply": reply_text,
+        "action": action_payload,
         "context_used": True,
         "live_llm": bool(used_model),
         "model": used_model or "fallback",

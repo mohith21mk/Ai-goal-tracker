@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
+import { Bot, User, Trash2, TriangleAlert } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import { sendCoachMessage, getCoachHistory, clearCoachHistory } from '../services/api';
 import './AICoach.css';
 
 const SUGGESTIONS = [
-  '🎯 What should I focus on today?',
-  '📊 Analyze my current progress',
-  '🧠 Give me a mindset reset',
-  '⚡ How do I build consistency?',
-  '🏆 Help me set a stretch goal',
+  'What should I focus on today?',
+  'Analyze my current progress',
+  'Give me a mindset reset',
+  'How do I build consistency?',
+  'Help me set a stretch goal',
 ];
 
 const AICoach = () => {
@@ -68,14 +69,14 @@ const AICoach = () => {
 
     try {
       const data = await sendCoachMessage(userText);
-      const reply = data.reply || 'Execute with discipline today.';
+      const reply = data.reply || "I'm having trouble connecting to my AI brain right now. Give me another try in a moment.";
       setMessages((prev) => [...prev, { sender: 'coach', text: reply, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
     } catch (err) {
       console.error('AI Coach error:', err);
       setError('Failed to get a response. Please try again.');
       setMessages((prev) => [...prev, {
         sender: 'coach',
-        text: `Focus on executing "${userText}" today with total discipline. Connection will restore shortly.`,
+        text: "I'm having trouble connecting to my AI brain right now. Give me another try in a moment.",
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       }]);
     } finally {
@@ -126,15 +127,18 @@ const AICoach = () => {
               </div>
               <span className="coach-page-model-badge">Neural v4.2</span>
               {messages.length > 0 && (
-                <button onClick={handleClearHistory} className="coach-page-clear-btn">
-                  🗑️ Clear History
+                <button onClick={handleClearHistory} className="coach-page-clear-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" /> Clear History
                 </button>
               )}
             </div>
           </div>
 
           {error && (
-            <div className="coach-page-error">⚠️ {error}</div>
+            <div className="coach-page-error" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <TriangleAlert size={16} strokeWidth={1.8} style={{ color: '#EF4444' }} aria-hidden="true" />
+              <span>{error}</span>
+            </div>
           )}
 
           {/* Chat Messages Area */}
@@ -145,7 +149,9 @@ const AICoach = () => {
               </div>
             ) : messages.length === 0 ? (
               <div className="coach-empty-state">
-                <div className="coach-empty-icon">🤖</div>
+                <div className="coach-empty-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Bot size={40} strokeWidth={1.8} style={{ color: 'var(--cyan)', filter: 'drop-shadow(0 0 10px rgba(56, 189, 248, 0.4))' }} aria-hidden="true" />
+                </div>
                 <h3>Start Your Coaching Session</h3>
                 <p>Ask your AI Coach anything — from daily focus priorities and goal strategy to mindset resets and progress analysis.</p>
               </div>
@@ -153,7 +159,11 @@ const AICoach = () => {
               messages.map((msg, idx) => (
                 <div key={idx} className={`coach-msg from-${msg.sender}`}>
                   <div className="coach-msg-avatar">
-                    {msg.sender === 'coach' ? '🤖' : '👤'}
+                    {msg.sender === 'coach' ? (
+                      <Bot size={20} strokeWidth={1.8} style={{ color: 'var(--cyan)' }} aria-hidden="true" />
+                    ) : (
+                      <User size={20} strokeWidth={1.8} style={{ color: 'var(--text-primary)' }} aria-hidden="true" />
+                    )}
                   </div>
                   <div>
                     <div className="coach-msg-bubble">{msg.text}</div>
@@ -168,9 +178,11 @@ const AICoach = () => {
               <div className="coach-typing-indicator">
                 <div className="coach-msg-avatar" style={{
                   width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 16, background: 'linear-gradient(135deg, rgba(56,189,248,0.15), rgba(59,130,246,0.15))',
+                  background: 'linear-gradient(135deg, rgba(56,189,248,0.15), rgba(59,130,246,0.15))',
                   border: '1px solid rgba(56,189,248,0.3)', flexShrink: 0
-                }}>🤖</div>
+                }}>
+                  <Bot size={20} strokeWidth={1.8} style={{ color: 'var(--cyan)' }} aria-hidden="true" />
+                </div>
                 <div className="coach-typing-dots">
                   <span /><span /><span />
                 </div>

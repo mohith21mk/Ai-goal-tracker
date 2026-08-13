@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Zap, Target, Scale, Shield, BatteryCharging, Calendar, Flame, BookOpen, Bot, RefreshCw, TriangleAlert, Trash2 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import {
@@ -12,11 +13,11 @@ import {
 import './Journal.css';
 
 const MOOD_OPTIONS = [
-  { id: 'energized', label: 'Energized', icon: '⚡' },
-  { id: 'focused', label: 'Focused', icon: '🎯' },
-  { id: 'neutral', label: 'Neutral', icon: '⚖️' },
-  { id: 'challenged', label: 'Challenged', icon: '🛡️' },
-  { id: 'exhausted', label: 'Exhausted', icon: '🔋' }
+  { id: 'energized', label: 'Energized', icon: <Zap size={16} style={{ color: '#FBBF24' }} /> },
+  { id: 'focused', label: 'Focused', icon: <Target size={16} style={{ color: '#38BDF8' }} /> },
+  { id: 'neutral', label: 'Neutral', icon: <Scale size={16} style={{ color: '#A78BFA' }} /> },
+  { id: 'challenged', label: 'Challenged', icon: <Shield size={16} style={{ color: '#F97316' }} /> },
+  { id: 'exhausted', label: 'Exhausted', icon: <BatteryCharging size={16} style={{ color: '#EF4444' }} /> }
 ];
 
 const Journal = () => {
@@ -211,14 +212,16 @@ const Journal = () => {
               <h1 className="font-serif">Mindset Journal</h1>
               <p>Reflect. Reframe. Return stronger.</p>
             </div>
-            <div className="today-date-badge">
-              📅 {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
+            <div className="today-date-badge" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Calendar size={14} strokeWidth={1.8} aria-hidden="true" />
+              <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</span>
             </div>
           </div>
 
           {error && (
-            <div style={{ padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '12px', color: '#EF4444', marginBottom: '24px' }}>
-              ⚠️ {error}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '12px', color: '#EF4444', marginBottom: '24px' }}>
+              <TriangleAlert size={16} strokeWidth={1.8} aria-hidden="true" />
+              <span>{error}</span>
             </div>
           )}
 
@@ -227,7 +230,7 @@ const Journal = () => {
             <div className="journal-stat-card glass-panel">
               <div className="journal-stat-header">
                 <span className="journal-stat-title">Reflection Streak</span>
-                <span className="journal-stat-icon">🔥</span>
+                <span className="journal-stat-icon"><Flame size={18} strokeWidth={1.8} style={{ color: '#38BDF8' }} aria-hidden="true" /></span>
               </div>
               <div className="journal-stat-value">{stats.journal_streak} <span style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>Days</span></div>
               <div className="journal-stat-sub">Best: {stats.longest_journal_streak} Days</div>
@@ -236,7 +239,7 @@ const Journal = () => {
             <div className="journal-stat-card glass-panel">
               <div className="journal-stat-header">
                 <span className="journal-stat-title">7-Day Avg Energy</span>
-                <span className="journal-stat-icon">⚡</span>
+                <span className="journal-stat-icon"><Zap size={18} strokeWidth={1.8} style={{ color: '#FBBF24' }} aria-hidden="true" /></span>
               </div>
               <div className="journal-stat-value">{stats.avg_energy_7d} <span style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>/10</span></div>
               <div className="journal-stat-sub">Weekly vital energy</div>
@@ -245,7 +248,7 @@ const Journal = () => {
             <div className="journal-stat-card glass-panel">
               <div className="journal-stat-header">
                 <span className="journal-stat-title">Total Reflections</span>
-                <span className="journal-stat-icon">📖</span>
+                <span className="journal-stat-icon"><BookOpen size={18} strokeWidth={1.8} style={{ color: '#3B82F6' }} aria-hidden="true" /></span>
               </div>
               <div className="journal-stat-value">{stats.total_entries}</div>
               <div className="journal-stat-sub">Logged reflections</div>
@@ -254,7 +257,7 @@ const Journal = () => {
             <div className="journal-stat-card glass-panel">
               <div className="journal-stat-header">
                 <span className="journal-stat-title">Latest Mood</span>
-                <span className="journal-stat-icon">🎯</span>
+                <span className="journal-stat-icon"><Target size={18} strokeWidth={1.8} style={{ color: '#A78BFA' }} aria-hidden="true" /></span>
               </div>
               <div className="journal-stat-value">{stats.latest_mood || 'None'}</div>
               <div className="journal-stat-sub">Self-reported mood</div>
@@ -371,7 +374,7 @@ const Journal = () => {
             {/* Right: AI Reflection Analysis Card */}
             <div className="ai-analysis-card glass-panel">
               <div className="ai-card-header">
-                <span style={{ fontSize: '20px' }}>🤖</span>
+                <Bot size={20} strokeWidth={1.8} style={{ color: 'var(--cyan)' }} aria-hidden="true" />
                 <h3>AI Mindset Coach Reflection</h3>
               </div>
 
@@ -389,9 +392,9 @@ const Journal = () => {
                     <button
                       onClick={handleReAnalyze}
                       disabled={isAnalyzing}
-                      style={{ background: 'transparent', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-secondary)', padding: '6px 12px', cursor: 'pointer', fontSize: '11px' }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'transparent', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-secondary)', padding: '6px 12px', cursor: 'pointer', fontSize: '11px' }}
                     >
-                      🔄 Re-Analyze Reflection
+                      <RefreshCw size={12} strokeWidth={1.8} aria-hidden="true" /> Re-Analyze Reflection
                     </button>
                   </div>
                 </div>
@@ -424,9 +427,13 @@ const Journal = () => {
                 <div key={item.id} className="history-card-item glass-panel">
                   <div className="history-item-left">
                     <div className="history-item-meta">
-                      <span className="history-item-date">📅 {item.entry_date}</span>
+                      <span className="history-item-date" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Calendar size={12} strokeWidth={1.8} aria-hidden="true" /> {item.entry_date}
+                      </span>
                       <span className="history-item-mood">{item.mood}</span>
-                      <span className="history-item-energy">⚡ Energy: {item.energy_level}/10</span>
+                      <span className="history-item-energy" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Zap size={12} strokeWidth={1.8} style={{ color: '#FBBF24' }} aria-hidden="true" /> Energy: {item.energy_level}/10
+                      </span>
                       {item.ai_analysis && <span style={{ fontSize: '10px', padding: '2px 6px', background: 'rgba(56, 189, 248, 0.15)', color: 'var(--cyan)', borderRadius: '4px' }}>AI Analyzed</span>}
                     </div>
 
@@ -447,7 +454,7 @@ const Journal = () => {
                     style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '14px', padding: '4px' }}
                     title="Delete reflection"
                   >
-                    🗑️
+                    <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" />
                   </button>
                 </div>
               ))

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Palette, Moon, Sun, Bot, Bell, Zap, Shield, TriangleAlert, CheckCircle2, LogOut } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
-import { getSettings, updateSettings } from '../services/api';
+import { getSettings, updateSettings, logoutUser } from '../services/api';
 import './Settings.css';
 
 const Settings = () => {
@@ -14,6 +16,18 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null);
+  
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+      navigate('/login');
+    } catch (err) {
+      console.error('Logout failed:', err);
+      navigate('/login');
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -114,9 +128,12 @@ const Settings = () => {
               borderRadius: '12px',
               color: statusMessage.type === 'error' ? '#EF4444' : 'var(--cyan)',
               marginBottom: '24px',
-              fontSize: '13px'
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}>
-              {statusMessage.type === 'error' ? '⚠️' : '✅'} {statusMessage.text}
+              {statusMessage.type === 'error' ? <TriangleAlert size={16} /> : <CheckCircle2 size={16} />} {statusMessage.text}
             </div>
           )}
 
@@ -128,7 +145,7 @@ const Settings = () => {
                 {/* 1. Appearance */}
                 <div className="settings-card glass-panel">
                   <div className="settings-card-header">
-                    <span className="settings-card-icon">🎨</span>
+                    <span className="settings-card-icon"><Palette size={20} /></span>
                     <h3>Appearance & Interface</h3>
                   </div>
                   <p className="settings-card-desc">Choose the visual theme for your mastery operating system.</p>
@@ -140,15 +157,17 @@ const Settings = () => {
                         type="button"
                         onClick={() => handleThemeChange('dark')}
                         className={`segmented-btn ${theme === 'dark' ? 'active' : ''}`}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                       >
-                        🌙 Dark Cyberpunk
+                        <Moon size={14} /> Dark Cyberpunk
                       </button>
                       <button
                         type="button"
                         onClick={() => handleThemeChange('light')}
                         className={`segmented-btn ${theme === 'light' ? 'active' : ''}`}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                       >
-                        ☀️ Light Mode
+                        <Sun size={14} /> Light Mode
                       </button>
                     </div>
                   </div>
@@ -157,7 +176,7 @@ const Settings = () => {
                 {/* 2. AI Coach Persona */}
                 <div className="settings-card glass-panel">
                   <div className="settings-card-header">
-                    <span className="settings-card-icon">🤖</span>
+                    <span className="settings-card-icon"><Bot size={20} /></span>
                     <h3>AI Coach Persona</h3>
                   </div>
                   <p className="settings-card-desc">Configure the tone and advice style of your AI mentor.</p>
@@ -179,7 +198,7 @@ const Settings = () => {
                 {/* 3. Notifications & Reminders */}
                 <div className="settings-card glass-panel">
                   <div className="settings-card-header">
-                    <span className="settings-card-icon">🔔</span>
+                    <span className="settings-card-icon"><Bell size={20} /></span>
                     <h3>Notifications & Protocols</h3>
                   </div>
                   <p className="settings-card-desc">Manage system alerts and daily discipline reminders.</p>
@@ -206,14 +225,21 @@ const Settings = () => {
                       onChange={(e) => setDailyReminderTime(e.target.value)}
                       className="settings-input"
                     />
-                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                      {notificationsEnabled
-                        ? `⚡ In-App Protocol Reminder set for ${dailyReminderTime} ${
-                            typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
-                              ? '(Browser Push Granted)'
-                              : '(In-App Protocol Active)'
-                          }`
-                        : 'Reminders currently disabled.'}
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      {notificationsEnabled ? (
+                        <>
+                          <Zap size={12} style={{ flexShrink: 0 }} />
+                          <span>
+                            In-App Protocol Reminder set for {dailyReminderTime} {
+                              typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
+                                ? '(Browser Push Granted)'
+                                : '(In-App Protocol Active)'
+                            }
+                          </span>
+                        </>
+                      ) : (
+                        'Reminders currently disabled.'
+                      )}
                     </div>
                   </div>
                 </div>
@@ -221,7 +247,7 @@ const Settings = () => {
                 {/* 4. Privacy & Visibility */}
                 <div className="settings-card glass-panel">
                   <div className="settings-card-header">
-                    <span className="settings-card-icon">🛡️</span>
+                    <span className="settings-card-icon"><Shield size={20} /></span>
                     <h3>Profile & Privacy</h3>
                   </div>
                   <p className="settings-card-desc">Control whether your profile is visible in the community feed.</p>
@@ -236,6 +262,48 @@ const Settings = () => {
                       <option value="public">Public (Visible in Community Feed)</option>
                       <option value="private">Private (Masked as Anonymous Member)</option>
                     </select>
+                  </div>
+                </div>
+
+                {/* 5. Account Actions */}
+                <div className="settings-card glass-panel" style={{ borderColor: 'rgba(239, 68, 68, 0.2)' }}>
+                  <div className="settings-card-header">
+                    <span className="settings-card-icon" style={{ color: 'var(--accent-red, #ef4444)' }}><LogOut size={20} /></span>
+                    <h3 style={{ color: 'var(--accent-red, #ef4444)' }}>Account Actions</h3>
+                  </div>
+                  <p className="settings-card-desc">Manage your active session and account status.</p>
+
+                  <div className="settings-field-group">
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      style={{
+                        padding: '12px 24px',
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        borderRadius: '8px',
+                        color: 'var(--accent-red, #ef4444)',
+                        fontWeight: '600',
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        transition: 'all 0.2s',
+                        width: 'fit-content'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                        e.currentTarget.style.transform = 'none';
+                      }}
+                    >
+                      <LogOut size={18} />
+                      Sign Out
+                    </button>
                   </div>
                 </div>
               </div>

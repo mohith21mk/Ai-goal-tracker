@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:8000';
 
 async function apiFetch(endpoint, options = {}) {
   const defaultHeaders = options.body ? { 'Content-Type': 'application/json' } : {};
@@ -60,6 +60,133 @@ export async function getCurrentUser() {
   const response = await apiFetch('/api/auth/me');
   if (!response.ok) {
     return null;
+  }
+  return response.json();
+}
+
+export async function forgotPassword(identifier) {
+  const response = await apiFetch('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ identifier }),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || 'Password reset request failed.');
+  }
+  return response.json();
+}
+
+export async function resetPassword(token, newPassword) {
+  const response = await apiFetch('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || 'Password reset failed.');
+  }
+  return response.json();
+}
+
+export async function verifyEmail(token) {
+  const response = await apiFetch('/api/auth/verify-email', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || 'Email verification failed.');
+  }
+  return response.json();
+}
+
+export async function resendVerification() {
+  const response = await apiFetch('/api/auth/resend-verification', {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || 'Failed to resend verification link.');
+  }
+  return response.json();
+}
+
+export async function changePassword(currentPassword, newPassword) {
+  const response = await apiFetch('/api/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || 'Failed to change password.');
+  }
+  return response.json();
+}
+
+export async function getActiveSessions() {
+  const response = await apiFetch('/api/auth/sessions');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch sessions: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function revokeSession(sessionId) {
+  const response = await apiFetch(`/api/auth/sessions/${sessionId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || 'Failed to revoke session.');
+  }
+  return response.json();
+}
+
+export async function revokeOtherSessions() {
+  const response = await apiFetch('/api/auth/sessions/revoke-others', {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || 'Failed to revoke other sessions.');
+  }
+  return response.json();
+}
+
+export async function deactivateAccount() {
+  const response = await apiFetch('/api/auth/deactivate', {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || 'Failed to deactivate account.');
+  }
+  return response.json();
+}
+
+export async function deleteAccount(currentPassword, confirmationText) {
+  const response = await apiFetch('/api/users/account', {
+    method: 'DELETE',
+    body: JSON.stringify({
+      current_password: currentPassword,
+      confirmation_text: confirmationText,
+    }),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || 'Failed to delete account.');
+  }
+  return response.json();
+}
+
+export async function submitOnboarding(data) {
+  const response = await apiFetch('/api/users/onboarding', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || 'Failed to submit onboarding.');
   }
   return response.json();
 }
@@ -515,6 +642,18 @@ export async function createCommunityPost(data) {
   return response.json();
 }
 
+export async function updateCommunityPost(id, data) {
+  const response = await apiFetch(`/api/community/posts/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to update post: ${response.statusText}`);
+  }
+  return response.json();
+}
+
 export async function deleteCommunityPost(id) {
   const response = await apiFetch(`/api/community/posts/${id}`, {
     method: 'DELETE',
@@ -532,6 +671,16 @@ export async function toggleCommunityLike(id) {
   });
   if (!response.ok) {
     throw new Error(`Failed to toggle post like: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function unlikeCommunityPost(id) {
+  const response = await apiFetch(`/api/community/posts/${id}/like`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to unlike post: ${response.statusText}`);
   }
   return response.json();
 }
@@ -556,6 +705,29 @@ export async function createCommunityComment(id, data) {
   return response.json();
 }
 
+export async function updateCommunityComment(commentId, data) {
+  const response = await apiFetch(`/api/community/comments/${commentId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to update comment: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function deleteCommunityComment(commentId) {
+  const response = await apiFetch(`/api/community/comments/${commentId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to delete comment: ${response.statusText}`);
+  }
+  return response.json();
+}
+
 export async function getDailyReflection() {
   const response = await apiFetch('/api/reflection/daily');
   if (!response.ok) {
@@ -563,3 +735,158 @@ export async function getDailyReflection() {
   }
   return response.json();
 }
+
+// -------------------------------------------------------------------
+// SOCIAL & CHAT APIs
+// -------------------------------------------------------------------
+
+export async function searchUsers(query) {
+  const response = await apiFetch(`/api/social/search?q=${encodeURIComponent(query)}`);
+  if (!response.ok) {
+    throw new Error(`Search failed: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getConnections() {
+  const response = await apiFetch('/api/social/connections');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch connections: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function requestConnection(userId) {
+  const response = await apiFetch('/api/social/connections/request', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId }),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to request connection: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function acceptConnection(userId) {
+  const response = await apiFetch('/api/social/connections/accept', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId }),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to accept connection: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function rejectConnection(userId) {
+  const response = await apiFetch('/api/social/connections/reject', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId }),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to reject connection: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function searchPublicUsers(q) {
+  const response = await apiFetch(`/api/users/search?q=${encodeURIComponent(q)}`);
+  if (!response.ok) {
+    throw new Error(`Failed to search users: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function createConversation(targetUserId) {
+  const response = await apiFetch('/api/chat/conversations', {
+    method: 'POST',
+    body: JSON.stringify({ target_user_id: targetUserId }),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to create conversation: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getConversations() {
+  const response = await apiFetch('/api/chat/conversations');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch conversations: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getConversationMessages(conversationId) {
+  const response = await apiFetch(`/api/chat/conversations/${conversationId}/messages`);
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to fetch messages: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function markConversationRead(conversationId) {
+  const response = await apiFetch(`/api/chat/conversations/${conversationId}/read`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to mark conversation read: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+// -------------------------------------------------------------------
+// NOTIFICATIONS APIs
+// -------------------------------------------------------------------
+
+export async function getNotifications(limit = 50, offset = 0) {
+  const response = await apiFetch(`/api/notifications?limit=${limit}&offset=${offset}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch notifications: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getUnreadNotificationCount() {
+  const response = await apiFetch('/api/notifications/unread-count');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch unread notification count: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function markNotificationRead(id) {
+  const response = await apiFetch(`/api/notifications/${id}/read`, {
+    method: 'PATCH',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to mark notification as read: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function markAllNotificationsRead() {
+  const response = await apiFetch('/api/notifications/read_all', {
+    method: 'PATCH',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to mark all notifications as read: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function deleteNotification(id) {
+  const response = await apiFetch(`/api/notifications/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete notification: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+

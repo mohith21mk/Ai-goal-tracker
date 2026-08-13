@@ -1,10 +1,24 @@
+import os
 import sqlite3
 from pathlib import Path
+from .config import settings
 
 DB_PATH = Path(__file__).resolve().parent / "app.db"
 
 
-def get_connection() -> sqlite3.Connection:
+def get_connection():
+    db_url = settings.DATABASE_URL
+    if db_url.startswith("postgres://") or db_url.startswith("postgresql://"):
+        try:
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+            pg_url = db_url.replace("postgres://", "postgresql://", 1)
+            conn = psycopg2.connect(pg_url, cursor_factory=RealDictCursor)
+            return conn
+        except Exception as err:
+            # Fallback to local SQLite if PostgreSQL connection fails in local testing
+            pass
+
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -215,28 +229,27 @@ def init_db() -> None:
             time TEXT DEFAULT '15 min',
             difficulty TEXT DEFAULT 'easy',
             xp_reward INTEGER DEFAULT 10,
-            completed INTEGER DEFAULT 0
+            completed INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
     conn.commit()
 
-    cursor.execute("PRAGMA table_info(missions)")
-    existing_columns = [col["name"] for col in cursor.fetchall()]
-
-    if "user_id" not in existing_columns:
-        cursor.execute("ALTER TABLE missions ADD COLUMN user_id INTEGER")
-        conn.commit()
-
-    if "goal_id" not in existing_columns:
-        cursor.execute("ALTER TABLE missions ADD COLUMN goal_id INTEGER")
-        conn.commit()
-
-    if "completed_at" not in existing_columns:
-        cursor.execute("ALTER TABLE missions ADD COLUMN completed_at TIMESTAMP NULL")
-        conn.commit()
+    for col_def in [
+        ("user_id", "INTEGER"),
+        ("goal_id", "INTEGER"),
+        ("completed_at", "TIMESTAMP NULL"),
+        ("created_at", "TIMESTAMP NULL")
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE missions ADD COLUMN {col_def[0]} {col_def[1]}")
+            conn.commit()
+        except Exception:
+            pass
 
     cursor.execute("UPDATE missions SET completed_at = CURRENT_TIMESTAMP WHERE completed = 1 AND completed_at IS NULL")
+    cursor.execute("UPDATE missions SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL")
     conn.commit()
 
     cursor.execute("SELECT COUNT(*) FROM missions")
@@ -582,10 +595,104 @@ def init_db() -> None:
         """
     )
 
-    # Indexes for Community
+    # 17. Create user_connections table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_connections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            requester_id INTEGER NOT NULL,
+            recipient_id INTEGER NOT NULL,
+            status TEXT DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(requester_id, recipient_id),
+            FOREIGN KEY(requester_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(recipient_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+    # Indexes for Community & Connections
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_posts_created ON community_posts(created_at DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_posts_author ON community_posts(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_likes_post_user ON community_likes(post_id, user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_comments_post ON community_comments(post_id, created_at ASC)")
-    conn.commit()
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_comments_created ON community_comments(created_at ASC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_conn_requester ON user_connections(requester_id, status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_conn_recipient ON user_connections(recipient_id, status)")
 
+    # 13. Create conversations table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS conversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    # 14. Create conversation_members table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS conversation_members (
+            conversation_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (conversation_id, user_id),
+            FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+    # 15. Create chat_messages table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id INTEGER NOT NULL,
+            sender_id INTEGER NOT NULL,
+            message TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            read_at TIMESTAMP,
+            FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+            FOREIGN KEY(sender_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+    # Chat & messaging performance indexes
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_conv_members_user ON conversation_members(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_conv ON chat_messages(conversation_id, created_at ASC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_unread ON chat_messages(conversation_id, sender_id, read_at)")
+
+    # 16. Create notifications table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            message TEXT,
+            reference_type TEXT,
+            reference_id INTEGER,
+            is_read INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+    # Notification indexes
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_notifications_ref ON notifications(reference_type, reference_id)")
+
+    conn.commit()
     conn.close()
+
+    from .db_session import engine, init_orm_db
+    engine.dispose()
+    init_orm_db()

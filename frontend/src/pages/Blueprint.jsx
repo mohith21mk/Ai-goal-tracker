@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
+import { Sparkles, TriangleAlert, Rocket, Target, Trash2, Calendar, Check, X } from 'lucide-react';
 import {
   getActiveBlueprint,
   createBlueprint,
@@ -193,14 +194,15 @@ const Blueprint = () => {
               onClick={() => setShowBpModal(true)}
               className="btn-create-blueprint-primary"
             >
-              <span>✨</span>
+              <Sparkles size={16} strokeWidth={1.8} aria-hidden="true" />
               <span>{activeBlueprint ? 'New Blueprint' : 'Build Blueprint'}</span>
             </button>
           </div>
 
           {error && (
-            <div style={{ padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '12px', color: '#EF4444', marginBottom: '24px' }}>
-              ⚠️ {error}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '12px', color: '#EF4444', marginBottom: '24px' }}>
+              <TriangleAlert size={16} strokeWidth={1.8} aria-hidden="true" />
+              <span>{error}</span>
             </div>
           )}
 
@@ -208,7 +210,9 @@ const Blueprint = () => {
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-tertiary)' }}>Loading Life Blueprint architecture...</div>
           ) : !activeBlueprint ? (
             <div className="blueprint-empty-card glass-panel">
-              <span style={{ fontSize: '48px' }}>🚀</span>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                <Rocket size={44} strokeWidth={1.8} style={{ color: 'var(--cyan)', filter: 'drop-shadow(0 0 10px rgba(56, 189, 248, 0.4))' }} aria-hidden="true" />
+              </div>
               <h3 className="font-display">Build Your Life Blueprint</h3>
               <p>Define your long-term vision, group focus into Life Areas, and organize execution into structured Phases and Milestones.</p>
               <button
@@ -234,8 +238,9 @@ const Blueprint = () => {
                     )}
                   </div>
                   {activeBlueprint.target_date && (
-                    <div className="blueprint-target-tag">
-                      🎯 Target: <strong>{activeBlueprint.target_date}</strong> ({getDaysRemaining(activeBlueprint.target_date)} days remaining)
+                    <div className="blueprint-target-tag" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Target size={16} strokeWidth={1.8} style={{ color: 'var(--cyan)' }} aria-hidden="true" />
+                      <span>Target: <strong>{activeBlueprint.target_date}</strong> ({getDaysRemaining(activeBlueprint.target_date)} days remaining)</span>
                     </div>
                   )}
                 </div>
@@ -261,7 +266,7 @@ const Blueprint = () => {
                   <div className="areas-grid">
                     {activeBlueprint.areas.map((area) => (
                       <div key={area.id} className="area-card glass-panel">
-                        <div className="area-icon-box">{area.icon || '🎯'}</div>
+                        <div className="area-icon-box">{area.icon || <Target size={16} strokeWidth={1.8} style={{ color: 'var(--cyan)' }} aria-hidden="true" />}</div>
                         <div className="area-details">
                           <h4>{area.name}</h4>
                           <p>{area.description || 'Core focus vector'}</p>
@@ -310,9 +315,10 @@ const Blueprint = () => {
                         </button>
                         <button
                           onClick={() => handleDeletePhase(phase.id)}
-                          style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer' }}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                          title="Delete Phase"
                         >
-                          🗑️
+                          <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />
                         </button>
                       </div>
                     </div>
@@ -342,7 +348,7 @@ const Blueprint = () => {
                                 onClick={() => handleToggleMilestone(ms.id)}
                                 className={`milestone-check-btn ${ms.completed ? 'checked' : ''}`}
                               >
-                                {ms.completed ? '✓' : ''}
+                                {ms.completed && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
                               </button>
                               <div className="milestone-info-text">
                                 <h5>{ms.title}</h5>
@@ -352,13 +358,16 @@ const Blueprint = () => {
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                               {ms.target_date && (
-                                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>📅 {ms.target_date}</span>
+                                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <Calendar size={12} strokeWidth={1.8} aria-hidden="true" /> {ms.target_date}
+                                </span>
                               )}
                               <button
                                 onClick={() => handleDeleteMilestone(ms.id)}
                                 className="milestone-delete-btn"
+                                title="Delete Milestone"
                               >
-                                🗑️
+                                <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" />
                               </button>
                             </div>
                           </div>
@@ -377,7 +386,7 @@ const Blueprint = () => {
               <div className="modal-content-card">
                 <div className="modal-header">
                   <h3>Build New Life Blueprint</h3>
-                  <button onClick={() => setShowBpModal(false)} className="modal-close-btn">✕</button>
+                  <button onClick={() => setShowBpModal(false)} className="modal-close-btn"><X size={16} /></button>
                 </div>
                 <form onSubmit={handleCreateBlueprint} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div className="modal-form-group">
@@ -425,7 +434,7 @@ const Blueprint = () => {
               <div className="modal-content-card">
                 <div className="modal-header">
                   <h3>Add Strategic Phase</h3>
-                  <button onClick={() => setShowPhaseModal(false)} className="modal-close-btn">✕</button>
+                  <button onClick={() => setShowPhaseModal(false)} className="modal-close-btn"><X size={16} /></button>
                 </div>
                 <form onSubmit={handleCreatePhase} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div className="modal-form-group">
@@ -464,7 +473,7 @@ const Blueprint = () => {
               <div className="modal-content-card">
                 <div className="modal-header">
                   <h3>Add Milestone Protocol</h3>
-                  <button onClick={() => setShowMilestoneModal(false)} className="modal-close-btn">✕</button>
+                  <button onClick={() => setShowMilestoneModal(false)} className="modal-close-btn"><X size={16} /></button>
                 </div>
                 <form onSubmit={handleCreateMilestone} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div className="modal-form-group">

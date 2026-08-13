@@ -1,6 +1,22 @@
 import './ProgressCircle.css';
 
-const ProgressCircle = ({ percentage = 84, label = 'On Track' }) => {
+const getStatusLabel = (score) => {
+  if (score === undefined || score === null || score === 0) return 'Starting';
+  if (score >= 80) return 'Optimal';
+  if (score >= 60) return 'Strong';
+  if (score >= 40) return 'Focused';
+  if (score >= 20) return 'Building';
+  return 'Starting';
+};
+
+const ProgressCircle = ({
+  percentage = 0,
+  label = 'Starting',
+  disciplineScore = 0,
+  mindsetScore = 0,
+  executionScore = 0,
+  consistencyScore = 0
+}) => {
   const radius = 68;
   const strokeWidth = 10;
   const normalizedRadius = radius - strokeWidth * 0.5;
@@ -56,26 +72,26 @@ const ProgressCircle = ({ percentage = 84, label = 'On Track' }) => {
 
         <div className="progress-center-text">
           <span className="progress-number font-display">{percentage}%</span>
-          <span className="progress-label">{label}</span>
+          <span className="progress-label">{percentage > 0 ? label : 'Starting'}</span>
         </div>
       </div>
 
       <div className="progress-stats-grid">
         <div className="progress-stat-item">
           <span className="stat-name">Discipline</span>
-          <span className="stat-val highlight-cyan">Strong</span>
+          <span className="stat-val highlight-cyan">{getStatusLabel(disciplineScore)}</span>
         </div>
         <div className="progress-stat-item">
           <span className="stat-name">Mindset</span>
-          <span className="stat-val highlight-blue">Focused</span>
+          <span className="stat-val highlight-blue">{getStatusLabel(mindsetScore)}</span>
         </div>
         <div className="progress-stat-item">
           <span className="stat-name">Execution</span>
-          <span className="stat-val highlight-gold">Excellent</span>
+          <span className="stat-val highlight-gold">{getStatusLabel(executionScore)}</span>
         </div>
         <div className="progress-stat-item">
           <span className="stat-name">Consistency</span>
-          <span className="stat-val highlight-green">Building</span>
+          <span className="stat-val highlight-green">{getStatusLabel(consistencyScore)}</span>
         </div>
       </div>
     </div>

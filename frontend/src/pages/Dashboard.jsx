@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Flame, Brain, Zap, TrendingUp, CheckCircle2, DollarSign, Rocket, ArrowRight } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import HeroSection from '../components/HeroSection';
@@ -12,24 +13,29 @@ import MotivationBar from '../components/MotivationBar';
 import { getMissions, toggleMission, getProgress, getTelemetry, getUser, getGoals, getDailyReflection } from '../services/api';
 import './Dashboard.css';
 
-const defaultFallbackMissions = [
-  { id: 1, title: 'Morning Meditation Protocol', category: 'wellness', time: '10 min', difficulty: 'easy', completed: false, xpReward: 10 },
-  { id: 2, title: 'Deep Work Block & Code Architecture', category: 'productivity', time: '2 hrs', difficulty: 'hard', completed: true, xpReward: 25 },
-  { id: 3, title: 'High-Intensity Workout Session', category: 'fitness', time: '45 min', difficulty: 'hard', completed: false, xpReward: 20 },
-  { id: 4, title: 'Mastery Reading & Knowledge Note', category: 'learning', time: '20 min', difficulty: 'easy', completed: true, xpReward: 10 },
-  { id: 5, title: 'Gratitude & Vision Reflection', category: 'mindset', time: '5 min', difficulty: 'easy', completed: false, xpReward: 10 },
-];
-
 const Dashboard = () => {
-  const [missions, setMissions] = useState(defaultFallbackMissions);
-  const [progressData, setProgressData] = useState({ completed: 2, total: 5, percentage: 40 });
+  const [missions, setMissions] = useState([]);
+  const [progressData, setProgressData] = useState({ completed: 0, total: 0, percentage: 0 });
   const [telemetry, setTelemetry] = useState({
-    discipline_score: 92,
-    mindset_strength: 88,
-    consistency: 76,
-    growth_index: 74,
+    discipline_score: 0,
+    mindset_strength: 0,
+    consistency: 0,
+    growth_index: 0,
+    financial_goal: 0,
     streak_days: 0,
-    xp_earned: 35,
+    xp_earned: 0,
+    discipline_score_change: 0,
+    mindset_strength_change: 0,
+    consistency_change: 0,
+    growth_index_change: 0,
+    financial_goal_change: 0,
+    sparklines: {
+      discipline_score: [0, 0, 0, 0, 0, 0, 0],
+      mindset_strength: [0, 0, 0, 0, 0, 0, 0],
+      consistency: [0, 0, 0, 0, 0, 0, 0],
+      growth_index: [0, 0, 0, 0, 0, 0, 0],
+      financial_goal: [0, 0, 0, 0, 0, 0, 0],
+    }
   });
   const [user, setUser] = useState(null);
   const [goals, setGoals] = useState([]);
@@ -133,7 +139,7 @@ const Dashboard = () => {
             <HeroSection />
 
             {/* Performance Metrics Section (4-Column Grid) */}
-            <section className="metrics-section">
+            <section className="metrics-section" id="analytics">
               <div className="section-header">
                 <h2 className="section-title font-display">Performance Metrics</h2>
                 <span className="section-subtitle">Real-time telemetry</span>
@@ -143,90 +149,90 @@ const Dashboard = () => {
                 {/* Row 1 */}
                 <StatCard
                   title="Discipline Score"
-                  value={String(telemetry.discipline_score)}
+                  value={String(telemetry.discipline_score || 0)}
                   unit="/100"
                   subtitle="Building daily discipline"
-                  change="+6"
-                  trend="up"
-                  icon="🔥"
+                  change={`${telemetry.discipline_score_change >= 0 ? '+' : ''}${telemetry.discipline_score_change || 0}`}
+                  trend={telemetry.discipline_score_change >= 0 ? "up" : "down"}
+                  icon={<Flame size={22} strokeWidth={1.8} />}
                   accentColor="#38BDF8"
-                  sparklineData={[45, 55, 60, 72, 80, 85, telemetry.discipline_score]}
+                  sparklineData={telemetry.sparklines?.discipline_score || [0, 0, 0, 0, 0, 0, 0]}
                 />
                 <StatCard
                   title="Mindset Strength"
-                  value={String(telemetry.mindset_strength)}
+                  value={String(telemetry.mindset_strength || 0)}
                   unit="/100"
                   subtitle="Mental fortitude index"
-                  change="+8"
-                  trend="up"
-                  icon="🧠"
+                  change={`${telemetry.mindset_strength_change >= 0 ? '+' : ''}${telemetry.mindset_strength_change || 0}`}
+                  trend={telemetry.mindset_strength_change >= 0 ? "up" : "down"}
+                  icon={<Brain size={22} strokeWidth={1.8} />}
                   accentColor="#3B82F6"
-                  sparklineData={[30, 42, 50, 68, 75, 80, telemetry.mindset_strength]}
+                  sparklineData={telemetry.sparklines?.mindset_strength || [0, 0, 0, 0, 0, 0, 0]}
                 />
                 <StatCard
                   title="Consistency"
-                  value={String(telemetry.consistency)}
+                  value={String(telemetry.consistency || 0)}
                   unit="/100"
                   subtitle="Closer to Freedom"
-                  change="+5"
-                  trend="up"
-                  icon="⚡"
+                  change={`${telemetry.consistency_change >= 0 ? '+' : ''}${telemetry.consistency_change || 0}`}
+                  trend={telemetry.consistency_change >= 0 ? "up" : "down"}
+                  icon={<Zap size={22} strokeWidth={1.8} />}
                   accentColor="#FBBF24"
-                  sparklineData={[50, 52, 58, 62, 70, 72, telemetry.consistency]}
+                  sparklineData={telemetry.sparklines?.consistency || [0, 0, 0, 0, 0, 0, 0]}
                 />
                 <StatCard
                   title="Growth Index"
-                  value={String(telemetry.growth_index)}
+                  value={String(telemetry.growth_index || 0)}
                   unit="/100"
                   subtitle="Compound expansion"
-                  change="+7"
-                  trend="up"
-                  icon="📈"
+                  change={`${telemetry.growth_index_change >= 0 ? '+' : ''}${telemetry.growth_index_change || 0}`}
+                  trend={telemetry.growth_index_change >= 0 ? "up" : "down"}
+                  icon={<TrendingUp size={22} strokeWidth={1.8} />}
                   accentColor="#10B981"
-                  sparklineData={[40, 48, 55, 60, 65, 70, telemetry.growth_index]}
+                  sparklineData={telemetry.sparklines?.growth_index || [0, 0, 0, 0, 0, 0, 0]}
                 />
 
                 {/* Row 2 */}
                 <StatCard
                   title="Missions Completed"
-                  value={String(completedCount)}
+                  value={String(telemetry.mission_completion?.completed !== undefined ? telemetry.mission_completion.completed : completedCount)}
                   subtitle="Discipline actions"
-                  change={`+${completedCount}`}
-                  trend="up"
-                  icon="✅"
+                  change={`${telemetry.missions_completed_change >= 0 ? '+' : ''}${telemetry.missions_completed_change || 0}`}
+                  trend={telemetry.missions_completed_change >= 0 ? "up" : "down"}
+                  icon={<CheckCircle2 size={22} strokeWidth={1.8} />}
                   accentColor="#38BDF8"
-                  sparklineData={[10, 15, 22, 28, 35, 39, completedCount * 8 || 10]}
+                  sparklineData={telemetry.sparklines?.missions_completed || [0, 0, 0, 0, 0, 0, 0]}
                 />
                 <StatCard
                   title="Financial Goal"
-                  value="68%"
+                  value={String(telemetry.financial_goal || 0) + "%"}
                   subtitle="Closer to Freedom"
-                  change="+2%"
-                  trend="up"
-                  icon="💰"
+                  change={`${telemetry.financial_goal_change >= 0 ? '+' : ''}${telemetry.financial_goal_change || 0}%`}
+                  trend={telemetry.financial_goal_change >= 0 ? "up" : "down"}
+                  icon={<DollarSign size={22} strokeWidth={1.8} />}
                   accentColor="#FBBF24"
-                  sparklineData={[50, 54, 58, 60, 62, 65, 68]}
+                  sparklineData={telemetry.sparklines?.financial_goal || [0, 0, 0, 0, 0, 0, 0]}
                 />
                 <StatCard
                   title="Discipline Streak"
-                  value={String(telemetry.streak_days)}
+                  value={String(telemetry.streak_days || 0)}
                   unit="Days"
                   subtitle="Consistency compounding"
-                  change={telemetry.streak_days > 0 ? "🔥 Active" : "⚡ Ready"}
-                  trend="up"
-                  icon="⚡"
+                  change={`${telemetry.streak_days_change >= 0 ? '+' : ''}${telemetry.streak_days_change || 0}`}
+                  trend={telemetry.streak_days_change >= 0 ? "up" : "down"}
+                  icon={<Zap size={22} strokeWidth={1.8} />}
                   accentColor="#FBBF24"
-                  sparklineData={[0, 0, 0, telemetry.streak_days, telemetry.streak_days, telemetry.streak_days, telemetry.streak_days]}
+                  sparklineData={telemetry.sparklines?.streak_days || [0, 0, 0, 0, 0, 0, 0]}
                 />
                 <StatCard
                   title="Future You"
-                  value={`Level ${Math.floor((telemetry.xp_earned || 35) / 50) + 8}`}
-                  subtitle={`${telemetry.xp_earned || 35} Total XP`}
-                  change="⚡ On Track"
-                  trend="up"
-                  icon="🚀"
+                  value={`Level ${Math.floor((telemetry.xp_earned || 0) / 50) + 1}`}
+                  subtitle={`${telemetry.xp_earned || 0} Total XP`}
+                  change={`${telemetry.xp_earned_change >= 0 ? '+' : ''}${telemetry.xp_earned_change || 0} XP`}
+                  trend={telemetry.xp_earned_change >= 0 ? "up" : "down"}
+                  icon={<Rocket size={22} strokeWidth={1.8} />}
                   accentColor="#A78BFA"
-                  sparklineData={[6, 7, 7, 8, 8, 8, 9]}
+                  sparklineData={telemetry.sparklines?.xp_earned || [0, 0, 0, 0, 0, 0, 0]}
                 />
               </div>
             </section>
@@ -263,10 +269,51 @@ const Dashboard = () => {
           {/* 3. RIGHT INFORMATION PANEL (~320px Fixed Width) */}
           <aside className="right-panel">
             {/* 1. Today's Progress */}
-            <ProgressCircle
-              percentage={progressData.percentage || Math.round((completedCount / (missions.length || 1)) * 100)}
-              label="On Track"
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+              <ProgressCircle
+                percentage={progressData.percentage || (missions.length > 0 ? Math.round((completedCount / missions.length) * 100) : 0)}
+                label={progressData.percentage > 0 || completedCount > 0 ? "On Track" : "Starting"}
+                disciplineScore={telemetry.discipline_score || 0}
+                mindsetScore={telemetry.mindset_strength || 0}
+                executionScore={missions.length > 0 ? Math.round((completedCount / missions.length) * 100) : 0}
+                consistencyScore={telemetry.consistency || 0}
+              />
+              
+              {/* Dynamic Mission CTA */}
+              {(() => {
+                const pendingMission = missions.find(m => !m.completed);
+                if (pendingMission) {
+                  return (
+                    <Link 
+                      to="/missions"
+                      style={{ width: '100%', background: 'var(--cyan)', color: '#000', border: 'none', borderRadius: '8px', padding: '14px', fontWeight: '700', fontSize: '14px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', textDecoration: 'none', transition: 'all 0.2s' }}
+                      onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(56,189,248,0.3)'; }}
+                      onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+                    >
+                      Begin Today's Mission <ArrowRight size={16} strokeWidth={2.5} />
+                    </Link>
+                  );
+                } else if (missions.length > 0) {
+                  return (
+                    <Link to="/dashboard" style={{ width: '100%', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid var(--cyan)', color: 'var(--cyan)', borderRadius: '8px', padding: '14px', fontWeight: '700', fontSize: '14px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', textDecoration: 'none', transition: 'all 0.2s' }}
+                      onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(56, 189, 248, 0.2)'; }}
+                      onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(56, 189, 248, 0.1)'; }}
+                    >
+                      Review Today's Progress <ArrowRight size={16} strokeWidth={2.5} />
+                    </Link>
+                  );
+                } else {
+                  return (
+                    <Link to="/missions" style={{ width: '100%', background: 'var(--cyan)', color: '#000', border: 'none', borderRadius: '8px', padding: '14px', fontWeight: '700', fontSize: '14px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', textDecoration: 'none', transition: 'all 0.2s' }}
+                      onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(56,189,248,0.3)'; }}
+                      onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+                    >
+                      Create Today's Mission <ArrowRight size={16} strokeWidth={2.5} />
+                    </Link>
+                  );
+                }
+              })()}
+            </div>
 
             {/* 2. AI Coach Card */}
             <AICoachCard
@@ -290,7 +337,8 @@ const Dashboard = () => {
                 "{reflectionData.reflection.replace(/^"|"$/g, '')}"
               </h3>
               <Link to="/journal" className="reflection-cta-btn" style={{ textDecoration: 'none' }}>
-                <span>Write Reflection →</span>
+                <span>Write Reflection</span>
+                <ArrowRight size={16} strokeWidth={1.8} style={{ marginLeft: '6px' }} />
               </Link>
             </div>
           </aside>

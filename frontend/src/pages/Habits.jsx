@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
+import { Flame, Zap, Trophy, TrendingUp, TriangleAlert, Check, Trash2, X } from 'lucide-react';
 import {
   getHabits,
   getHabitStats,
@@ -142,8 +143,9 @@ const Habits = () => {
           </div>
 
           {error && (
-            <div style={{ padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '12px', color: '#EF4444', marginBottom: '24px' }}>
-              ⚠️ {error}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '12px', color: '#EF4444', marginBottom: '24px' }}>
+              <TriangleAlert size={16} strokeWidth={1.8} aria-hidden="true" />
+              <span>{error}</span>
             </div>
           )}
 
@@ -152,7 +154,7 @@ const Habits = () => {
             <div className="habit-stat-card glass-panel">
               <div className="habit-stat-header">
                 <span className="habit-stat-title">Active Habits</span>
-                <span className="habit-stat-icon">🔥</span>
+                <span className="habit-stat-icon"><Flame size={18} strokeWidth={1.8} style={{ color: '#38BDF8' }} aria-hidden="true" /></span>
               </div>
               <div className="habit-stat-value">{stats.total_active_habits}</div>
               <div className="habit-stat-sub">{stats.habits_completed_today} completed today</div>
@@ -161,7 +163,7 @@ const Habits = () => {
             <div className="habit-stat-card glass-panel">
               <div className="habit-stat-header">
                 <span className="habit-stat-title">Avg Current Streak</span>
-                <span className="habit-stat-icon">⚡</span>
+                <span className="habit-stat-icon"><Zap size={18} strokeWidth={1.8} style={{ color: '#FBBF24' }} aria-hidden="true" /></span>
               </div>
               <div className="habit-stat-value">{stats.avg_current_streak} <span style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>Days</span></div>
               <div className="habit-stat-sub">Consecutive execution</div>
@@ -170,7 +172,7 @@ const Habits = () => {
             <div className="habit-stat-card glass-panel">
               <div className="habit-stat-header">
                 <span className="habit-stat-title">Longest Record</span>
-                <span className="habit-stat-icon">🏆</span>
+                <span className="habit-stat-icon"><Trophy size={18} strokeWidth={1.8} style={{ color: '#FBBF24' }} aria-hidden="true" /></span>
               </div>
               <div className="habit-stat-value">{stats.max_longest_streak} <span style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>Days</span></div>
               <div className="habit-stat-sub">All-time record</div>
@@ -179,7 +181,7 @@ const Habits = () => {
             <div className="habit-stat-card glass-panel">
               <div className="habit-stat-header">
                 <span className="habit-stat-title">7-Day Consistency</span>
-                <span className="habit-stat-icon">📈</span>
+                <span className="habit-stat-icon"><TrendingUp size={18} strokeWidth={1.8} style={{ color: '#10B981' }} aria-hidden="true" /></span>
               </div>
               <div className="habit-stat-value">{stats.overall_7day_completion_pct}%</div>
               <div className="habit-stat-sub">Weekly protocol average</div>
@@ -209,8 +211,8 @@ const Habits = () => {
                       <span className={`category-tag ${habit.category}`}>
                         {habit.category}
                       </span>
-                      <span className="streak-badge">
-                        ⚡ {habit.current_streak} Day Streak (Best: {habit.longest_streak})
+                      <span className="streak-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Zap size={12} strokeWidth={1.8} aria-hidden="true" /> {habit.current_streak} Day Streak (Best: {habit.longest_streak})
                       </span>
                     </div>
                     <h3 className="habit-title">{habit.title}</h3>
@@ -229,8 +231,8 @@ const Habits = () => {
                           className={`matrix-cell ${dayItem.completed ? 'completed' : ''}`}
                         >
                           <span className="matrix-cell-day">{formatDayLabel(dayItem.date)}</span>
-                          <span className="matrix-cell-dot">
-                            {dayItem.completed ? '✓' : ''}
+                          <span className="matrix-cell-dot" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {dayItem.completed && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
                           </span>
                         </button>
                       ))}
@@ -244,7 +246,7 @@ const Habits = () => {
                       className="action-icon-btn"
                       title="Delete habit"
                     >
-                      🗑️
+                      <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -260,7 +262,7 @@ const Habits = () => {
           <div className="modal-card">
             <div className="modal-header">
               <h3>Create Habit Protocol</h3>
-              <button onClick={() => setShowModal(false)} className="close-btn">✕</button>
+              <button onClick={() => setShowModal(false)} className="close-btn"><X size={16} /></button>
             </div>
             <form onSubmit={handleCreateSubmit}>
               <div className="form-group">

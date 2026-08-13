@@ -1,6 +1,28 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { searchApplication, getSettings, getUser } from '../services/api';
+import { 
+  Search, 
+  Zap, 
+  Target, 
+  ClipboardList, 
+  MapPin, 
+  Moon, 
+  Bell,
+  LogOut,
+  CheckCheck,
+  Trash2
+} from 'lucide-react';
+import {
+  searchApplication,
+  getUser,
+  logoutUser,
+  getNotifications,
+  getUnreadNotificationCount,
+  markNotificationRead,
+  markAllNotificationsRead,
+  deleteNotification
+} from '../services/api';
+import { useNotificationsSocket } from '../hooks/useNotificationsSocket';
 import './TopBar.css';
 
 const TopBar = ({ user }) => {
@@ -8,25 +30,85 @@ const TopBar = ({ user }) => {
   const [searchResults, setSearchResults] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [settings, setSettings] = useState(null);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [userProfile, setUserProfile] = useState(user || null);
   const searchInputRef = useRef(null);
   const navigate = useNavigate();
+
+  const handleIncomingNotification = useCallback((notif) => {
+    setNotifications((prev) => {
+      if (prev.some((n) => n.id === notif.id)) return prev;
+      return [notif, ...prev];
+    });
+    setUnreadCount((prev) => prev + 1);
+  }, []);
+
+  useNotificationsSocket(handleIncomingNotification);
+
+
+  const handleMarkSingleRead = async (id, e) => {
+    if (e) e.stopPropagation();
+    try {
+      await markNotificationRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, is_read: 1 } : n))
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('Failed to mark read:', err);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllNotificationsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: 1 })));
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('Failed to mark all read:', err);
+    }
+  };
+
+  const handleDeleteNotif = async (id, e) => {
+    if (e) e.stopPropagation();
+    try {
+      await deleteNotification(id);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('Failed to delete notification:', err);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+      navigate('/login');
+    } catch (err) {
+      console.error('Logout failed:', err);
+      navigate('/login');
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
     async function loadTopBarData() {
       try {
-        const [s, u] = await Promise.all([
-          getSettings().catch(() => null),
+        const [u, notifList, unreadData] = await Promise.all([
           getUser().catch(() => null),
+          getNotifications(20, 0).catch(() => []),
+          getUnreadNotificationCount().catch(() => ({ unread_count: 0 })),
         ]);
         if (isMounted) {
-          if (s) setSettings(s);
           if (u) setUserProfile(u);
+          if (notifList) setNotifications(notifList);
+          if (unreadData) setUnreadCount(unreadData.unread_count || 0);
         }
       } catch (err) {
-        console.warn('TopBar settings sync warning:', err);
+        console.warn('TopBar data sync warning:', err);
       }
     }
     loadTopBarData();
@@ -103,10 +185,7 @@ const TopBar = ({ user }) => {
     <header className="topbar-container" style={{ position: 'relative' }}>
       {/* Search Input Field */}
       <div className="topbar-search glass-panel">
-        <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="8"/>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
+        <Search className="search-icon" size={18} strokeWidth={1.8} aria-hidden="true" style={{ color: 'var(--text-tertiary)' }} />
         <input
           ref={searchInputRef}
           type="text"
@@ -157,7 +236,9 @@ const TopBar = ({ user }) => {
               {/* Habits */}
               {searchResults.habits?.length > 0 && (
                 <div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '600', marginBottom: '6px' }}>⚡ HABITS ({searchResults.habits.length})</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '600', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Zap size={18} strokeWidth={1.8} aria-hidden="true" /> HABITS ({searchResults.habits.length})
+                  </div>
                   {searchResults.habits.map(h => (
                     <div
                       key={h.id}
@@ -176,7 +257,9 @@ const TopBar = ({ user }) => {
               {/* Goals */}
               {searchResults.goals?.length > 0 && (
                 <div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '600', marginBottom: '6px' }}>🎯 GOALS ({searchResults.goals.length})</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '600', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Target size={18} strokeWidth={1.8} aria-hidden="true" /> GOALS ({searchResults.goals.length})
+                  </div>
                   {searchResults.goals.map(g => (
                     <div
                       key={g.id}
@@ -195,7 +278,9 @@ const TopBar = ({ user }) => {
               {/* Missions */}
               {searchResults.missions?.length > 0 && (
                 <div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '600', marginBottom: '6px' }}>📋 MISSIONS ({searchResults.missions.length})</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '600', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <ClipboardList size={18} strokeWidth={1.8} aria-hidden="true" /> MISSIONS ({searchResults.missions.length})
+                  </div>
                   {searchResults.missions.map(m => (
                     <div
                       key={m.id}
@@ -214,7 +299,9 @@ const TopBar = ({ user }) => {
               {/* Blueprint Milestones */}
               {searchResults.milestones?.length > 0 && (
                 <div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '600', marginBottom: '6px' }}>🗺️ MILESTONES ({searchResults.milestones.length})</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '600', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <MapPin size={18} strokeWidth={1.8} aria-hidden="true" /> MILESTONES ({searchResults.milestones.length})
+                  </div>
                   {searchResults.milestones.map(ms => (
                     <div
                       key={ms.id}
@@ -234,12 +321,37 @@ const TopBar = ({ user }) => {
         </div>
       )}
 
+      {/* Brand Text - Centered */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        pointerEvents: 'none',
+        padding: '0 12px',
+        minWidth: 0,
+        overflow: 'hidden'
+      }}>
+        <span style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: '14px',
+          fontWeight: '700',
+          letterSpacing: '1.5px',
+          color: 'var(--text-primary)',
+          opacity: 0.9,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }}>MASTERY KEY <span style={{ color: 'var(--cyan)' }}>•</span> COACH</span>
+      </div>
+
       {/* Right User & AI Status Area */}
       <div className="topbar-actions">
         {/* Quick Theme Switch Button */}
         <button
           onClick={handleThemeToggleQuick}
           title="Toggle Theme"
+          aria-label="Toggle theme"
           style={{
             padding: '6px 10px',
             background: 'rgba(10, 22, 40, 0.6)',
@@ -247,30 +359,148 @@ const TopBar = ({ user }) => {
             borderRadius: '9999px',
             color: 'var(--text-primary)',
             fontSize: '12px',
-            cursor: 'pointer'
-          }}
-        >
-          🌓 Theme
-        </button>
-
-        {/* Active Notification Protocol Indicator */}
-        {settings?.notifications_enabled && (
-          <div style={{
-            fontSize: '11px',
-            fontWeight: '600',
-            color: 'var(--cyan)',
-            padding: '4px 10px',
-            background: 'rgba(56, 189, 248, 0.1)',
-            border: '1px solid rgba(56, 189, 248, 0.25)',
-            borderRadius: '9999px',
+            cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px'
-          }}>
-            <span>🔔</span>
-            <span>{settings.daily_reminder_time || '08:00'} Protocol</span>
-          </div>
-        )}
+            gap: '6px'
+          }}
+        >
+          <Moon size={18} strokeWidth={1.8} aria-hidden="true" />
+          <span>Theme</span>
+        </button>
+
+        {/* Notification Bell with Badge & Dropdown */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setIsNotifDropdownOpen(!isNotifDropdownOpen)}
+            className="notification-bell-btn"
+            title="Notifications"
+            aria-label="Toggle notifications"
+            style={{
+              padding: '8px',
+              background: 'rgba(10, 22, 40, 0.6)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '50%',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative'
+            }}
+          >
+            <Bell size={18} strokeWidth={1.8} aria-hidden="true" />
+            {unreadCount > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '-4px',
+                right: '-4px',
+                background: 'var(--cyan)',
+                color: '#090D16',
+                borderRadius: '9999px',
+                padding: '2px 5px',
+                fontSize: '10px',
+                fontWeight: '700',
+                lineHeight: 1
+              }}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Notifications Dropdown Panel */}
+          {isNotifDropdownOpen && (
+            <div style={{
+              position: 'absolute',
+              top: 'calc(100% + 12px)',
+              right: 0,
+              width: '320px',
+              maxHeight: '420px',
+              background: 'rgba(7, 20, 38, 0.95)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '12px',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+              zIndex: 1000,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                padding: '12px 16px',
+                borderBottom: '1px solid var(--border-subtle)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                  Notifications {unreadCount > 0 && `(${unreadCount})`}
+                </span>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={handleMarkAllRead}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--cyan)',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <CheckCheck size={14} /> Mark all read
+                  </button>
+                )}
+              </div>
+
+              <div style={{ overflowY: 'auto', flex: 1, padding: '8px 0' }}>
+                {notifications.length === 0 ? (
+                  <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px' }}>
+                    No system notifications.
+                  </div>
+                ) : (
+                  notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      onClick={() => !n.is_read && handleMarkSingleRead(n.id)}
+                      style={{
+                        padding: '10px 16px',
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                        background: n.is_read ? 'transparent' : 'rgba(56, 189, 248, 0.06)',
+                        display: 'flex',
+                        gap: '10px',
+                        cursor: 'pointer',
+                        transition: 'background 0.2s'
+                      }}
+                    >
+                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: n.is_read ? 'transparent' : 'var(--cyan)', marginTop: '6px', flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '12px', fontWeight: n.is_read ? '500' : '700', color: 'var(--text-primary)', marginBottom: '2px' }}>
+                          {n.title}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', lineHeight: '1.4', marginBottom: '4px' }}>
+                          {n.message}
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', opacity: 0.7 }}>
+                          {n.created_at || 'Just now'}
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => handleDeleteNotif(n.id, e)}
+                        title="Delete notification"
+                        style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', opacity: 0.6, padding: '2px' }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* AI Coach Online Pill */}
         <div className="ai-status-pill">
@@ -279,19 +509,85 @@ const TopBar = ({ user }) => {
         </div>
 
         {/* User Profile & Badge */}
-        <div
-          onClick={() => navigate('/profile')}
-          className="user-profile-wrapper glass-panel"
-          style={{ cursor: 'pointer', transition: 'all 0.2s' }}
-          title="View & Edit Identity Profile"
-        >
-          <div className="user-level-badge">
-            <span className="badge-star">⚡</span>
-            <span className="badge-text">{displayName} • {usernameDisplay}</span>
+        <div style={{ position: 'relative' }}>
+          <div
+            onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+            className="user-profile-wrapper glass-panel"
+            style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+            title="Profile Options"
+          >
+            <div className="user-level-badge">
+              <Zap className="badge-star" size={18} strokeWidth={1.8} aria-hidden="true" />
+              <span className="badge-text">{displayName} • {usernameDisplay}</span>
+            </div>
+            <div className="avatar-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.15)', border: '1px solid var(--cyan)', color: 'var(--cyan)', fontWeight: '700', fontSize: '12px' }}>
+              {avatarInitials}
+            </div>
           </div>
-          <div className="avatar-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: '50%', background: 'rgba(56, 189, 248, 0.15)', border: '1px solid var(--cyan)', color: 'var(--cyan)', fontWeight: '700', fontSize: '12px' }}>
-            {avatarInitials}
-          </div>
+          
+          {/* Profile Dropdown Menu */}
+          {isProfileDropdownOpen && (
+            <div style={{
+              position: 'absolute',
+              top: 'calc(100% + 12px)',
+              right: 0,
+              width: '220px',
+              background: 'rgba(7, 20, 38, 0.95)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid var(--cyan)',
+              borderRadius: '12px',
+              padding: '8px',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+              zIndex: 1000,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px'
+            }}>
+              <div
+                onClick={() => {
+                  setIsProfileDropdownOpen(false);
+                  navigate('/profile');
+                }}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: 'var(--text-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+              >
+                My Identity Profile
+              </div>
+              <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />
+              <div
+                onClick={handleLogout}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: 'var(--accent-red, #ef4444)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+              >
+                <LogOut size={16} strokeWidth={2} />
+                Sign Out
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>
@@ -299,3 +595,4 @@ const TopBar = ({ user }) => {
 };
 
 export default TopBar;
+

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, TriangleAlert } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Login.css';
 
@@ -46,7 +47,7 @@ const Login = () => {
           <p>Your next level of discipline is waiting.</p>
         </div>
 
-        {errorMsg && <div className="auth-error-banner">⚠️ {errorMsg}</div>}
+        {errorMsg && <div className="auth-error-banner"><TriangleAlert size={16} /> {errorMsg}</div>}
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="auth-field-group">
@@ -76,7 +77,7 @@ const Login = () => {
                 onClick={() => setShowPassword(!showPassword)}
                 className="auth-password-toggle"
               >
-                {showPassword ? '🙈' : '👁️'}
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>

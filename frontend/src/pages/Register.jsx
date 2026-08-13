@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, TriangleAlert, Check, X, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Login.css';
 import './Register.css';
@@ -96,7 +97,7 @@ const Register = () => {
         {createdUser ? (
           /* Onboarding Success Card */
           <div className="onboarding-card">
-            <div className="onboarding-icon">✦</div>
+            <div className="onboarding-icon"><Sparkles size={28} /></div>
             <h1 className="onboarding-title font-serif">ACCOUNT CREATED</h1>
             <p className="onboarding-subtitle">
               Welcome to Mastery Key Coach, {createdUser.full_name}.
@@ -125,7 +126,7 @@ const Register = () => {
               <p>Build your identity. Build your discipline. Build your future.</p>
             </div>
 
-            {errorMsg && <div className="auth-error-banner">⚠️ {errorMsg}</div>}
+            {errorMsg && <div className="auth-error-banner"><TriangleAlert size={16} /> {errorMsg}</div>}
 
             <form onSubmit={handleSubmit} className="auth-form">
               <div className="auth-field-group">
@@ -153,9 +154,11 @@ const Register = () => {
                 )}
                 {!checkingUsername && availability && (
                   <div className={`username-feedback ${availability.available ? 'username-available' : 'username-taken'}`}>
-                    {availability.available
-                      ? `✓ @${availability.username} is available`
-                      : `✕ ${availability.reason || `@${availability.username} is already taken`}`}
+                    {availability.available ? (
+                      <><Check size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} /> @{availability.username} is available</>
+                    ) : (
+                      <><X size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} /> {availability.reason || `@${availability.username} is already taken`}</>
+                    )}
                   </div>
                 )}
               </div>
@@ -186,7 +189,7 @@ const Register = () => {
                     onClick={() => setShowPassword(!showPassword)}
                     className="auth-password-toggle"
                   >
-                    {showPassword ? '🙈' : '👁️'}
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>

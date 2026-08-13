@@ -1,4 +1,16 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Globe,
+  MessageSquare,
+  MessageCircle,
+  Trophy,
+  Brain,
+  HelpCircle,
+  TriangleAlert,
+  Heart,
+  Trash2
+} from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import {
@@ -8,19 +20,22 @@ import {
   toggleCommunityLike,
   getCommunityComments,
   createCommunityComment,
+  deleteCommunityComment,
+  createConversation,
   getUser
 } from '../services/api';
 import './Community.css';
 
 const CATEGORIES = [
-  { id: 'all', label: 'All Feeds', icon: '🌐' },
-  { id: 'general', label: 'General', icon: '💬' },
-  { id: 'wins', label: 'Victory Wins', icon: '🏆' },
-  { id: 'mindset', label: 'Mindset Insights', icon: '🧠' },
-  { id: 'questions', label: 'Q&A Discussions', icon: '❓' },
+  { id: 'all', label: 'All Feeds', icon: Globe },
+  { id: 'general', label: 'General', icon: MessageSquare },
+  { id: 'wins', label: 'Victory Wins', icon: Trophy },
+  { id: 'mindset', label: 'Mindset Insights', icon: Brain },
+  { id: 'questions', label: 'Q&A Discussions', icon: HelpCircle },
 ];
 
 const Community = () => {
+  const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [newPostContent, setNewPostContent] = useState('');
@@ -33,6 +48,17 @@ const Community = () => {
 
   // Active expanded comments map: { [postId]: { comments: [], loading: false, open: true, input: '' } }
   const [commentsState, setCommentsState] = useState({});
+
+  const handleMessageAuthor = async (targetUserId) => {
+    if (!targetUserId || targetUserId === currentUserId) return;
+    try {
+      await createConversation(targetUserId);
+      navigate('/messages');
+    } catch (err) {
+      console.error('Failed to open chat:', err);
+      navigate('/messages');
+    }
+  };
 
   const loadPosts = async (cat = selectedCategory) => {
     try {
@@ -197,7 +223,23 @@ const Community = () => {
 
       setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments_count: (p.comments_count || 0) + 1 } : p));
     } catch (err) {
-      alert(err.message || 'Failed to post comment.');
+      console.error('Failed to add comment:', err);
+    }
+  };
+
+  const handleDeleteComment = async (postId, commentId) => {
+    try {
+      await deleteCommunityComment(commentId);
+      setCommentsState(prev => ({
+        ...prev,
+        [postId]: {
+          ...prev[postId],
+          comments: (prev[postId]?.comments || []).filter(c => c.id !== commentId)
+        }
+      }));
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments_count: Math.max(0, (p.comments_count || 1) - 1) } : p));
+    } catch (err) {
+      console.error('Failed to delete comment:', err);
     }
   };
 
@@ -216,8 +258,8 @@ const Community = () => {
           </div>
 
           {error && (
-            <div style={{ padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', borderRadius: '12px', color: '#EF4444', marginBottom: '24px' }}>
-              ⚠️ {error}
+            <div style={{ padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #EF4444', borderRadius: '12px', color: '#EF4444', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <TriangleAlert size={16} /> {error}
             </div>
           )}
 
@@ -237,10 +279,10 @@ const Community = () => {
                   onChange={(e) => setNewPostCategory(e.target.value)}
                   className="community-category-select"
                 >
-                  <option value="general">💬 General</option>
-                  <option value="wins">🏆 Victory Wins</option>
-                  <option value="mindset">🧠 Mindset Insights</option>
-                  <option value="questions">❓ Q&A Discussions</option>
+                  <option value="general">General</option>
+                  <option value="wins">Victory Wins</option>
+                  <option value="mindset">Mindset Insights</option>
+                  <option value="questions">Q&A Discussions</option>
                 </select>
 
                 <button
@@ -256,16 +298,19 @@ const Community = () => {
 
           {/* Category Filter Tabs */}
           <div className="community-filter-bar">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => handleCategoryChange(cat.id)}
-                className={`community-filter-btn ${selectedCategory === cat.id ? 'active' : ''}`}
-              >
-                <span>{cat.icon}</span>
-                <span>{cat.label}</span>
-              </button>
-            ))}
+            {CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => handleCategoryChange(cat.id)}
+                  className={`community-filter-btn ${selectedCategory === cat.id ? 'active' : ''}`}
+                >
+                  <span><Icon size={16} /></span>
+                  <span>{cat.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Posts Feed */}
@@ -303,7 +348,13 @@ const Community = () => {
                         onClick={() => handleToggleLike(post.id)}
                         className={`post-action-btn ${post.user_has_liked ? 'liked' : ''}`}
                       >
-                        <span>{post.user_has_liked ? '❤️' : '🤍'}</span>
+                        <span>
+                          <Heart
+                            size={16}
+                            fill={post.user_has_liked ? '#EF4444' : 'none'}
+                            color={post.user_has_liked ? '#EF4444' : 'currentColor'}
+                          />
+                        </span>
                         <span>{post.likes_count ?? 0} Likes</span>
                       </button>
 
@@ -311,9 +362,20 @@ const Community = () => {
                         onClick={() => handleToggleCommentsThread(post.id)}
                         className="post-action-btn"
                       >
-                        <span>💬</span>
+                        <span><MessageSquare size={16} /></span>
                         <span>{post.comments_count ?? 0} Comments</span>
                       </button>
+
+                      {!isOwned && (
+                        <button
+                          onClick={() => handleMessageAuthor(post.user_id)}
+                          className="post-action-btn"
+                          title="Message Author"
+                        >
+                          <span><MessageCircle size={16} /></span>
+                          <span>Message</span>
+                        </button>
+                      )}
 
                       {isOwned && (
                         <button
@@ -321,7 +383,7 @@ const Community = () => {
                           className="btn-delete-post"
                           title="Delete post"
                         >
-                          🗑️ Delete
+                          <Trash2 size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} /> Delete
                         </button>
                       )}
                     </div>
@@ -335,9 +397,21 @@ const Community = () => {
                           <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>No comments yet. Start the conversation!</div>
                         ) : (
                           cState.comments.map((c) => (
-                            <div key={c.id} className="comment-item">
-                              <div className="comment-author">{c.author_name}</div>
-                              <div className="comment-text">{c.content}</div>
+                            <div key={c.id} className="comment-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <div className="comment-author">{c.author_name}</div>
+                                <div className="comment-text">{c.content}</div>
+                              </div>
+                              {c.user_id === currentUserId && (
+                                <button
+                                  onClick={() => handleDeleteComment(post.id, c.id)}
+                                  className="btn-delete-post"
+                                  title="Delete comment"
+                                  style={{ padding: '2px 6px', fontSize: '11px' }}
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
                             </div>
                           ))
                         )}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Zap, Laptop, HeartPulse, Dumbbell, BookOpen, Brain, CheckCircle2, Target, Flame, TriangleAlert, X } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import MissionCard from '../components/MissionCard';
@@ -6,12 +7,12 @@ import { getMissions, toggleMission, createMission, getTelemetry } from '../serv
 import './Missions.css';
 
 const CATEGORY_FILTERS = [
-  { id: 'all', label: 'All Protocols', icon: '⚡' },
-  { id: 'productivity', label: 'Productivity', icon: '💻' },
-  { id: 'wellness', label: 'Wellness', icon: '🧘' },
-  { id: 'fitness', label: 'Fitness', icon: '🏋️' },
-  { id: 'learning', label: 'Learning', icon: '📖' },
-  { id: 'mindset', label: 'Mindset', icon: '🧠' },
+  { id: 'all', label: 'All Protocols', icon: <Zap size={14} style={{ color: '#FBBF24' }} /> },
+  { id: 'productivity', label: 'Productivity', icon: <Laptop size={14} style={{ color: '#38BDF8' }} /> },
+  { id: 'wellness', label: 'Wellness', icon: <HeartPulse size={14} style={{ color: '#EC4899' }} /> },
+  { id: 'fitness', label: 'Fitness', icon: <Dumbbell size={14} style={{ color: '#10B981' }} /> },
+  { id: 'learning', label: 'Learning', icon: <BookOpen size={14} style={{ color: '#3B82F6' }} /> },
+  { id: 'mindset', label: 'Mindset', icon: <Brain size={14} style={{ color: '#A78BFA' }} /> },
 ];
 
 const Missions = () => {
@@ -152,8 +153,9 @@ const Missions = () => {
           </div>
 
           {error && (
-            <div style={{ padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '12px', color: '#EF4444', marginBottom: '24px' }}>
-              ⚠️ {error}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '12px', color: '#EF4444', marginBottom: '24px' }}>
+              <TriangleAlert size={16} strokeWidth={1.8} aria-hidden="true" />
+              <span>{error}</span>
             </div>
           )}
 
@@ -162,7 +164,7 @@ const Missions = () => {
             <div className="missions-stat-card glass-panel">
               <div className="missions-stat-header">
                 <span className="missions-stat-title">Protocols Completed</span>
-                <span style={{ fontSize: '16px' }}>✅</span>
+                <CheckCircle2 size={18} strokeWidth={1.8} style={{ color: '#10B981' }} aria-hidden="true" />
               </div>
               <div className="missions-stat-value">{completedCount} <span style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>/ {totalCount}</span></div>
               <div className="missions-stat-sub">Daily execution target</div>
@@ -171,7 +173,7 @@ const Missions = () => {
             <div className="missions-stat-card glass-panel">
               <div className="missions-stat-header">
                 <span className="missions-stat-title">Completion Rate</span>
-                <span style={{ fontSize: '16px' }}>🎯</span>
+                <Target size={18} strokeWidth={1.8} style={{ color: '#38BDF8' }} aria-hidden="true" />
               </div>
               <div className="missions-stat-value">{completionPct}%</div>
               <div className="missions-stat-sub">Discipline efficiency</div>
@@ -180,7 +182,7 @@ const Missions = () => {
             <div className="missions-stat-card glass-panel">
               <div className="missions-stat-header">
                 <span className="missions-stat-title">Total XP Earned</span>
-                <span style={{ fontSize: '16px' }}>⚡</span>
+                <Zap size={18} strokeWidth={1.8} style={{ color: '#FBBF24' }} aria-hidden="true" />
               </div>
               <div className="missions-stat-value">{telemetry?.xp_earned ?? 0} <span style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>XP</span></div>
               <div className="missions-stat-sub">Level progression points</div>
@@ -189,7 +191,7 @@ const Missions = () => {
             <div className="missions-stat-card glass-panel">
               <div className="missions-stat-header">
                 <span className="missions-stat-title">Discipline Streak</span>
-                <span style={{ fontSize: '16px' }}>🔥</span>
+                <Flame size={18} strokeWidth={1.8} style={{ color: '#F97316' }} aria-hidden="true" />
               </div>
               <div className="missions-stat-value">{telemetry?.streak_days ?? 0} <span style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>Days</span></div>
               <div className="missions-stat-sub">Consecutive active days</div>
@@ -203,8 +205,9 @@ const Missions = () => {
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`category-filter-btn ${selectedCategory === cat.id ? 'active' : ''}`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
-                <span>{cat.icon}</span>
+                {cat.icon}
                 <span>{cat.label}</span>
               </button>
             ))}
@@ -240,7 +243,7 @@ const Missions = () => {
               <div className="modal-content-card">
                 <div className="modal-header">
                   <h3>Create Daily Mission Protocol</h3>
-                  <button onClick={() => setShowModal(false)} className="modal-close-btn">✕</button>
+                  <button onClick={() => setShowModal(false)} className="modal-close-btn"><X size={16} /></button>
                 </div>
 
                 <form onSubmit={handleCreateMission} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

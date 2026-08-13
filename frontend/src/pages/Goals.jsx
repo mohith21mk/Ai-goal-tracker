@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { TriangleAlert, Target, Calendar, Pencil, Trash2, X } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import MissionCard from '../components/MissionCard';
@@ -292,8 +293,9 @@ const Goals = () => {
           </div>
 
           {apiError && (
-            <div className="api-warning-bar">
-              <span>⚠️ {apiError}</span>
+            <div className="api-warning-bar" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <TriangleAlert size={16} strokeWidth={1.8} style={{ color: '#EF4444' }} aria-hidden="true" />
+              <span>{apiError}</span>
               <button className="retry-btn" onClick={fetchGoalsData}>Retry Connection</button>
             </div>
           )}
@@ -306,7 +308,9 @@ const Goals = () => {
             </div>
           ) : goals.length === 0 ? (
             <div className="goals-empty-state glass-panel">
-              <div className="empty-icon">🎯</div>
+              <div className="empty-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Target size={40} strokeWidth={1.8} style={{ color: 'var(--cyan)', filter: 'drop-shadow(0 0 10px rgba(56, 189, 248, 0.4))' }} aria-hidden="true" />
+              </div>
               <h3 className="empty-title font-display">No Goals Defined Yet</h3>
               <p className="empty-desc">
                 No goals yet. Define the next milestone and start building your mastery.
@@ -354,8 +358,8 @@ const Goals = () => {
                         <p className="goal-card-desc">{goal.description}</p>
 
                         <div className="goal-card-meta">
-                          <span className="target-date-text">
-                            📅 {formatDate(goal.target_date)}
+                          <span className="target-date-text" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Calendar size={13} strokeWidth={1.8} aria-hidden="true" /> {formatDate(goal.target_date)}
                           </span>
 
                           <div className="goal-card-actions">
@@ -364,7 +368,7 @@ const Goals = () => {
                               className="action-icon-btn edit-btn"
                               onClick={(e) => openEditModal(goal, e)}
                             >
-                              ✏️
+                              <Pencil size={14} strokeWidth={1.8} aria-hidden="true" />
                             </button>
                             <button
                               aria-label={`Delete ${goal.title}`}
@@ -374,7 +378,7 @@ const Goals = () => {
                                 setDeletingGoal(goal);
                               }}
                             >
-                              🗑️
+                              <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" />
                             </button>
                           </div>
                         </div>
@@ -480,7 +484,7 @@ const Goals = () => {
               <h3 className="modal-title font-display">
                 {editingGoal ? 'Edit Milestone Goal' : 'Define New Milestone Goal'}
               </h3>
-              <button aria-label="Close modal" className="modal-close-btn" onClick={closeModal}>✕</button>
+              <button aria-label="Close modal" className="modal-close-btn" onClick={closeModal}><X size={16} /></button>
             </div>
 
             <form onSubmit={handleFormSubmit} className="modal-form">

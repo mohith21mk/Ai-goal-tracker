@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { TriangleAlert, CheckCircle2, Pencil, Flame, Zap, Target, Shield, Globe, X } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import { getUser, updateUser } from '../services/api';
@@ -99,7 +100,11 @@ const Profile = () => {
               color: feedbackMessage.type === 'error' ? '#EF4444' : 'var(--cyan)',
               fontSize: '13px'
             }}>
-              {feedbackMessage.type === 'error' ? '⚠️' : '✅'} {feedbackMessage.text}
+              {feedbackMessage.type === 'error' ? (
+                <TriangleAlert size={16} strokeWidth={1.8} style={{ color: '#EF4444' }} aria-hidden="true" />
+              ) : (
+                <CheckCircle2 size={16} strokeWidth={1.8} style={{ color: 'var(--cyan)' }} aria-hidden="true" />
+              )} {feedbackMessage.text}
             </div>
           )}
 
@@ -133,8 +138,8 @@ const Profile = () => {
                     {user?.bio || 'AI Engineering & Full-Stack Systems Mastery'}
                   </div>
                 </div>
-                <button onClick={handleOpenEditModal} className="btn-edit-profile">
-                  ✏️ Edit Profile
+                <button onClick={handleOpenEditModal} className="btn-edit-profile" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <Pencil size={14} strokeWidth={1.8} aria-hidden="true" /> Edit Profile
                 </button>
               </div>
 
@@ -143,7 +148,7 @@ const Profile = () => {
                 <div className="profile-stat-card glass-panel">
                   <div className="profile-stat-header">
                     <span className="profile-stat-label">Discipline Streak</span>
-                    <span className="profile-stat-icon">🔥</span>
+                    <span className="profile-stat-icon"><Flame size={18} strokeWidth={1.8} style={{ color: '#F97316' }} aria-hidden="true" /></span>
                   </div>
                   <div className="profile-stat-val">{user?.streak_days || 0} Days</div>
                   <div className="profile-stat-sub">Consecutive protocol execution</div>
@@ -152,7 +157,7 @@ const Profile = () => {
                 <div className="profile-stat-card glass-panel">
                   <div className="profile-stat-header">
                     <span className="profile-stat-label">Total Mastery XP</span>
-                    <span className="profile-stat-icon">⚡</span>
+                    <span className="profile-stat-icon"><Zap size={18} strokeWidth={1.8} style={{ color: '#FBBF24' }} aria-hidden="true" /></span>
                   </div>
                   <div className="profile-stat-val">{user?.xp_earned || 0} XP</div>
                   <div className="profile-stat-sub">Level 8 Champion progress</div>
@@ -161,7 +166,7 @@ const Profile = () => {
                 <div className="profile-stat-card glass-panel">
                   <div className="profile-stat-header">
                     <span className="profile-stat-label">Missions Completed</span>
-                    <span className="profile-stat-icon">✅</span>
+                    <span className="profile-stat-icon"><CheckCircle2 size={18} strokeWidth={1.8} style={{ color: '#10B981' }} aria-hidden="true" /></span>
                   </div>
                   <div className="profile-stat-val">{user?.completed_missions || 0}</div>
                   <div className="profile-stat-sub">Daily protocols executed</div>
@@ -170,7 +175,7 @@ const Profile = () => {
                 <div className="profile-stat-card glass-panel">
                   <div className="profile-stat-header">
                     <span className="profile-stat-label">Active Goals</span>
-                    <span className="profile-stat-icon">🎯</span>
+                    <span className="profile-stat-icon"><Target size={18} strokeWidth={1.8} style={{ color: '#38BDF8' }} aria-hidden="true" /></span>
                   </div>
                   <div className="profile-stat-val">{user?.active_goals || 0}</div>
                   <div className="profile-stat-sub">High-leverage targets</div>
@@ -181,7 +186,11 @@ const Profile = () => {
               <div className="profile-privacy-banner glass-panel">
                 <div className="profile-privacy-left">
                   <span className="profile-privacy-icon">
-                    {user?.profile_visibility === 'private' ? '🛡️' : '🌐'}
+                    {user?.profile_visibility === 'private' ? (
+                      <Shield size={20} strokeWidth={1.8} style={{ color: '#A78BFA' }} aria-hidden="true" />
+                    ) : (
+                      <Globe size={20} strokeWidth={1.8} style={{ color: 'var(--cyan)' }} aria-hidden="true" />
+                    )}
                   </span>
                   <div>
                     <div className="profile-privacy-title">
@@ -206,7 +215,7 @@ const Profile = () => {
                     <div className="modal-header">
                       <h2>Edit Account Profile</h2>
                       <button onClick={() => setIsEditModalOpen(false)} className="modal-close-btn">
-                        ✕
+                        <X size={16} />
                       </button>
                     </div>
 

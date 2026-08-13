@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Dict
+from typing import Any, Dict, List
 from fastapi import APIRouter, Depends
 
 from ..database import get_connection
@@ -11,109 +11,290 @@ from .auth import get_current_user
 router = APIRouter()
 
 
-async def compute_telemetry(user_id: int) -> Dict[str, Any]:
+def _compute_daily_snapshot(cursor: Any, user_id: int, date_cutoff: str) -> Dict[str, Any]:
+    """Helper to compute historical telemetry snapshot for a specific date cutoff (YYYY-MM-DD 23:59:59)."""
+    cutoff_date = date_cutoff[:10]
+
+    # 1. Missions created on or before cutoff
+    cursor.execute(
+        "SELECT COUNT(*) FROM missions WHERE user_id = ? AND (created_at <= ? OR created_at IS NULL)",
+        (user_id, date_cutoff),
+    )
+    tot_m = cursor.fetchone()[0] or 0
+
+    # Missions completed on or before cutoff
+    cursor.execute(
+        "SELECT COUNT(*), COALESCE(SUM(xp_reward), 0) FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL AND completed_at <= ?",
+        (user_id, date_cutoff),
+    )
+    m_comp_row = cursor.fetchone()
+    comp_m = m_comp_row[0] or 0
+    xp_m = int(m_comp_row[1] or 0)
+    m_pct = round((comp_m / tot_m) * 100) if tot_m > 0 else 0
+
+    # 2. Mindset missions created & completed on or before cutoff
+    cursor.execute(
+        "SELECT COUNT(*) FROM missions WHERE user_id = ? AND category = 'mindset' AND (created_at <= ? OR created_at IS NULL)",
+        (user_id, date_cutoff),
+    )
+    tot_mind = cursor.fetchone()[0] or 0
+
+    cursor.execute(
+        "SELECT COUNT(*) FROM missions WHERE user_id = ? AND category = 'mindset' AND completed = 1 AND completed_at IS NOT NULL AND completed_at <= ?",
+        (user_id, date_cutoff),
+    )
+    comp_mind = cursor.fetchone()[0] or 0
+    mind_base = round((comp_mind / tot_mind) * 100) if tot_mind > 0 else 0
+
+    # Journal reflections logged on or before cutoff date
+    cursor.execute(
+        "SELECT COUNT(*), AVG(energy_level) FROM journal_entries WHERE user_id = ? AND entry_date <= ?",
+        (user_id, cutoff_date),
+    )
+    j_row = cursor.fetchone()
+    tot_j = j_row[0] or 0
+    avg_energy_j = float(j_row[1] or 0.0)
+
+    # Journal streak up to cutoff_date
+    cursor.execute(
+        "SELECT DISTINCT entry_date FROM journal_entries WHERE user_id = ? AND entry_date <= ? ORDER BY entry_date DESC",
+        (user_id, cutoff_date),
+    )
+    j_dates = [r[0] for r in cursor.fetchall() if r[0]]
+    j_streak = 0
+    if j_dates:
+        try:
+            curr_dt = datetime.datetime.strptime(cutoff_date, "%Y-%m-%d").date()
+            latest_j_dt = datetime.datetime.strptime(j_dates[0], "%Y-%m-%d").date()
+            if (curr_dt - latest_j_dt).days <= 1:
+                j_streak = 1
+                ref_dt = latest_j_dt
+                for d_str in j_dates[1:]:
+                    d = datetime.datetime.strptime(d_str, "%Y-%m-%d").date()
+                    if (ref_dt - d).days == 1:
+                        j_streak += 1
+                        ref_dt = d
+                    else:
+                        break
+        except Exception:
+            j_streak = len(j_dates)
+
+    if tot_j > 0:
+        j_streak_score = min(j_streak * 20, 100)
+        energy_score = min(round(avg_energy_j * 10), 100)
+        mind = round((mind_base * 0.40) + (j_streak_score * 0.30) + (energy_score * 0.30))
+    else:
+        mind = mind_base
+
+    # 3. Habits active & logged on or before cutoff
+    cursor.execute(
+        "SELECT COUNT(*) FROM habits WHERE user_id = ? AND (created_at <= ? OR created_at IS NULL)",
+        (user_id, date_cutoff),
+    )
+    tot_habits = cursor.fetchone()[0] or 0
+
+    try:
+        c_dt = datetime.datetime.strptime(cutoff_date, "%Y-%m-%d").date()
+        start_7d = (c_dt - datetime.timedelta(days=6)).strftime("%Y-%m-%d")
+    except ValueError:
+        start_7d = cutoff_date
+
+    cursor.execute(
+        "SELECT COUNT(*) FROM habit_logs WHERE user_id = ? AND completed_date BETWEEN ? AND ?",
+        (user_id, start_7d, cutoff_date),
+    )
+    completed_7d_habits = cursor.fetchone()[0] or 0
+    possible_7d_habits = max(1, tot_habits * 7)
+    h_weekly_pct = round((completed_7d_habits / possible_7d_habits) * 100) if tot_habits > 0 else 0
+
+    cursor.execute(
+        "SELECT COUNT(*) FROM habit_logs WHERE user_id = ? AND completed_date <= ?",
+        (user_id, cutoff_date),
+    )
+    tot_h_logs = cursor.fetchone()[0] or 0
+
+    # 4. Streak Days up to cutoff
+    cursor.execute(
+        """
+        SELECT DISTINCT DATE(completed_at) as c_date FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL AND completed_at <= ?
+        UNION
+        SELECT DISTINCT completed_date as c_date FROM habit_logs WHERE user_id = ? AND completed_date <= ?
+        ORDER BY c_date DESC
+        """,
+        (user_id, date_cutoff, user_id, cutoff_date),
+    )
+    active_dates = [r[0] for r in cursor.fetchall() if r[0]]
+    streak = 0
+    if active_dates:
+        try:
+            c_dt = datetime.datetime.strptime(cutoff_date, "%Y-%m-%d").date()
+            latest_act_dt = datetime.datetime.strptime(active_dates[0], "%Y-%m-%d").date()
+            if (c_dt - latest_act_dt).days <= 1:
+                streak = 1
+                ref_dt = latest_act_dt
+                for d_str in active_dates[1:]:
+                    d = datetime.datetime.strptime(d_str, "%Y-%m-%d").date()
+                    if (ref_dt - d).days == 1:
+                        streak += 1
+                        ref_dt = d
+                    else:
+                        break
+        except Exception:
+            streak = len(active_dates)
+
+    streak_comp = min(streak * 10, 100)
+
+    # Discipline & Consistency
+    if tot_m > 0 or tot_habits > 0 or tot_h_logs > 0:
+        disc = round((m_pct * 0.50) + (h_weekly_pct * 0.30) + (streak_comp * 0.20))
+        cons = round((h_weekly_pct * 0.40) + (m_pct * 0.40) + (streak_comp * 0.20))
+    else:
+        disc = 0
+        cons = 0
+
+    # 5. Goals & Financial Goals on or before cutoff
+    cursor.execute(
+        "SELECT COUNT(*), SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) FROM goals WHERE user_id = ? AND (created_at <= ? OR created_at IS NULL)",
+        (user_id, date_cutoff),
+    )
+    g_row = cursor.fetchone()
+    tot_g = g_row[0] or 0
+    comp_g = g_row[1] or 0
+    g_pct = round((comp_g / tot_g) * 100) if tot_g > 0 else 0
+
+    cursor.execute(
+        """
+        SELECT COUNT(*), SUM(CASE WHEN m.completed = 1 THEN 1 ELSE 0 END)
+        FROM blueprint_milestones m
+        JOIN life_blueprints b ON m.blueprint_id = b.id
+        WHERE b.user_id = ? AND (m.created_at <= ? OR m.created_at IS NULL)
+        """,
+        (user_id, date_cutoff),
+    )
+    bp_row = cursor.fetchone()
+    tot_bp = bp_row[0] or 0
+    comp_bp = bp_row[1] or 0
+    bp_pct = round((comp_bp / tot_bp) * 100) if tot_bp > 0 else 0
+
+    if tot_g > 0 or bp_pct > 0 or tot_m > 0:
+        grow = round((g_pct * 0.40) + (bp_pct * 0.30) + (m_pct * 0.30))
+    else:
+        grow = 0
+
+    cursor.execute(
+        """
+        SELECT COUNT(*), SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END)
+        FROM goals
+        WHERE user_id = ? AND (created_at <= ? OR created_at IS NULL) AND (
+            LOWER(category) IN ('finance', 'wealth', 'financial', 'money') OR
+            LOWER(title) LIKE '%finance%' OR LOWER(title) LIKE '%wealth%' OR
+            LOWER(title) LIKE '%money%' OR LOWER(title) LIKE '%freedom%' OR LOWER(title) LIKE '%fund%'
+        )
+        """,
+        (user_id, date_cutoff),
+    )
+    fin_row = cursor.fetchone()
+    tot_fin = fin_row[0] or 0
+    comp_fin = fin_row[1] or 0
+    fin_pct = round((comp_fin / tot_fin) * 100) if tot_fin > 0 else 0
+
+    return {
+        "discipline_score": disc,
+        "mindset_strength": mind,
+        "consistency": cons,
+        "growth_index": grow,
+        "financial_goal": fin_pct,
+        "completed_missions": comp_m,
+        "streak_days": streak,
+        "xp_earned": xp_m,
+    }
+
+
+def compute_telemetry_sync(user_id: int) -> Dict[str, Any]:
     conn = get_connection()
     cursor = conn.cursor()
+
+    today_dt = datetime.date.today()
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Current Live Snapshot
+    current_snap = _compute_daily_snapshot(cursor, user_id, now_str)
 
     # 1. Missions Telemetry
     cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ?", (user_id,))
     total_missions = cursor.fetchone()[0] or 0
-
-    cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ? AND completed = 1", (user_id,))
-    completed_missions = cursor.fetchone()[0] or 0
-
+    completed_missions = current_snap["completed_missions"]
     mission_percentage = round((completed_missions / total_missions) * 100) if total_missions > 0 else 0
-    discipline_score = mission_percentage
 
-    # 2. Mindset Strength
-    cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ? AND category = 'mindset'", (user_id,))
-    total_mindset = cursor.fetchone()[0] or 0
-
-    cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ? AND category = 'mindset' AND completed = 1", (user_id,))
-    completed_mindset = cursor.fetchone()[0] or 0
-
-    mindset_base = round((completed_mindset / total_mindset) * 100) if total_mindset > 0 else 0
-
-    journal_stats = compute_journal_stats(user_id)
-    journal_streak = journal_stats.get("reflection_streak", 0)
-
-    if journal_stats.get("total_entries", 0) > 0:
-        journal_bonus = (
-            min(journal_streak * 5, 15)
-            + round(journal_stats.get("avg_energy_7d", 7) * 0.5)
-        )
-        mindset_strength = min(mindset_base + journal_bonus, 100)
-    else:
-        mindset_strength = mindset_base
-
-    # 3. XP Earned
-    cursor.execute("SELECT SUM(xp_reward) FROM missions WHERE user_id = ? AND completed = 1", (user_id,))
-    xp_row = cursor.fetchone()[0]
-    xp_earned = int(xp_row) if xp_row is not None else 0
-
-    # 4. Streak Days
-    cursor.execute(
-        """
-        SELECT DISTINCT DATE(completed_at) as comp_date
-        FROM missions
-        WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL
-        ORDER BY comp_date DESC
-        """,
-        (user_id,),
-    )
-    date_rows = cursor.fetchall()
-    dates = [r["comp_date"] for r in date_rows if r["comp_date"]]
-
-    streak_days = 0
-    if dates:
-        today = datetime.date.today()
-        latest_date = datetime.datetime.strptime(dates[0], "%Y-%m-%d").date()
-        if (today - latest_date).days <= 1:
-            streak_days = 1
-            current = latest_date
-            for d_str in dates[1:]:
-                d = datetime.datetime.strptime(d_str, "%Y-%m-%d").date()
-                if (current - d).days == 1:
-                    streak_days += 1
-                    current = d
-                else:
-                    break
-
-    # 5. Habit Telemetry
-    habit_stats = get_aggregate_habit_stats(user_id)
-    habit_weekly_pct = habit_stats.get("overall_7day_completion_pct", 0)
-
-    streak_component = min(streak_days * 10, 100)
-    if habit_stats.get("total_active_habits", 0) > 0:
-        consistency = round((mission_percentage * 0.5) + (streak_component * 0.3) + (habit_weekly_pct * 0.2))
-    else:
-        consistency = round((mission_percentage * 0.5) + (streak_component * 0.5))
-
-    # 6. Goals Telemetry
+    # 2. Goals Telemetry
     cursor.execute("SELECT COUNT(*) FROM goals WHERE user_id = ?", (user_id,))
     total_goals = cursor.fetchone()[0] or 0
-
     cursor.execute("SELECT COUNT(*) FROM goals WHERE user_id = ? AND status = 'active'", (user_id,))
     active_goals = cursor.fetchone()[0] or 0
-
     cursor.execute("SELECT COUNT(*) FROM goals WHERE user_id = ? AND status = 'completed'", (user_id,))
     completed_goals = cursor.fetchone()[0] or 0
 
-    goal_completion_comp = round((completed_goals / total_goals) * 100) if total_goals > 0 else 0
-    growth_index = round((mission_percentage * 0.6) + (goal_completion_comp * 0.4))
+    # 3. Habits Telemetry
+    habit_stats = get_aggregate_habit_stats(user_id)
 
-    # 7. Life Blueprint Telemetry
+    # 4. Journal & Blueprint Telemetry
+    journal_stats = compute_journal_stats(user_id)
     blueprint_telemetry = get_blueprint_telemetry(user_id)
+
+    # 5. Compute Historical 7-Day Sparkline Arrays
+    sparklines = {
+        "discipline_score": [],
+        "mindset_strength": [],
+        "consistency": [],
+        "growth_index": [],
+        "financial_goal": [],
+        "missions_completed": [],
+        "streak_days": [],
+        "xp_earned": [],
+    }
+
+    for i in range(6, -1, -1):
+        target_day = today_dt - datetime.timedelta(days=i)
+        cutoff_str = f"{target_day.strftime('%Y-%m-%d')} 23:59:59"
+        snap = _compute_daily_snapshot(cursor, user_id, cutoff_str)
+        sparklines["discipline_score"].append(snap["discipline_score"])
+        sparklines["mindset_strength"].append(snap["mindset_strength"])
+        sparklines["consistency"].append(snap["consistency"])
+        sparklines["growth_index"].append(snap["growth_index"])
+        sparklines["financial_goal"].append(snap["financial_goal"])
+        sparklines["missions_completed"].append(snap["completed_missions"])
+        sparklines["streak_days"].append(snap["streak_days"])
+        sparklines["xp_earned"].append(snap["xp_earned"])
+
+    prev_discipline = sparklines["discipline_score"][5]
+    prev_mindset = sparklines["mindset_strength"][5]
+    prev_consistency = sparklines["consistency"][5]
+    prev_growth = sparklines["growth_index"][5]
+    prev_fin = sparklines["financial_goal"][5]
+    prev_missions = sparklines["missions_completed"][5]
+    prev_streak = sparklines["streak_days"][5]
+    prev_xp = sparklines["xp_earned"][5]
 
     conn.close()
 
     return {
-        "discipline_score": discipline_score,
-        "mindset_strength": mindset_strength,
-        "consistency": consistency,
-        "growth_index": growth_index,
-        "streak_days": streak_days,
-        "xp_earned": xp_earned,
+        "discipline_score": current_snap["discipline_score"],
+        "discipline_score_change": current_snap["discipline_score"] - prev_discipline,
+        "mindset_strength": current_snap["mindset_strength"],
+        "mindset_strength_change": current_snap["mindset_strength"] - prev_mindset,
+        "consistency": current_snap["consistency"],
+        "consistency_change": current_snap["consistency"] - prev_consistency,
+        "growth_index": current_snap["growth_index"],
+        "growth_index_change": current_snap["growth_index"] - prev_growth,
+        "financial_goal": current_snap["financial_goal"],
+        "financial_goal_change": current_snap["financial_goal"] - prev_fin,
+        "financial_goal_pct": current_snap["financial_goal"],
+        "missions_completed_change": current_snap["completed_missions"] - prev_missions,
+        "streak_days": current_snap["streak_days"],
+        "streak_days_change": current_snap["streak_days"] - prev_streak,
+        "xp_earned": current_snap["xp_earned"],
+        "xp_earned_change": current_snap["xp_earned"] - prev_xp,
+        "sparklines": sparklines,
         "mission_completion": {
             "completed": completed_missions,
             "total": total_missions,
@@ -127,12 +308,16 @@ async def compute_telemetry(user_id: int) -> Dict[str, Any]:
         "habits": habit_stats,
         "journal": {
             "total_entries": journal_stats.get("total_entries", 0),
-            "journal_streak": journal_stats.get("reflection_streak", 0),
+            "journal_streak": journal_stats.get("journal_streak", 0),
             "avg_energy_7d": journal_stats.get("avg_energy_7d", 0.0),
             "latest_mood": journal_stats.get("latest_mood", None),
         },
         "blueprint": blueprint_telemetry,
     }
+
+
+async def compute_telemetry(user_id: int) -> Dict[str, Any]:
+    return compute_telemetry_sync(user_id)
 
 
 @router.get("", response_model=Dict[str, Any])

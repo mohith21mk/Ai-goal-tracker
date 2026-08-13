@@ -110,6 +110,26 @@ def create_community_post(user_id: int, author_name: str, content: str, category
     return post
 
 
+def update_community_post(user_id: int, post_id: int, content: str) -> Dict[str, Any]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM community_posts WHERE id = ?", (post_id,))
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        raise ValueError("Post not found")
+
+    if row["user_id"] != user_id:
+        conn.close()
+        raise PermissionError("User does not own this post")
+
+    cursor.execute("UPDATE community_posts SET content = ? WHERE id = ?", (content, post_id))
+    conn.commit()
+    conn.close()
+    return get_post_by_id(post_id)
+
+
 def delete_community_post(user_id: int, post_id: int) -> bool:
     conn = get_connection()
     cursor = conn.cursor()
@@ -134,10 +154,13 @@ def toggle_community_like(user_id: int, post_id: int) -> Dict[str, Any]:
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM community_posts WHERE id = ?", (post_id,))
-    if not cursor.fetchone():
+    cursor.execute("SELECT id, user_id FROM community_posts WHERE id = ?", (post_id,))
+    post_row = cursor.fetchone()
+    if not post_row:
         conn.close()
         raise ValueError("Post not found")
+
+    post_author_id = post_row["user_id"]
 
     cursor.execute("SELECT id FROM community_likes WHERE post_id = ? AND user_id = ?", (post_id, user_id))
     like_row = cursor.fetchone()
@@ -153,6 +176,19 @@ def toggle_community_like(user_id: int, post_id: int) -> Dict[str, Any]:
         cursor.execute("UPDATE community_posts SET likes_count = likes_count + 1 WHERE id = ?", (post_id,))
         user_has_liked = True
 
+        # Trigger notification for post author if not self
+        if post_author_id != user_id:
+            cursor.execute("SELECT username, full_name FROM users WHERE id = ?", (user_id,))
+            liker_row = cursor.fetchone()
+            liker_name = (liker_row["full_name"] or liker_row["username"]) if liker_row else "Someone"
+            cursor.execute(
+                """
+                INSERT INTO notifications (user_id, type, title, message, reference_type, reference_id)
+                VALUES (?, 'community_like', 'New Post Like', ?, 'post', ?)
+                """,
+                (post_author_id, f"{liker_name} liked your post", post_id)
+            )
+
     conn.commit()
 
     cursor.execute("SELECT likes_count FROM community_posts WHERE id = ?", (post_id,))
@@ -163,6 +199,30 @@ def toggle_community_like(user_id: int, post_id: int) -> Dict[str, Any]:
         "post_id": post_id,
         "likes_count": likes_count,
         "user_has_liked": user_has_liked,
+    }
+
+
+def delete_community_like(user_id: int, post_id: int) -> Dict[str, Any]:
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id FROM community_posts WHERE id = ?", (post_id,))
+    if not cursor.fetchone():
+        conn.close()
+        raise ValueError("Post not found")
+
+    cursor.execute("DELETE FROM community_likes WHERE post_id = ? AND user_id = ?", (post_id, user_id))
+    cursor.execute("UPDATE community_posts SET likes_count = MAX(0, likes_count - 1) WHERE id = ?", (post_id,))
+    conn.commit()
+
+    cursor.execute("SELECT likes_count FROM community_posts WHERE id = ?", (post_id,))
+    likes_count = cursor.fetchone()["likes_count"]
+    conn.close()
+
+    return {
+        "post_id": post_id,
+        "likes_count": likes_count,
+        "user_has_liked": False,
     }
 
 
@@ -210,10 +270,13 @@ def create_community_comment(user_id: int, author_name: str, post_id: int, conte
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM community_posts WHERE id = ?", (post_id,))
-    if not cursor.fetchone():
+    cursor.execute("SELECT id, user_id FROM community_posts WHERE id = ?", (post_id,))
+    post_row = cursor.fetchone()
+    if not post_row:
         conn.close()
         raise ValueError("Post not found")
+
+    post_author_id = post_row["user_id"]
 
     cursor.execute(
         """
@@ -222,10 +285,67 @@ def create_community_comment(user_id: int, author_name: str, post_id: int, conte
         """,
         (post_id, user_id, display_author, content),
     )
-    conn.commit()
     comment_id = cursor.lastrowid
+
+    # Trigger notification for post author if not self
+    if post_author_id != user_id:
+        cursor.execute("SELECT username, full_name FROM users WHERE id = ?", (user_id,))
+        commenter_row = cursor.fetchone()
+        commenter_name = (commenter_row["full_name"] or commenter_row["username"]) if commenter_row else "Someone"
+        cursor.execute(
+            """
+            INSERT INTO notifications (user_id, type, title, message, reference_type, reference_id)
+            VALUES (?, 'community_comment', 'New Comment', ?, 'post', ?)
+            """,
+            (post_author_id, f"{commenter_name} commented on your post", post_id)
+        )
+
+    conn.commit()
 
     cursor.execute("SELECT * FROM community_comments WHERE id = ?", (comment_id,))
     row = cursor.fetchone()
     conn.close()
     return dict(row)
+
+
+def update_community_comment(user_id: int, comment_id: int, content: str) -> Dict[str, Any]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id, post_id FROM community_comments WHERE id = ?", (comment_id,))
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        raise ValueError("Comment not found")
+
+    if row["user_id"] != user_id:
+        conn.close()
+        raise PermissionError("User does not own this comment")
+
+    cursor.execute("UPDATE community_comments SET content = ? WHERE id = ?", (content, comment_id))
+    conn.commit()
+
+    cursor.execute("SELECT * FROM community_comments WHERE id = ?", (comment_id,))
+    comment_row = cursor.fetchone()
+    conn.close()
+    return dict(comment_row)
+
+
+def delete_community_comment(user_id: int, comment_id: int) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM community_comments WHERE id = ?", (comment_id,))
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        return False
+
+    if row["user_id"] != user_id:
+        conn.close()
+        raise PermissionError("User does not own this comment")
+
+    cursor.execute("DELETE FROM community_comments WHERE id = ?", (comment_id,))
+    conn.commit()
+    conn.close()
+    return True

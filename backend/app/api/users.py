@@ -1,21 +1,58 @@
 import datetime
-from typing import Any, Dict, Optional
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, validator
+import json
+from typing import Any, Dict, Optional, List
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import BaseModel, field_validator
 
+from ..config import settings
 from ..database import get_connection
+from ..services.email import send_verification_email
+from ..services.auth import (
+    create_email_verification_token,
+    delete_user_account,
+    is_email_registered,
+    is_username_available,
+    normalize_username,
+    revoke_all_sessions,
+    validate_username,
+    verify_password,
+)
 from ..services.settings import get_or_create_user_settings
-from .auth import get_current_user
+from .auth import COOKIE_NAME, get_current_user
 
 router = APIRouter()
 
 
 class UserUpdateRequest(BaseModel):
     full_name: Optional[str] = None
+    username: Optional[str] = None
+    email: Optional[str] = None
     avatar_initials: Optional[str] = None
     bio: Optional[str] = None
 
-    @validator("full_name")
+    @field_validator("username")
+    @classmethod
+    def validate_uname(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            valid, msg_or_norm = validate_username(v)
+            if not valid:
+                raise ValueError(msg_or_norm)
+            return msg_or_norm
+        return v
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v_str = v.strip().lower()
+            import re
+            if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", v_str):
+                raise ValueError("Invalid email format")
+            return v_str
+        return v
+
+    @field_validator("full_name")
+    @classmethod
     def validate_full_name(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
             v_str = v.strip()
@@ -26,7 +63,8 @@ class UserUpdateRequest(BaseModel):
             return v_str
         return v
 
-    @validator("avatar_initials")
+    @field_validator("avatar_initials")
+    @classmethod
     def validate_avatar_initials(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
             v_str = v.strip().upper()
@@ -35,13 +73,26 @@ class UserUpdateRequest(BaseModel):
             return v_str
         return v
 
-    @validator("bio")
+    @field_validator("bio")
+    @classmethod
     def validate_bio(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
             if len(v) > 500:
                 raise ValueError("Bio cannot exceed 500 characters")
             return v.strip()
         return v
+
+
+class OnboardingRequest(BaseModel):
+    primary_goal: Optional[str] = None
+    commitment_level: Optional[str] = None
+    improvement_area: Optional[str] = None
+    first_mission_title: Optional[str] = None
+
+
+class AccountDeleteRequest(BaseModel):
+    current_password: str
+    confirmation_text: str
 
 
 def _get_user_profile_dict(user_id: int) -> Dict[str, Any]:
@@ -113,6 +164,8 @@ def _get_user_profile_dict(user_id: int) -> Dict[str, Any]:
 
     user_dict.pop("password_hash", None)
     user_dict["is_active"] = True
+    user_dict["email_verified"] = bool(user_dict.get("email_verified", 0))
+    user_dict["onboarding_completed"] = bool(user_dict.get("onboarding_completed", 0))
     user_dict["member_since"] = member_since
     user_dict["streak_days"] = streak_days
     user_dict["xp_earned"] = xp_earned
@@ -141,10 +194,38 @@ async def update_current_user(
     if not updates:
         return _get_user_profile_dict(user_id)
 
-    valid_fields = ["full_name", "avatar_initials", "bio"]
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, email FROM users WHERE id = ?", (user_id,))
+    current_row = cursor.fetchone()
+
+    # Validate Username change
+    if "username" in updates and updates["username"]:
+        new_username = normalize_username(updates["username"])
+        if current_row and current_row["username"] and current_row["username"].lower() != new_username:
+            if not is_username_available(new_username):
+                conn.close()
+                raise HTTPException(status_code=409, detail=f"@{new_username} is already taken.")
+            updates["username"] = new_username
+
+    # Validate Email change
+    new_verif_token = None
+    if "email" in updates and updates["email"]:
+        new_email = updates["email"].strip().lower()
+        if current_row and current_row["email"].lower() != new_email:
+            if is_email_registered(new_email):
+                conn.close()
+                raise HTTPException(status_code=409, detail="Email address is already in use.")
+            updates["email"] = new_email
+            updates["email_verified"] = 0
+            new_verif_token = create_email_verification_token(user_id, new_email)
+            send_verification_email(new_email, current_user.get("full_name", "Member"), new_verif_token)
+
+    valid_fields = ["full_name", "username", "email", "email_verified", "avatar_initials", "bio"]
     filtered = {k: v for k, v in updates.items() if k in valid_fields and v is not None}
 
     if not filtered:
+        conn.close()
         return _get_user_profile_dict(user_id)
 
     set_clauses = [f"{k} = ?" for k in filtered.keys()]
@@ -152,11 +233,110 @@ async def update_current_user(
     params.append(user_id)
 
     sql = f"UPDATE users SET {', '.join(set_clauses)} WHERE id = ?"
-
-    conn = get_connection()
-    cursor = conn.cursor()
     cursor.execute(sql, params)
     conn.commit()
     conn.close()
 
-    return _get_user_profile_dict(user_id)
+    result = _get_user_profile_dict(user_id)
+    if new_verif_token and settings.DEBUG and settings.ENVIRONMENT != "production":
+        result["dev_verification_token"] = new_verif_token
+    return result
+
+
+@router.post("/onboarding", response_model=Dict[str, Any])
+async def complete_onboarding(
+    payload: OnboardingRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
+    onboarding_data_str = json.dumps(payload.dict())
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET onboarding_completed = 1, onboarding_data = ? WHERE id = ?",
+        (onboarding_data_str, user_id),
+    )
+    conn.commit()
+
+    # Optionally seed user's first mission if provided
+    if payload.first_mission_title and payload.first_mission_title.strip():
+        cursor.execute(
+            """
+            INSERT INTO missions (user_id, title, description, category, time, difficulty, xp_reward, completed)
+            VALUES (?, ?, 'User-created onboarding protocol task', 'productivity', '15 min', 'easy', 15, 0)
+            """,
+            (user_id, payload.first_mission_title.strip()),
+        )
+        conn.commit()
+
+    conn.close()
+    return {"message": "Onboarding completed successfully!", "onboarding_completed": True}
+
+
+@router.delete("/account", response_model=Dict[str, Any])
+async def delete_account_endpoint(
+    payload: AccountDeleteRequest,
+    response: Response,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user["id"]
+
+    # Verify confirmation string
+    if payload.confirmation_text.strip() != "DELETE MY ACCOUNT":
+        raise HTTPException(
+            status_code=400,
+            detail="Confirmation phrase mismatch. Please type exactly 'DELETE MY ACCOUNT' to confirm deletion.",
+        )
+
+    # Verify password
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT password_hash FROM users WHERE id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row or not row["password_hash"] or not verify_password(payload.current_password, row["password_hash"]):
+        raise HTTPException(status_code=400, detail="Incorrect password. Account deletion denied.")
+
+    # Perform safe cascade deletion
+    delete_user_account(user_id)
+
+    # Clear auth cookie
+    response.delete_cookie(key=COOKIE_NAME, path="/")
+    return {"message": "Your account and all associated data have been permanently deleted."}
+
+
+@router.get("/search", response_model=Dict[str, Any])
+async def search_public_users(
+    q: str = Query(..., min_length=2),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    search_term = f"%{q.strip()}%"
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT id, mkc_id, username, full_name, avatar_initials, bio
+        FROM users
+        WHERE (username LIKE ? OR full_name LIKE ? OR mkc_id LIKE ?) AND id != ?
+        ORDER BY id ASC LIMIT 20
+        """,
+        (search_term, search_term, search_term, current_user["id"])
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    users_list = []
+    for r in rows:
+        users_list.append({
+            "id": r["id"],
+            "mkc_id": r["mkc_id"] or f"MKC-{r['id']:04d}",
+            "display_name": r["full_name"] or r["username"],
+            "username": r["username"],
+            "avatar_initials": r["avatar_initials"] or r["username"][:2].upper(),
+            "bio": r["bio"] or ""
+        })
+
+    return {"users": users_list}
+

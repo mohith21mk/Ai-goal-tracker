@@ -95,14 +95,21 @@
   border-radius: 4px;
 }
 
-.stat-change.positive {
+.stat-change.positive,
+.stat-change.up {
   color: var(--success);
   background: rgba(16, 185, 129, 0.12);
 }
 
-.stat-change.negative {
+.stat-change.negative,
+.stat-change.down {
   color: #EF4444;
   background: rgba(239, 68, 68, 0.12);
+}
+
+.stat-change.neutral {
+  color: var(--text-tertiary);
+  background: rgba(148, 163, 184, 0.08);
 }
 
 .stat-card-border-glow {

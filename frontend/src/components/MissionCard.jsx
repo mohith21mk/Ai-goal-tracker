@@ -1,3 +1,4 @@
+import { Clock } from 'lucide-react';
 import './MissionCard.css';
 
 const MissionCard = ({
@@ -28,7 +29,7 @@ const MissionCard = ({
         <div className="mission-header-tags">
           <span className={`category-tag tag-${category}`}>{category}</span>
           <span className={`difficulty-tag difficulty-${difficulty}`}>{difficulty}</span>
-          <span className="time-tag">⏱ {time}</span>
+          <span className="time-tag"><Clock size={12} strokeWidth={1.8} style={{ marginRight: '4px' }} /> {time}</span>
         </div>
         <h4 className={`mission-title ${completed ? 'strikethrough' : ''}`}>{title}</h4>
       </div>

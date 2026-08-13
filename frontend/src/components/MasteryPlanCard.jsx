@@ -1,3 +1,4 @@
+import { Target } from 'lucide-react';
 import './MasteryPlanCard.css';
 
 const MasteryPlanCard = ({ activeGoal, linkedMissions = [], telemetryBlueprint = null }) => {
@@ -56,7 +57,7 @@ const MasteryPlanCard = ({ activeGoal, linkedMissions = [], telemetryBlueprint =
 
         {/* Next Milestone Step Badge */}
         <div className="next-step-badge">
-          <div className="next-step-icon">🎯</div>
+          <div className="next-step-icon"><Target size={24} strokeWidth={1.8} /></div>
           <div className="next-step-details">
             <span className="next-step-label">NEXT MILESTONE</span>
             <span className="next-step-name">{nextStepText}</span>

@@ -1,9 +1,10 @@
+import { Flame, Zap } from 'lucide-react';
 import './StreakCounter.css';
 
 const StreakCounter = ({ days = 28, label = 'Days Strong' }) => {
   return (
     <div className="streak-counter glass-card">
-      <div className="streak-icon">🔥</div>
+      <div className="streak-icon"><Flame size={28} strokeWidth={1.8} /></div>
       
       <div className="streak-content">
         <div className="streak-days">{days}</div>
@@ -18,7 +19,7 @@ const StreakCounter = ({ days = 28, label = 'Days Strong' }) => {
       </div>
 
       <p className="streak-message">
-        Keep the momentum going! 💪
+        Keep the momentum going! <Zap size={16} strokeWidth={1.8} style={{ display: 'inline-block', verticalAlign: 'middle' }} />
       </p>
     </div>
   );

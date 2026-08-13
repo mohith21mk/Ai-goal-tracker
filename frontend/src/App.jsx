@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
+import Analytics from './pages/Analytics';
 import Missions from './pages/Missions';
 import Goals from './pages/Goals';
 import AICoach from './pages/AICoach';
@@ -11,9 +12,13 @@ import Journal from './pages/Journal';
 import Blueprint from './pages/Blueprint';
 import Settings from './pages/Settings';
 import Community from './pages/Community';
+import Chat from './pages/Chat';
 import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import VerifyEmail from './pages/VerifyEmail';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { getSettings } from './services/api';
@@ -49,24 +54,35 @@ const PublicOnlyRoute = ({ children }) => {
 };
 
 function AppContent() {
+  const { user, loading } = useAuth();
+
   useEffect(() => {
-    let isMounted = true;
-    async function syncBackendTheme() {
-      try {
-        const s = await getSettings();
-        if (isMounted && s && s.theme) {
-          document.documentElement.setAttribute('data-theme', s.theme);
-          localStorage.setItem('theme', s.theme);
-        }
-      } catch (err) {
-        console.warn('Could not sync theme settings from backend:', err);
-      }
+    if (user) {
+      getSettings()
+        .then((data) => {
+          if (data && data.theme) {
+            document.documentElement.setAttribute('data-theme', data.theme);
+          }
+        })
+        .catch((err) => console.error('Failed to load user settings for theme:', err));
     }
-    syncBackendTheme();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  }, [user]);
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        background: 'var(--bg-primary, #0B0F19)',
+        color: 'var(--text-secondary, #94A3B8)',
+        fontFamily: 'sans-serif'
+      }}>
+        Loading Mastery Key Coach...
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
@@ -74,11 +90,15 @@ function AppContent() {
         {/* Public Routes */}
         <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
         <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
+        <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
+        <Route path="/reset-password" element={<PublicOnlyRoute><ResetPassword /></PublicOnlyRoute>} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/landing" element={<Landing />} />
 
         {/* Protected Application Routes */}
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
         <Route path="/missions" element={<ProtectedRoute><Missions /></ProtectedRoute>} />
         <Route path="/goals" element={<ProtectedRoute><Goals /></ProtectedRoute>} />
         <Route path="/coach" element={<ProtectedRoute><AICoach /></ProtectedRoute>} />
@@ -88,6 +108,8 @@ function AppContent() {
         <Route path="/blueprint" element={<ProtectedRoute><Blueprint /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
+        <Route path="/messages" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
