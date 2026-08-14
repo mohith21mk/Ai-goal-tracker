@@ -5,7 +5,7 @@ import urllib.request
 import urllib.error
 import asyncio
 import time
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 from ..config import settings
