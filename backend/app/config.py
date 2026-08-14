@@ -56,3 +56,12 @@ class Settings:
 
 settings = Settings()
 
+# Production safety checks
+if settings.ENVIRONMENT == "production":
+    _unsafe_keys = {"fallback-secret-key-change-in-production", "change_this_to_a_secure_random_64_char_secret_key", ""}
+    if settings.SECRET_KEY in _unsafe_keys:
+        raise RuntimeError(
+            "FATAL: SECRET_KEY is not set or uses an unsafe default. "
+            "Set a secure random SECRET_KEY environment variable for production."
+        )
+

@@ -11,13 +11,7 @@ from pathlib import Path
 from ..config import settings
 from .logger import logger
 
-DB_PATH = Path(__file__).resolve().parent.parent / "app.db"
-
-
-def get_db_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+from ..database import get_connection as get_db_connection
 
 
 def get_db_context(user_id: int) -> Dict[str, Any]:
@@ -228,9 +222,47 @@ def _call_gemini_rest_api(gemini_url: str, payload: dict) -> Dict[str, Any]:
         headers={"Content-Type": "application/json"},
         method="POST"
     )
-    with urllib.request.urlopen(req, timeout=25.0) as response:
+    with urllib.request.urlopen(req, timeout=30.0) as response:
         resp_bytes = response.read()
         return json.loads(resp_bytes.decode("utf-8"))
+
+
+def _extract_reply_and_action(extracted_text: str) -> tuple[str, Optional[Dict[str, Any]]]:
+    if not extracted_text:
+        return "", None
+
+    clean_text = extracted_text.strip()
+
+    # Strip markdown code fences if present (e.g. ```json ... ``` or ``` ...)
+    if clean_text.startswith("```"):
+        lines = clean_text.splitlines()
+        if len(lines) >= 2 and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        clean_text = "\n".join(lines).strip()
+
+    # Try parsing JSON
+    try:
+        data = json.loads(clean_text)
+        if isinstance(data, dict):
+            reply = (
+                data.get("reply") or
+                data.get("response") or
+                data.get("answer") or
+                data.get("text") or
+                data.get("coaching_reply") or
+                data.get("message") or
+                ""
+            )
+            action = data.get("action")
+            if isinstance(reply, str) and reply.strip():
+                return reply.strip(), action if isinstance(action, dict) else None
+    except json.JSONDecodeError:
+        pass
+
+    # Direct plain text fallback
+    return clean_text, None
 
 
 async def generate_coaching_response(user_message: str, user_id: int) -> Dict[str, Any]:
@@ -312,18 +344,11 @@ async def generate_coaching_response(user_message: str, user_id: int) -> Dict[st
     recent_history = fetch_chat_history(user_id, limit=6)
 
     coach_style = context.get("coach_style", "strategic")
-    style_directives = {
-        "strategic": "Tone & Style: Clear, practical, insightful, analytical, and structured.",
-        "empathetic": "Tone & Style: Empathetic, supportive, warm, understanding, and emotionally intelligent.",
-        "relentless": "Tone & Style: High-energy, motivating, action-oriented, focused, and direct."
-    }
-    tone_directive = style_directives.get(str(coach_style).lower(), style_directives["strategic"])
-
     # System Instructions for ChatGPT-Style Natural Conversational Mentor
     system_instruction = (
-        f"You are AI Coach, a warm, highly intelligent, calm, and practical personal mentor (like ChatGPT).\n"
+        f"You are AI Coach, a warm, highly intelligent, calm, and practical human mentor (like ChatGPT).\n"
         f"\n"
-        f"USER BACKGROUND CONTEXT (Private internal context ONLY. NEVER output or leak raw context, IDs, database names, or metadata):\n"
+        f"USER BACKGROUND CONTEXT (Private background context ONLY. NEVER output or leak raw context, IDs, database names, or metadata):\n"
         f"- User Name: {user_name}\n"
         f"- Primary Goals: {goals_text}\n"
         f"- Task Progress Today: {completed_missions}/{total_missions} completed.\n"
@@ -331,21 +356,20 @@ async def generate_coaching_response(user_message: str, user_id: int) -> Dict[st
         f"{detailed_context_block}\n"
         f"\n"
         f"CORE CONVERSATIONAL PRINCIPLES (THINK & ACT LIKE CHATGPT):\n"
-        f"1. NO MANDATORY RESPONSE STRUCTURE: Never force every reply to contain an acknowledgement, insight, action plan, motivation, bullet points, or a question at the end. Choose the response structure dynamically based entirely on what the user asked.\n"
-        f"2. SITUATION-AWARE RESPONSES:\n"
-        f"   - Casual / Greetings ('hey', 'what's up?', 'thanks', 'okay', 'cool'): Respond in 1-2 short, warm, natural human sentences (e.g. 'Hey! 👋 What's on your mind today?', 'You're welcome! Let me know whenever you want to dig into anything else.').\n"
-        f"   - Learning / Teaching ('teach me Python', 'explain recursion'): Teach naturally and progressively using intuitive analogies and concrete code examples.\n"
-        f"   - Technical / Coding ('why am I getting a CORS error?', 'reverse a string'): Answer the technical problem directly with clean code and concise explanation. Do NOT add motivational speeches.\n"
-        f"   - Frustration / Emotional ('I'm tired', 'I failed my exam'): Acknowledge feelings first with genuine empathy. Do NOT dump a productivity framework or task list.\n"
-        f"   - Motivation ('motivate me'): Give grounding, practical perspective rather than generic posters.\n"
-        f"   - Planning ('what should I study today?'): Help prioritize practical next steps based on user's known goals.\n"
-        f"   - Follow-Ups / Continuation ('I don't understand', 'why?', 'give another example'): Build seamlessly on the immediate prior turn without re-introducing yourself or restarting.\n"
-        f"   - Personal ('I feel like I'm wasting my time'): Respond like a thoughtful, caring human mentor, not an analytics dashboard.\n"
-        f"3. INVISIBLE RAG & ZERO CONTEXT LEAKAGE: Never display phrases like 'Insights retrieved:', 'MKC ID:', 'User Identity:', or 'Retrieved context:'. Mention personal goals or background ONLY when naturally relevant.\n"
-        f"4. NATURAL HUMAN LANGUAGE & ELIMINATE STOCK BUZZWORDS: Avoid habitual repetition of stock phrases like 'Absolutely', 'Let's break this down', 'Here's the thing', 'Stay consistent', 'Protocol', 'Discipline', 'Focus locked in'. Speak naturally.\n"
-        f"5. DO NOT OVERUSE NAME: Use {user_name}'s name only when naturally meaningful in conversation. Never start messages with '{user_name}!'.\n"
-        f"6. DYNAMIC RESPONSE LENGTH: Match response length to the complexity of the query. Simple queries get short answers; teaching and complex problems get thorough explanations.\n"
-        f"7. OUTPUT FORMAT: Return a valid JSON object matching: {{ 'reply': '...', 'action': ... }}."
+        f"1. SITUATION-AWARE RESPONSE STYLE & LENGTH:\n"
+        f"   - Casual / Greetings ('hey', 'what's up?', 'how's your day going?'): Respond naturally in 1-2 short, warm sentences (e.g. 'Hey! 👋 What's up?' or 'Hey! How's your day going?'). Never repeatedly say 'Great to see you today'.\n"
+        f"   - Thanks / Acknowledgments ('thanks', 'okay', 'cool', 'goodbye'): Keep it very short and human (e.g. 'Anytime! 🙂' or 'You got it. Talk soon!'). Do NOT generate a long coaching essay.\n"
+        f"   - Learning / Teaching ('can you teach me Python?', 'explain recursion'): Teach progressively and conversationally. Do not dump a massive course outline at once. Start with the core idea (like variables), use an intuitive analogy (like a labeled box), show a tiny code snippet, and explain naturally.\n"
+        f"   - Follow-Ups / Continuation ('I don't understand variables', 'why?', 'give me another example'): Build seamlessly on the previous turn in the conversation. Do NOT restart the entire explanation or re-introduce yourself.\n"
+        f"   - Technical / Coding ('why am I getting a CORS error?', 'reverse a string'): Answer the technical question directly with clean code and concise explanation. Do NOT insert motivational speeches or tell the user to 'stay consistent'.\n"
+        f"   - Frustration / Emotional ('I'm tired', 'I failed my exam', 'I'm feeling lazy'): Acknowledge feelings with genuine human empathy. Do NOT automatically produce a 5-step productivity framework or use overly polished/robotic stock phrases like 'That's completely natural' or 'The engine doesn't want to turn over'. Talk like a real friend.\n"
+        f"   - Motivation ('motivate me'): Give practical, grounded encouragement—avoid motivational-poster clichés.\n"
+        f"   - Planning ('what should I focus on today?', 'make me a study plan'): Act as a coach using user's background goals, habits, and missions.\n"
+        f"2. NO MANDATORY RESPONSE STRUCTURE: Never force every reply to contain an acknowledgement, insight, action plan, motivation, bullet points, or a question at the end. Use headings or bullet points ONLY when they genuinely clarify complex technical topics.\n"
+        f"3. ELIMINATE REPETITIVE STOCK BUZZWORDS: Avoid habitual repetition of stock coaching phrases like 'That's completely natural', 'Let's break this down', 'Here's the thing', 'Absolutely', 'Great to see you', 'Take a small step', 'You've got this', 'Stay consistent', 'Focus on', 'Keep pushing', 'One step at a time', 'Protocol', 'Discipline'. Use varied, natural phrasing.\n"
+        f"4. INVISIBLE RAG & PRIVATE CONTEXT: Never output 'Insights retrieved:', 'User Identity & Profile:', 'MKC ID:', or raw database metadata. Only refer to the user's goals or progress when directly relevant.\n"
+        f"5. DO NOT OVERUSE NAME: Use {user_name}'s name only when naturally meaningful. Never start messages with '{user_name}!'.\n"
+        f"6. OUTPUT FORMAT: Return a valid JSON object matching: {{ 'reply': '...', 'action': ... }}."
     )
 
     contents = []
@@ -412,8 +436,16 @@ async def generate_coaching_response(user_message: str, user_id: int) -> Dict[st
         }
     }
 
-    candidate_models = ["gemini-3.6-flash"
-    , "gemini-3.5", "gemini-3.6", "gemini-3.7"]
+    # Dynamically build candidate models list with active config + fallback models
+    configured_model = settings.GEMINI_MODEL or os.getenv("GEMINI_MODEL", "")
+    candidate_models = []
+    if configured_model:
+        candidate_models.append(configured_model)
+    
+    for fallback in ["gemini-3.6-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest", "gemini-1.5-pro"]:
+        if fallback not in candidate_models:
+            candidate_models.append(fallback)
+
     reply_text = None
     action_payload = None
     used_model = None
@@ -442,18 +474,17 @@ async def generate_coaching_response(user_message: str, user_id: int) -> Dict[st
                 logger.warning(f"[AI Coach] {last_error}")
                 continue
 
-            try:
-                parsed_response = json.loads(extracted_text)
-                reply_text = parsed_response.get("reply", "")
-                action_payload = parsed_response.get("action", None)
-            except json.JSONDecodeError:
-                reply_text = extracted_text
-                action_payload = None
-
-            if reply_text:
+            extracted_reply, extracted_action = _extract_reply_and_action(extracted_text)
+            if extracted_reply:
+                reply_text = extracted_reply
+                action_payload = extracted_action
                 used_model = model_name
                 logger.info(f"[AI Coach] LLM success with '{used_model}'. Response length: {len(reply_text)} chars")
                 break
+            else:
+                last_error = f"Could not extract valid reply string from {model_name} response"
+                logger.warning(f"[AI Coach] {last_error}")
+                continue
 
         except urllib.error.HTTPError as err:
             err_detail = ""

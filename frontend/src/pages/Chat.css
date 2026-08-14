@@ -127,6 +127,28 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color 0.15s ease;
+}
+
+.avatar.clickable {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.avatar.clickable:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+}
+
+.user-info.clickable:hover .username {
+  color: var(--cyan);
+}
+
+.chat-header-info.clickable h3 {
+  transition: color 0.15s ease;
+}
+
+.chat-header-info.clickable:hover h3 {
+  color: var(--cyan);
 }
 
 .name {
@@ -282,6 +304,8 @@
 
 .message-bubble-wrapper.mine {
   justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
 }
 
 .message-bubble-wrapper.theirs {
@@ -307,6 +331,29 @@
   background: var(--cyan);
   color: #000;
   border-bottom-right-radius: 4px;
+}
+
+.msg-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  align-self: center;
+  flex-shrink: 0;
+}
+
+.message-bubble-wrapper.mine:hover .msg-delete-btn {
+  opacity: 1;
+}
+
+.msg-delete-btn:hover {
+  color: #EF4444;
 }
 
 .message-input-area {

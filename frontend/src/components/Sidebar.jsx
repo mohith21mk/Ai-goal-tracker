@@ -112,12 +112,8 @@ const Sidebar = () => {
       }
     }
     loadProgress();
-    
-    // Simple interval to keep sidebar fresh if user stays on page
-    const interval = setInterval(loadProgress, 60000);
     return () => {
       isMounted = false;
-      clearInterval(interval);
     };
   }, []);
 

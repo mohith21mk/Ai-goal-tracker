@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, UserPlus, Check, X, Send, MessageSquare, MessageCircle } from 'lucide-react';
+import { Search, UserPlus, Check, X, Send, MessageSquare, MessageCircle, Trash2 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import { useMessagingSocket } from '../hooks/useMessagingSocket';
+import UserProfilePanel from '../components/UserProfilePanel';
 import {
   searchPublicUsers,
   getConnections,
@@ -13,18 +14,22 @@ import {
   getConversations,
   getConversationMessages,
   markConversationRead,
-  getCurrentUser
+  getCurrentUser,
+  deleteMessage
 } from '../services/api';
 import './Chat.css';
 
 const Chat = () => {
   const [currentUser, setCurrentUser] = useState(null);
+  const [selectedProfileUserId, setSelectedProfileUserId] = useState(null);
   
   // Left Panel State
   const [activeTab, setActiveTab] = useState('conversations'); // 'conversations' | 'discover' | 'requests'
   const [conversations, setConversations] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchPerformed, setSearchPerformed] = useState(false);
   const [connections, setConnections] = useState({ accepted: [], pending_received: [], pending_sent: [], blocked: [] });
   
   // Right Panel State
@@ -42,6 +47,8 @@ const Chat = () => {
     }
   }, []);
 
+  const scrollTimerRef = useRef(null);
+
   const loadConnections = useCallback(async () => {
     try {
       const data = await getConnections();
@@ -51,24 +58,32 @@ const Chat = () => {
     }
   }, []);
 
-  const scrollToBottom = () => {
-    setTimeout(() => {
+  const scrollToBottom = useCallback(() => {
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = setTimeout(() => {
       if (messagesEndRef.current) {
         messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
       }
     }, 100);
-  };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    };
+  }, []);
 
   const activeConvRef = useRef(activeConversation);
   useEffect(() => {
     activeConvRef.current = activeConversation;
   }, [activeConversation]);
 
-  // Real-time WebSocket event handler
+  // Real-time WebSocket event handler with local state updates (NO HTTP spam)
   const handleIncomingMessage = useCallback((eventData) => {
     const msgObj = eventData.message || eventData;
     const targetConvId = eventData.conversation_id || msgObj.conversation_id;
     const currentActiveConv = activeConvRef.current;
+    const content = msgObj.content || msgObj.message || '';
 
     if (currentActiveConv && currentActiveConv.id === targetConvId) {
       setMessages(prev => {
@@ -77,8 +92,8 @@ const Chat = () => {
           id: msgObj.id || Date.now(),
           conversation_id: targetConvId,
           sender_id: msgObj.sender_id,
-          message: msgObj.message || msgObj.content,
-          content: msgObj.content || msgObj.message,
+          message: content,
+          content: content,
           created_at: msgObj.created_at || new Date().toISOString()
         }];
       });
@@ -86,8 +101,27 @@ const Chat = () => {
       markConversationRead(targetConvId).catch(() => {});
     }
 
-    getConversations().then(data => setConversations(data)).catch(() => {});
-  }, []);
+    // Update conversation list locally without HTTP refetch
+    setConversations(prev => {
+      if (!Array.isArray(prev)) return prev;
+      const existingIndex = prev.findIndex(c => c.id === targetConvId);
+      if (existingIndex !== -1) {
+        const updated = [...prev];
+        const conv = { ...updated[existingIndex] };
+        conv.last_message = content;
+        conv.last_message_at = msgObj.created_at || new Date().toISOString();
+        if (!currentActiveConv || currentActiveConv.id !== targetConvId) {
+          conv.unread_count = (conv.unread_count || 0) + 1;
+        }
+        updated.splice(existingIndex, 1);
+        return [conv, ...updated];
+      } else {
+        // Only fetch if from a completely unknown new conversation
+        loadConversations();
+        return prev;
+      }
+    });
+  }, [loadConversations, scrollToBottom]);
 
   const { status: socketStatus, sendMessage: sendWsMessage } = useMessagingSocket(
     handleIncomingMessage
@@ -102,11 +136,13 @@ const Chat = () => {
 
         const [convs, conns] = await Promise.all([
           getConversations().catch(() => []),
-          getConnections().catch(() => [])
+          getConnections().catch(() => ({ accepted: [], pending_received: [], pending_sent: [], blocked: [] }))
         ]);
         if (isMounted) {
           if (Array.isArray(convs)) setConversations(convs);
-          if (Array.isArray(conns)) setConnections(conns);
+          if (conns && typeof conns === 'object' && !Array.isArray(conns)) {
+            setConnections(conns);
+          }
         }
       } catch (err) {
         console.error('Chat init error:', err);
@@ -119,22 +155,58 @@ const Chat = () => {
     };
   }, []);
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!searchQuery || searchQuery.length < 2) return;
+  const executeSearch = useCallback(async (query) => {
+    const q = (query || '').trim();
+    if (q.length < 2) {
+      setSearchResults([]);
+      setSearchPerformed(false);
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchPerformed(true);
     try {
-      const res = await searchPublicUsers(searchQuery);
-      setSearchResults(res.users || res);
+      const res = await searchPublicUsers(q);
+      const list = res?.users || (Array.isArray(res) ? res : []);
+      setSearchResults(list);
     } catch (err) {
-      console.error(err);
+      console.error('Search error:', err);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  const handleSearch = (e) => {
+    if (e) e.preventDefault();
+    executeSearch(searchQuery);
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'discover') return;
+    const timer = setTimeout(() => {
+      if (searchQuery.trim().length >= 2) {
+        executeSearch(searchQuery);
+      } else if (searchQuery.trim().length === 0) {
+        setSearchResults([]);
+        setSearchPerformed(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery, activeTab, executeSearch]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'requests' || tab === 'discover') {
+      loadConnections();
     }
   };
 
   const handleStartConversation = async (targetUserId) => {
     try {
       const convRes = await createConversation(targetUserId);
-      await loadConversations();
       const updatedConvs = await getConversations();
+      setConversations(updatedConvs);
       const targetConv = updatedConvs.find(c => c.id === convRes.conversation_id || c.id === convRes.id);
       if (targetConv) {
         openConversation(targetConv);
@@ -181,7 +253,7 @@ const Chat = () => {
       setMessages(history);
       scrollToBottom();
       await markConversationRead(conv.id);
-      loadConversations();
+      setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c));
     } catch (err) {
       console.error(err);
     }
@@ -209,6 +281,15 @@ const Chat = () => {
     setMessageInput('');
   };
 
+  const handleDeleteMessage = async (messageId) => {
+    try {
+      await deleteMessage(messageId);
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+    } catch (err) {
+      alert(err.message || 'Failed to delete message.');
+    }
+  };
+
   return (
     <div className="app-shell">
       <Sidebar />
@@ -221,21 +302,21 @@ const Chat = () => {
             <div className="chat-tabs">
               <button 
                 className={activeTab === 'conversations' ? 'active' : ''} 
-                onClick={() => setActiveTab('conversations')}
+                onClick={() => handleTabChange('conversations')}
               >
                 Chats
               </button>
               <button 
                 className={activeTab === 'discover' ? 'active' : ''} 
-                onClick={() => setActiveTab('discover')}
+                onClick={() => handleTabChange('discover')}
               >
                 Discover
               </button>
               <button 
                 className={activeTab === 'requests' ? 'active' : ''} 
-                onClick={() => setActiveTab('requests')}
+                onClick={() => handleTabChange('requests')}
               >
-                Requests {connections.pending_received.length > 0 && <span className="badge">{connections.pending_received.length}</span>}
+                Requests {connections.pending_received?.length > 0 && <span className="badge">{connections.pending_received.length}</span>}
               </button>
             </div>
 
@@ -270,56 +351,110 @@ const Chat = () => {
                   <form onSubmit={handleSearch} className="search-form">
                     <input 
                       type="text" 
-                      placeholder="Search username..." 
+                      placeholder="Search username or MKC ID..." 
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
-                    <button type="submit"><Search size={16} strokeWidth={1.8} /></button>
+                    <button type="submit" aria-label="Search">
+                      <Search size={16} strokeWidth={1.8} />
+                    </button>
                   </form>
                   <div className="search-results">
-                    {searchResults.map(user => (
-                      <div key={user.id} className="user-card">
-                        <div className="avatar">{user.avatar_initials}</div>
-                        <div className="user-info">
-                          <span className="name">{user.full_name}</span>
-                          <span className="username">@{user.username}</span>
-                        </div>
-                        <div className="action" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <button 
-                            onClick={() => handleStartConversation(user.id)} 
-                            className="btn-icon"
-                            title="Start Chat"
-                          >
-                            <MessageCircle size={16} strokeWidth={1.8}/>
-                          </button>
-                          {user.connection_status === 'none' && (
-                            <button onClick={() => handleSendRequest(user.id)} className="btn-icon"><UserPlus size={16} strokeWidth={1.8}/></button>
-                          )}
-                          {user.connection_status === 'sent' && (
-                            <span className="status-text">Pending</span>
-                          )}
-                          {user.connection_status === 'received' && (
-                            <span className="status-text">Awaiting Reply</span>
-                          )}
-                          {user.connection_status === 'accepted' && (
-                            <span className="status-text">Connected</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                    {isSearching ? (
+                      <div className="empty-state">Searching community members...</div>
+                    ) : searchResults.length > 0 ? (
+                      searchResults.map(user => {
+                        const displayName = user.full_name || user.display_name || user.username || 'Member';
+                        const usernameDisplay = user.username || 'member';
+                        const initials = user.avatar_initials || usernameDisplay.substring(0, 2).toUpperCase();
+                        const mkcId = user.mkc_id || (user.id ? `MKC-${user.id}` : '');
+
+                        return (
+                          <div key={user.id} className="user-card">
+                            <div 
+                              className="avatar clickable" 
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => setSelectedProfileUserId(user.id)}
+                              title="View Profile"
+                            >
+                              {initials}
+                            </div>
+                            <div 
+                              className="user-info clickable" 
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => setSelectedProfileUserId(user.id)}
+                              title="View Profile"
+                            >
+                              <span className="name">{displayName}</span>
+                              <span className="username">@{usernameDisplay}</span>
+                              {mkcId && (
+                                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>
+                                  {mkcId}
+                                </span>
+                              )}
+                            </div>
+                            <div className="action" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              {user.connection_status === 'accepted' && (
+                                <button 
+                                  onClick={() => handleStartConversation(user.id)} 
+                                  className="btn-icon"
+                                  title="Start Chat"
+                                >
+                                  <MessageCircle size={16} strokeWidth={1.8}/>
+                                </button>
+                              )}
+                              {user.connection_status === 'none' && (
+                                <button 
+                                  onClick={() => handleSendRequest(user.id)} 
+                                  className="btn-icon"
+                                  title="Send Connection Request"
+                                >
+                                  <UserPlus size={16} strokeWidth={1.8}/>
+                                </button>
+                              )}
+                              {user.connection_status === 'sent' && (
+                                <span className="status-text">Pending</span>
+                              )}
+                              {user.connection_status === 'received' && (
+                                <span className="status-text">Awaiting Reply</span>
+                              )}
+                              {user.connection_status === 'accepted' && (
+                                <span className="status-text">Connected</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : searchPerformed ? (
+                      <div className="empty-state">No members found matching &quot;{searchQuery}&quot;</div>
+                    ) : (
+                      <div className="empty-state">Search by username, name, or MKC ID</div>
+                    )}
                   </div>
                 </div>
               )}
 
               {activeTab === 'requests' && (
                 <div className="requests-list">
-                  {connections.pending_received.length === 0 ? (
+                  {(!connections.pending_received || connections.pending_received.length === 0) ? (
                     <div className="empty-state">No pending requests</div>
                   ) : (
                     connections.pending_received.map(req => (
                       <div key={req.id} className="user-card">
-                        <div className="avatar">{req.avatar_initials}</div>
-                        <div className="user-info">
+                        <div 
+                          className="avatar clickable" 
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setSelectedProfileUserId(req.id)}
+                          title="View Profile"
+                        >
+                          {req.avatar_initials}
+                        </div>
+                        <div 
+                          className="user-info clickable" 
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setSelectedProfileUserId(req.id)}
+                          title="View Profile"
+                        >
                           <span className="name">{req.full_name}</span>
                           <span className="username">@{req.username}</span>
                         </div>
@@ -346,8 +481,20 @@ const Chat = () => {
             ) : (
               <div className="active-chat">
                 <div className="chat-header">
-                  <div className="avatar">{activeConversation.other_avatar || activeConversation.other_username?.charAt(0).toUpperCase()}</div>
-                  <div className="chat-header-info">
+                  <div 
+                    className="avatar clickable" 
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setSelectedProfileUserId(activeConversation.other_user_id)}
+                    title="View Profile"
+                  >
+                    {activeConversation.other_avatar || activeConversation.other_username?.charAt(0).toUpperCase()}
+                  </div>
+                  <div 
+                    className="chat-header-info clickable" 
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setSelectedProfileUserId(activeConversation.other_user_id)}
+                    title="View Profile"
+                  >
                     <h3>@{activeConversation.other_username}</h3>
                     <span className="status-pill" style={{ fontSize: '11px', color: socketStatus === 'CONNECTED' ? 'var(--cyan)' : 'var(--text-tertiary)' }}>
                       ● {socketStatus}
@@ -360,6 +507,15 @@ const Chat = () => {
                     const isMine = msg.sender_id === currentUser?.id;
                     return (
                       <div key={msg.id} className={`message-bubble-wrapper ${isMine ? 'mine' : 'theirs'}`}>
+                        {isMine && (
+                          <button
+                            onClick={() => handleDeleteMessage(msg.id)}
+                            className="msg-delete-btn"
+                            title="Delete message"
+                          >
+                            <Trash2 size={13} strokeWidth={1.6} />
+                          </button>
+                        )}
                         <div className={`message-bubble ${isMine ? 'mine' : 'theirs'}`}>
                           {msg.content || msg.message}
                         </div>
@@ -386,6 +542,25 @@ const Chat = () => {
           
         </div>
       </div>
+
+      {/* User Profile Panel Modal */}
+      {selectedProfileUserId && (
+        <UserProfilePanel
+          userId={selectedProfileUserId}
+          onClose={() => setSelectedProfileUserId(null)}
+          onStartConversation={(targetId) => {
+            setSelectedProfileUserId(null);
+            handleStartConversation(targetId);
+          }}
+          onConnectionUpdated={() => {
+            loadConnections();
+            loadConversations();
+            if (searchQuery && searchQuery.length >= 2) {
+              searchPublicUsers(searchQuery).then(res => setSearchResults(res.users || res)).catch(() => {});
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

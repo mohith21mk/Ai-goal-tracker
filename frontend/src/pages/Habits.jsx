@@ -1,13 +1,26 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
-import { Flame, Zap, Trophy, TrendingUp, TriangleAlert, Check, Trash2, X } from 'lucide-react';
+import { 
+  Zap, 
+  Trophy, 
+  TrendingUp, 
+  TriangleAlert, 
+  Check, 
+  Trash2, 
+  X, 
+  Sparkles, 
+  Shield, 
+  Crown,
+  PartyPopper
+} from 'lucide-react';
 import {
   getHabits,
   getHabitStats,
   createHabit,
   deleteHabit,
-  toggleHabit
+  toggleHabit,
+  getProgression
 } from '../services/api';
 import './Habits.css';
 
@@ -20,9 +33,25 @@ const Habits = () => {
     overall_7day_completion_pct: 0,
     habits_completed_today: 0
   });
+  const [progression, setProgression] = useState({
+    level: 1,
+    rank: 'Initiate',
+    total_xp: 0,
+    current_level_xp: 0,
+    next_level_xp: 100,
+    progress_pct: 0,
+    xp_to_next: 100
+  });
+  const [levelUpEvent, setLevelUpEvent] = useState(null); // { oldLevel, newLevel, oldRank, newRank }
+  const [floatingXp, setFloatingXp] = useState([]); // [{ id, habitId, text }]
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
+
+  const prevProgressionRef = useRef(null);
+  const animCounterRef = useRef(1);
+  const animTimersRef = useRef(new Set());
+  const isMountedRef = useRef(true);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -35,50 +64,100 @@ const Habits = () => {
 
   const refreshHabits = async () => {
     try {
-      const [habitsList, statsData] = await Promise.all([
+      const [habitsList, statsData, progData] = await Promise.all([
         getHabits(),
-        getHabitStats()
+        getHabitStats(),
+        getProgression().catch(() => null)
       ]);
+      if (!isMountedRef.current) return;
       setHabits(habitsList);
       setStats(statsData);
+
+      if (progData) {
+        if (prevProgressionRef.current) {
+          const oldLvl = prevProgressionRef.current.level;
+          const newLvl = progData.level;
+          const oldRnk = prevProgressionRef.current.rank;
+          const newRnk = progData.rank;
+
+          if (newLvl > oldLvl || (oldRnk && newRnk && oldRnk !== newRnk)) {
+            setLevelUpEvent({
+              oldLevel: oldLvl,
+              newLevel: newLvl,
+              oldRank: oldRnk,
+              newRank: newRnk,
+              isRankUp: oldRnk !== newRnk
+            });
+          }
+        }
+        prevProgressionRef.current = progData;
+        setProgression(progData);
+      }
+
       setError(null);
     } catch (err) {
+      if (!isMountedRef.current) return;
       console.error('Failed to refresh habits data:', err);
       setError('Failed to refresh habits data.');
     }
   };
 
   useEffect(() => {
-    let isMounted = true;
+    isMountedRef.current = true;
     async function initHabits() {
       try {
-        const [habitsList, statsData] = await Promise.all([
+        const [habitsList, statsData, progData] = await Promise.all([
           getHabits(),
-          getHabitStats()
+          getHabitStats(),
+          getProgression().catch(() => null)
         ]);
-        if (isMounted) {
+        if (isMountedRef.current) {
           setHabits(habitsList);
           setStats(statsData);
+          if (progData) {
+            prevProgressionRef.current = progData;
+            setProgression(progData);
+          }
           setError(null);
           setLoading(false);
         }
       } catch (err) {
-        if (isMounted) {
+        if (isMountedRef.current) {
           console.error('Failed to load habits data:', err);
           setError('Failed to load habits. Please verify backend connection.');
           setLoading(false);
         }
       }
     }
+    const currentTimers = animTimersRef.current;
     initHabits();
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
+      currentTimers.forEach(t => clearTimeout(t));
+      currentTimers.clear();
     };
   }, []);
 
+  const triggerXpAnimation = (habitId, xpText = '+15 XP') => {
+    animCounterRef.current += 1;
+    const animId = animCounterRef.current;
+    if (!isMountedRef.current) return;
+    setFloatingXp(prev => [...prev, { id: animId, habitId, text: xpText }]);
+    const timerId = setTimeout(() => {
+      animTimersRef.current.delete(timerId);
+      if (isMountedRef.current) {
+        setFloatingXp(prev => prev.filter(item => item.id !== animId));
+      }
+    }, 1200);
+    animTimersRef.current.add(timerId);
+  };
+
   const handleToggleDate = async (habitId, dateStr) => {
     try {
-      await toggleHabit(habitId, dateStr);
+      const res = await toggleHabit(habitId, dateStr);
+      if (res && (res.completed || res.status === 'completed' || !res.removed)) {
+        triggerXpAnimation(habitId, '+15 XP');
+      }
       await refreshHabits();
     } catch (err) {
       alert(err.message || 'Could not toggle habit completion.');
@@ -128,18 +207,53 @@ const Habits = () => {
       <div className="main-viewport">
         <TopBar />
         <div className="habits-container">
-          {/* Header */}
-          <div className="habits-header-section">
-            <div className="habits-header-left">
-              <h1 className="font-serif">Habits & Streaks</h1>
-              <p>Forge unbroken discipline through daily micro-consistency.</p>
+          {/* 1. SOUL-LEVELING CHARACTER PROGRESSION HUD */}
+          <div className="habits-hud-card glass-panel">
+            <div className="hud-top-row">
+              <div className="hud-identity">
+                <div className="hud-level-badge font-display">
+                  <span className="lvl-prefix">LVL</span>
+                  <span className="lvl-number">{progression.level || 1}</span>
+                </div>
+                <div className="hud-title-col">
+                  <div className="hud-rank-row">
+                    <Crown size={15} style={{ color: 'var(--cyan)' }} />
+                    <span className="hud-rank-title font-display">{progression.rank || 'Initiate'}</span>
+                  </div>
+                  <h1 className="hud-main-title font-serif">Discipline Protocols & Quests</h1>
+                </div>
+              </div>
+
+              <div className="hud-actions-right">
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="create-habit-btn"
+                >
+                  <span>+ Add Protocol Quest</span>
+                </button>
+              </div>
             </div>
-            <button
-              onClick={() => setShowModal(true)}
-              className="create-habit-btn"
-            >
-              <span>+ Create New Habit</span>
-            </button>
+
+            {/* Soul-Leveling XP Progress Bar */}
+            <div className="hud-xp-section">
+              <div className="hud-xp-meta">
+                <div className="xp-current-info font-display">
+                  <Sparkles size={14} style={{ color: 'var(--cyan)' }} />
+                  <span>XP {progression.current_level_xp || 0} / {progression.next_level_xp || 100}</span>
+                </div>
+                <div className="xp-next-target font-display">
+                  +{progression.xp_to_next || Math.max(0, (progression.next_level_xp || 100) - (progression.current_level_xp || 0))} XP TO LEVEL {(progression.level || 1) + 1}
+                </div>
+              </div>
+              <div className="hud-xp-bar-track">
+                <div 
+                  className="hud-xp-bar-fill" 
+                  style={{ width: `${Math.max(4, Math.min(100, progression.progress_pct || 0))}%` }}
+                >
+                  <div className="xp-bar-glow" />
+                </div>
+              </div>
+            </div>
           </div>
 
           {error && (
@@ -153,8 +267,8 @@ const Habits = () => {
           <div className="habits-overview-grid">
             <div className="habit-stat-card glass-panel">
               <div className="habit-stat-header">
-                <span className="habit-stat-title">Active Habits</span>
-                <span className="habit-stat-icon"><Flame size={18} strokeWidth={1.8} style={{ color: '#38BDF8' }} aria-hidden="true" /></span>
+                <span className="habit-stat-title">Active Protocols</span>
+                <span className="habit-stat-icon"><Shield size={18} strokeWidth={1.8} style={{ color: '#38BDF8' }} aria-hidden="true" /></span>
               </div>
               <div className="habit-stat-value">{stats.total_active_habits}</div>
               <div className="habit-stat-sub">{stats.habits_completed_today} completed today</div>
@@ -205,11 +319,21 @@ const Habits = () => {
             <div className="habits-list-section">
               {habits.map((habit) => (
                 <div key={habit.id} className="habit-card glass-panel">
+                  {/* Floating XP bubble animation */}
+                  {floatingXp.filter(fx => fx.habitId === habit.id).map(fx => (
+                    <div key={fx.id} className="floating-xp-bubble font-display">
+                      <Sparkles size={13} /> {fx.text}
+                    </div>
+                  ))}
+
                   {/* Left Column: Info & Category */}
                   <div className="habit-info-col">
                     <div className="habit-meta-tags">
                       <span className={`category-tag ${habit.category}`}>
                         {habit.category}
+                      </span>
+                      <span className="quest-xp-reward font-display">
+                        <Sparkles size={11} /> +15 XP
                       </span>
                       <span className="streak-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <Zap size={12} strokeWidth={1.8} aria-hidden="true" /> {habit.current_streak} Day Streak (Best: {habit.longest_streak})
@@ -221,13 +345,13 @@ const Habits = () => {
 
                   {/* Center Column: 7-Day Matrix */}
                   <div className="habit-matrix-col">
-                    <span className="matrix-header-text">Past 7 Days (Click to toggle)</span>
+                    <span className="matrix-header-text">Past 7 Days Protocol Execution</span>
                     <div className="matrix-cells-row">
                       {habit.recent_7_days.map((dayItem) => (
                         <button
                           key={dayItem.date}
                           onClick={() => handleToggleDate(habit.id, dayItem.date)}
-                          title={`${dayItem.date}: ${dayItem.completed ? 'Completed' : 'Pending'}`}
+                          title={`${dayItem.date}: ${dayItem.completed ? 'Completed' : 'Click to complete protocol (+15 XP)'}`}
                           className={`matrix-cell ${dayItem.completed ? 'completed' : ''}`}
                         >
                           <span className="matrix-cell-day">{formatDayLabel(dayItem.date)}</span>
@@ -244,7 +368,7 @@ const Habits = () => {
                     <button
                       onClick={() => handleDeleteHabit(habit.id, habit.title)}
                       className="action-icon-btn"
-                      title="Delete habit"
+                      title="Delete habit protocol"
                     >
                       <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />
                     </button>
@@ -255,6 +379,44 @@ const Habits = () => {
           )}
         </div>
       </div>
+
+      {/* Level Up & Rank Up Celebration Modal */}
+      {levelUpEvent && (
+        <div className="level-up-modal-backdrop" onClick={() => setLevelUpEvent(null)}>
+          <div className="level-up-modal-card glass-panel" onClick={e => e.stopPropagation()}>
+            <div className="level-up-glow" />
+            <div className="level-up-icon-wrap">
+              <PartyPopper size={36} style={{ color: 'var(--cyan)' }} />
+            </div>
+            <span className="level-up-tag font-display">
+              {levelUpEvent.isRankUp ? '★ RANK ADVANCEMENT ★' : '★ LEVEL UP ACHIEVED ★'}
+            </span>
+            <h2 className="level-up-title font-serif">
+              {levelUpEvent.isRankUp
+                ? `${levelUpEvent.oldRank} → ${levelUpEvent.newRank}`
+                : `Level ${levelUpEvent.oldLevel} → Level ${levelUpEvent.newLevel}`}
+            </h2>
+            <div className="level-up-stats-box">
+              <div className="level-up-stat">
+                <span className="lvl-stat-lbl">ADVANCED RANK</span>
+                <span className="lvl-stat-val font-display">{levelUpEvent.newRank}</span>
+              </div>
+              <div className="level-up-stat">
+                <span className="lvl-stat-lbl">CURRENT LEVEL</span>
+                <span className="lvl-stat-val font-display">LVL {levelUpEvent.newLevel}</span>
+              </div>
+              <div className="level-up-stat">
+                <span className="lvl-stat-lbl">PROTOCOL REWARD</span>
+                <span className="lvl-stat-val font-display" style={{ color: 'var(--cyan)' }}>+15 XP</span>
+              </div>
+            </div>
+            <p className="level-up-sub">Your character progression accelerates through persistent protocol execution.</p>
+            <button onClick={() => setLevelUpEvent(null)} className="btn-level-up-claim font-display">
+              Claim Advancement →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Create Habit Modal */}
       {showModal && (

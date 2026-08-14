@@ -7,7 +7,8 @@ from typing import Any, Dict, Optional, Tuple
 
 from ..database import get_connection
 
-SECRET_KEY = "mkc_mastery_key_coach_secret_session_key_2026"
+from ..config import settings as _cfg
+SECRET_KEY = _cfg.SECRET_KEY
 SESSION_DURATION_DAYS = 30
 
 RESERVED_USERNAMES = {

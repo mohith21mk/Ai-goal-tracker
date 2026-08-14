@@ -25,7 +25,7 @@ export function useNotificationsSocket(onNotificationReceived) {
 
     let wsUrl = import.meta.env.VITE_WS_URL;
     if (!wsUrl) {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const apiUrl = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:8000';
       if (apiUrl.startsWith('http')) {
         wsUrl = apiUrl.replace(/^http/, 'ws') + '/api/notifications/ws';
       } else {

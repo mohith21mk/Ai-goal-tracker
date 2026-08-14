@@ -203,6 +203,15 @@ export async function getUser() {
   return response.json();
 }
 
+export async function getPublicUserProfile(userId) {
+  const response = await apiFetch(`/api/users/${userId}`);
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to fetch profile: ${response.statusText}`);
+  }
+  return response.json();
+}
+
 export async function updateUser(data) {
   const response = await apiFetch('/api/users', {
     method: 'PATCH',
@@ -839,6 +848,17 @@ export async function markConversationRead(conversationId) {
   return response.json();
 }
 
+export async function deleteMessage(messageId) {
+  const response = await apiFetch(`/api/chat/messages/${messageId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to delete message: ${response.statusText}`);
+  }
+  return response.json();
+}
+
 // -------------------------------------------------------------------
 // NOTIFICATIONS APIs
 // -------------------------------------------------------------------
@@ -888,5 +908,45 @@ export async function deleteNotification(id) {
   }
   return response.json();
 }
+
+// -------------------------------------------------------------------
+// PROGRESSION & CREDENTIALS APIs
+// -------------------------------------------------------------------
+
+export async function getProgression() {
+  const response = await apiFetch('/api/progression');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch progression: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getCredentials() {
+  const response = await apiFetch('/api/credentials');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch credentials: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getPublicCredentials(userId) {
+  const response = await apiFetch(`/api/credentials/user/${userId}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch user credentials: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function checkCredentials() {
+  const response = await apiFetch('/api/credentials/check', {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to evaluate credentials: ${response.statusText}`);
+  }
+  return response.json();
+}
+
 
 

@@ -6,6 +6,104 @@ from .config import settings
 DB_PATH = Path(__file__).resolve().parent / "app.db"
 
 
+def _is_postgres():
+    db_url = settings.DATABASE_URL
+    return db_url.startswith('postgres://') or db_url.startswith('postgresql://')
+
+
+class _CompatRow(dict):
+    """A dict subclass that also supports integer indexing like sqlite3.Row."""
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return list(self.values())[key]
+        return super().__getitem__(key)
+
+
+class _PgCompatCursor:
+    """Wraps a psycopg2 RealDictCursor to accept '?' placeholders and translate to '%s'."""
+    def __init__(self, real_cursor):
+        self._cursor = real_cursor
+
+    def execute(self, sql, params=None):
+        sql = sql.replace('?', '%s')
+        stripped = sql.strip()
+        upper_stripped = stripped.upper()
+        self._last_insert_id = None
+        if upper_stripped.startswith('INSERT') and 'RETURNING' not in upper_stripped:
+            # Add RETURNING id for tables that have auto-increment id
+            # Skip for tables with composite PKs (conversation_members)
+            # and string PKs (app_sessions)
+            skip_tables = ('app_sessions', 'conversation_members')
+            should_return = True
+            for t in skip_tables:
+                if t.upper() in upper_stripped:
+                    should_return = False
+                    break
+            if should_return:
+                returning_sql = stripped.rstrip().rstrip(';') + ' RETURNING id'
+                self._cursor.execute(returning_sql, params)
+                row = self._cursor.fetchone()
+                self._last_insert_id = row['id'] if row else None
+                return
+        return self._cursor.execute(sql, params)
+
+    def executemany(self, sql, params_list):
+        sql = sql.replace('?', '%s')
+        return self._cursor.executemany(sql, params_list)
+
+    def fetchone(self):
+        row = self._cursor.fetchone()
+        return _CompatRow(row) if row else None
+
+    def fetchall(self):
+        rows = self._cursor.fetchall()
+        return [_CompatRow(r) for r in rows]
+
+    @property
+    def lastrowid(self):
+        return getattr(self, '_last_insert_id', None)
+
+    @property
+    def rowcount(self):
+        return self._cursor.rowcount
+
+    @property
+    def description(self):
+        return self._cursor.description
+
+    def close(self):
+        return self._cursor.close()
+
+    def __iter__(self):
+        return iter(self._cursor)
+
+
+class _PgCompatConnection:
+    """Wraps a psycopg2 connection to return CompatCursor instances."""
+    def __init__(self, real_conn):
+        self._conn = real_conn
+
+    def cursor(self):
+        return _PgCompatCursor(self._conn.cursor())
+
+    def commit(self):
+        return self._conn.commit()
+
+    def rollback(self):
+        return self._conn.rollback()
+
+    def close(self):
+        return self._conn.close()
+
+    @property
+    def autocommit(self):
+        return self._conn.autocommit
+
+    @autocommit.setter
+    def autocommit(self, value):
+        self._conn.autocommit = value
+
+
 def get_connection():
     db_url = settings.DATABASE_URL
     if db_url.startswith("postgres://") or db_url.startswith("postgresql://"):
@@ -14,7 +112,7 @@ def get_connection():
             from psycopg2.extras import RealDictCursor
             pg_url = db_url.replace("postgres://", "postgresql://", 1)
             conn = psycopg2.connect(pg_url, cursor_factory=RealDictCursor)
-            return conn
+            return _PgCompatConnection(conn)
         except Exception as err:
             # Fallback to local SQLite if PostgreSQL connection fails in local testing
             pass
@@ -25,6 +123,13 @@ def get_connection():
 
 
 def init_db() -> None:
+    if _is_postgres():
+        # PostgreSQL schema is managed by Alembic migrations + SQLAlchemy ORM
+        from .db_session import engine, init_orm_db
+        engine.dispose()
+        init_orm_db()
+        return
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -557,12 +662,18 @@ def init_db() -> None:
             author_name TEXT NOT NULL,
             content TEXT NOT NULL,
             category TEXT DEFAULT 'general',
+            credential_id INTEGER,
             likes_count INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(credential_id) REFERENCES user_credentials(id) ON DELETE SET NULL
         )
         """
     )
+    try:
+        cursor.execute("ALTER TABLE community_posts ADD COLUMN credential_id INTEGER REFERENCES user_credentials(id)")
+    except Exception:
+        pass
 
     # 15. Create community_likes table
     cursor.execute(
@@ -689,6 +800,29 @@ def init_db() -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at DESC)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_notifications_ref ON notifications(reference_type, reference_id)")
+
+    # 18. Create user_credentials table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_credentials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            credential_type TEXT NOT NULL,
+            slug TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            tier TEXT DEFAULT 'bronze',
+            xp_value INTEGER DEFAULT 50,
+            evidence_type TEXT NOT NULL,
+            evidence_id TEXT,
+            issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, slug),
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_credentials_user ON user_credentials(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_credentials_slug ON user_credentials(user_id, slug)")
 
     conn.commit()
     conn.close()

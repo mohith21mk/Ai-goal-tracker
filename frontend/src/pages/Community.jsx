@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Globe,
@@ -9,10 +9,13 @@ import {
   HelpCircle,
   TriangleAlert,
   Heart,
-  Trash2
+  Trash2,
+  Award
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
+import VictoryCredentialCard from '../components/VictoryCredentialCard';
+import CertificateModal from '../components/CertificateModal';
 import {
   getCommunityPosts,
   createCommunityPost,
@@ -22,7 +25,8 @@ import {
   createCommunityComment,
   deleteCommunityComment,
   createConversation,
-  getUser
+  getUser,
+  getCredentials
 } from '../services/api';
 import './Community.css';
 
@@ -40,6 +44,9 @@ const Community = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostCategory, setNewPostCategory] = useState('general');
+  const [selectedCredentialId, setSelectedCredentialId] = useState(null);
+  const [userCredentials, setUserCredentials] = useState([]);
+  const [certModalData, setCertModalData] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(1);
 
   const [loading, setLoading] = useState(true);
@@ -55,42 +62,57 @@ const Community = () => {
       await createConversation(targetUserId);
       navigate('/messages');
     } catch (err) {
-      console.error('Failed to open chat:', err);
-      navigate('/messages');
+      const msg = err.message || '';
+      if (msg.includes('connected') || msg.includes('403')) {
+        alert('Send a connection request to message this user.');
+      } else {
+        console.error('Failed to open chat:', err);
+        alert('Could not start conversation. Please try again.');
+      }
     }
   };
+
+  const isMountedRef = useRef(true);
 
   const loadPosts = async (cat = selectedCategory) => {
     try {
       const data = await getCommunityPosts(cat === 'all' ? null : cat);
+      if (!isMountedRef.current) return;
       if (Array.isArray(data)) {
         setPosts(data);
       }
       setError(null);
     } catch (err) {
+      if (!isMountedRef.current) return;
       console.error('Failed to fetch community posts:', err);
       setError('Could not connect to community network.');
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    let isMounted = true;
+    isMountedRef.current = true;
     async function init() {
       try {
-        const [u, pData] = await Promise.all([
+        const [u, pData, creds] = await Promise.all([
           getUser().catch(() => ({ id: 1 })),
-          getCommunityPosts(null).catch(() => [])
+          getCommunityPosts(null).catch(() => []),
+          getCredentials().catch(() => [])
         ]);
 
-        if (isMounted) {
-          if (u && u.id) setCurrentUserId(u.id);
+        if (isMountedRef.current) {
+          if (u && u.id) {
+            setCurrentUserId(u.id);
+          }
           if (Array.isArray(pData)) setPosts(pData);
+          if (Array.isArray(creds)) setUserCredentials(creds);
           setLoading(false);
         }
       } catch (err) {
-        if (isMounted) {
+        if (isMountedRef.current) {
           console.error('Failed community init:', err);
           setError('Could not connect to community network.');
           setLoading(false);
@@ -99,7 +121,7 @@ const Community = () => {
     }
     init();
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
     };
   }, []);
 
@@ -117,10 +139,12 @@ const Community = () => {
     try {
       await createCommunityPost({
         content: newPostContent.trim(),
-        category: newPostCategory
+        category: newPostCategory,
+        credential_id: newPostCategory === 'wins' ? selectedCredentialId : null
       });
 
       setNewPostContent('');
+      setSelectedCredentialId(null);
       await loadPosts(selectedCategory);
     } catch (err) {
       alert(err.message || 'Failed to publish post.');
@@ -135,7 +159,6 @@ const Community = () => {
     setPosts(prev => prev.filter(p => p.id !== postId));
     try {
       await deleteCommunityPost(postId);
-      await loadPosts(selectedCategory);
     } catch (err) {
       alert(err.message || 'Failed to delete post.');
       await loadPosts(selectedCategory);
@@ -273,10 +296,14 @@ const Community = () => {
                 className="community-textarea"
                 required
               />
+              {/* Category selector & Attachments */}
               <div className="community-create-actions">
                 <select
                   value={newPostCategory}
-                  onChange={(e) => setNewPostCategory(e.target.value)}
+                  onChange={(e) => {
+                    setNewPostCategory(e.target.value);
+                    if (e.target.value !== 'wins') setSelectedCredentialId(null);
+                  }}
                   className="community-category-select"
                 >
                   <option value="general">General</option>
@@ -293,6 +320,35 @@ const Community = () => {
                   {publishing ? 'Publishing...' : 'Publish Post →'}
                 </button>
               </div>
+
+              {/* Credential Attachment Picker for Victory Wins */}
+              {newPostCategory === 'wins' && (
+                <div className="community-credential-picker">
+                  <div className="credential-picker-header">
+                    <Award size={14} style={{ color: 'var(--cyan)' }} />
+                    <span>Attach Verified Achievement (Optional):</span>
+                  </div>
+                  {userCredentials.length === 0 ? (
+                    <span className="no-credentials-hint">No verified credentials earned yet. You can still share your win!</span>
+                  ) : (
+                    <div className="credential-picker-chips">
+                      {userCredentials.map(cred => {
+                        const isSelected = selectedCredentialId === cred.id;
+                        return (
+                          <VictoryCredentialCard
+                            key={cred.id || cred.slug}
+                            credential={cred}
+                            compact={true}
+                            interactive={true}
+                            selected={isSelected}
+                            onClick={() => setSelectedCredentialId(isSelected ? null : cred.id)}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </form>
           </div>
 
@@ -342,6 +398,21 @@ const Community = () => {
                     </div>
 
                     <div className="post-body">{post.content}</div>
+
+                    {/* Attached Verified Credential Badge */}
+                    {post.credential && (
+                      <div className="post-credential-attachment">
+                        <VictoryCredentialCard
+                          credential={post.credential}
+                          userName={post.author_name}
+                          interactive={true}
+                          onClick={() => setCertModalData({
+                            credential: post.credential,
+                            user: { full_name: post.author_name }
+                          })}
+                        />
+                      </div>
+                    )}
 
                     <div className="post-footer">
                       <button
@@ -441,6 +512,14 @@ const Community = () => {
           )}
         </div>
       </div>
+
+      {certModalData && (
+        <CertificateModal
+          credential={certModalData.credential}
+          user={certModalData.user}
+          onClose={() => setCertModalData(null)}
+        />
+      )}
     </div>
   );
 };

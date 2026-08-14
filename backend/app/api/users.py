@@ -183,6 +183,116 @@ async def get_user_profile_endpoint(current_user: Dict[str, Any] = Depends(get_c
     return _get_user_profile_dict(current_user["id"])
 
 
+@router.get("/search", response_model=Dict[str, Any])
+async def search_public_users(
+    q: str = Query(..., min_length=2),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    search_term = f"%{q.strip().lower()}%"
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT id, mkc_id, username, full_name, avatar_initials, bio
+        FROM users
+        WHERE (LOWER(COALESCE(username, '')) LIKE ? 
+            OR LOWER(COALESCE(full_name, '')) LIKE ? 
+            OR LOWER(COALESCE(mkc_id, '')) LIKE ?) 
+          AND id != ?
+        ORDER BY id ASC LIMIT 20
+        """,
+        (search_term, search_term, search_term, current_user["id"])
+    )
+    rows = cursor.fetchall()
+
+    users_list = []
+    if rows:
+        user_ids = [r["id"] for r in rows]
+        placeholders = ",".join("?" * len(user_ids))
+        cursor.execute(
+            f"""
+            SELECT requester_id, recipient_id, status
+            FROM user_connections
+            WHERE (requester_id = ? AND recipient_id IN ({placeholders}))
+               OR (recipient_id = ? AND requester_id IN ({placeholders}))
+            """,
+            [current_user["id"]] + user_ids + [current_user["id"]] + user_ids
+        )
+        conn_rows = cursor.fetchall()
+        status_map = {}
+        for c in conn_rows:
+            other_id = c["recipient_id"] if c["requester_id"] == current_user["id"] else c["requester_id"]
+            if c["requester_id"] == current_user["id"]:
+                status_map[other_id] = "sent" if c["status"] == "pending" else c["status"]
+            else:
+                status_map[other_id] = "received" if c["status"] == "pending" else c["status"]
+
+        for r in rows:
+            u_id = r["id"]
+            users_list.append({
+                "id": u_id,
+                "mkc_id": r["mkc_id"] or f"MKC-{u_id:04d}",
+                "display_name": r["full_name"] or r["username"],
+                "full_name": r["full_name"] or r["username"],
+                "username": r["username"],
+                "avatar_initials": r["avatar_initials"] or r["username"][:2].upper(),
+                "bio": r["bio"] or "",
+                "connection_status": status_map.get(u_id, "none"),
+            })
+    conn.close()
+
+    return {"users": users_list}
+
+
+@router.get("/{user_id}", response_model=Dict[str, Any])
+async def get_public_user_profile_endpoint(
+    user_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Fetch public profile for a specific user ID with bidirectional connection status.
+    """
+    profile = _get_user_profile_dict(user_id)
+
+    if user_id == current_user["id"]:
+        profile["connection_status"] = "self"
+        return profile
+
+    # Hide private email from other users
+    profile.pop("email", None)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT requester_id, recipient_id, status
+        FROM user_connections
+        WHERE (requester_id = ? AND recipient_id = ?)
+           OR (requester_id = ? AND recipient_id = ?)
+        """,
+        (current_user["id"], user_id, user_id, current_user["id"])
+    )
+    conn_row = cursor.fetchone()
+    conn.close()
+
+    if not conn_row:
+        connection_status = "none"
+    elif conn_row["status"] == "accepted":
+        connection_status = "accepted"
+    elif conn_row["status"] == "blocked":
+        connection_status = "blocked"
+    elif conn_row["status"] == "pending":
+        if conn_row["requester_id"] == current_user["id"]:
+            connection_status = "sent"
+        else:
+            connection_status = "received"
+    else:
+        connection_status = conn_row["status"]
+
+    profile["connection_status"] = connection_status
+    return profile
+
+
 @router.patch("", response_model=Dict[str, Any])
 async def update_current_user(
     payload: UserUpdateRequest,
@@ -305,38 +415,4 @@ async def delete_account_endpoint(
     # Clear auth cookie
     response.delete_cookie(key=COOKIE_NAME, path="/")
     return {"message": "Your account and all associated data have been permanently deleted."}
-
-
-@router.get("/search", response_model=Dict[str, Any])
-async def search_public_users(
-    q: str = Query(..., min_length=2),
-    current_user: Dict[str, Any] = Depends(get_current_user)
-) -> Dict[str, Any]:
-    search_term = f"%{q.strip()}%"
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT id, mkc_id, username, full_name, avatar_initials, bio
-        FROM users
-        WHERE (username LIKE ? OR full_name LIKE ? OR mkc_id LIKE ?) AND id != ?
-        ORDER BY id ASC LIMIT 20
-        """,
-        (search_term, search_term, search_term, current_user["id"])
-    )
-    rows = cursor.fetchall()
-    conn.close()
-
-    users_list = []
-    for r in rows:
-        users_list.append({
-            "id": r["id"],
-            "mkc_id": r["mkc_id"] or f"MKC-{r['id']:04d}",
-            "display_name": r["full_name"] or r["username"],
-            "username": r["username"],
-            "avatar_initials": r["avatar_initials"] or r["username"][:2].upper(),
-            "bio": r["bio"] or ""
-        })
-
-    return {"users": users_list}
 

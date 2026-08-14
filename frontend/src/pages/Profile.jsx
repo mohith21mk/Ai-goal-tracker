@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { TriangleAlert, CheckCircle2, Pencil, Flame, Zap, Target, Shield, Globe, X } from 'lucide-react';
+import { TriangleAlert, CheckCircle2, Pencil, Flame, Zap, Target, Shield, Globe, X, Award, Sparkles } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
-import { getUser, updateUser } from '../services/api';
+import VictoryCredentialCard from '../components/VictoryCredentialCard';
+import CertificateModal from '../components/CertificateModal';
+import { getUser, updateUser, getProgression, getCredentials } from '../services/api';
 import './Profile.css';
 
 const Profile = () => {
   const [user, setUser] = useState(null);
+  const [progression, setProgression] = useState({ level: 1, rank: 'Initiate', total_xp: 0, next_level_xp: 100, progress_pct: 0 });
+  const [credentials, setCredentials] = useState([]);
+  const [selectedCert, setSelectedCert] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
@@ -21,14 +26,23 @@ const Profile = () => {
 
   useEffect(() => {
     let isMounted = true;
-    async function loadUserProfile() {
+    async function loadProfileData() {
       try {
-        const u = await getUser();
-        if (isMounted && u) {
-          setUser(u);
-          setFullName(u.full_name || '');
-          setAvatarInitials(u.avatar_initials || 'MK');
-          setBio(u.bio || '');
+        const [u, prog, creds] = await Promise.all([
+          getUser().catch(() => null),
+          getProgression().catch(() => ({ level: 1, rank: 'Initiate', total_xp: 0, next_level_xp: 100, progress_pct: 0 })),
+          getCredentials().catch(() => [])
+        ]);
+
+        if (isMounted) {
+          if (u) {
+            setUser(u);
+            setFullName(u.full_name || '');
+            setAvatarInitials(u.avatar_initials || 'MK');
+            setBio(u.bio || '');
+          }
+          if (prog) setProgression(prog);
+          if (Array.isArray(creds)) setCredentials(creds);
           setLoading(false);
         }
       } catch (err) {
@@ -39,7 +53,7 @@ const Profile = () => {
         }
       }
     }
-    loadUserProfile();
+    loadProfileData();
     return () => {
       isMounted = false;
     };
@@ -132,7 +146,7 @@ const Profile = () => {
                     </span>
                   </div>
                   <div className="profile-member-since">
-                    Member Since {user?.member_since || 'August 2026'} • Level 8 Champion
+                    Member Since {user?.member_since || 'August 2026'} • Level {progression.level || 1} {progression.rank || 'Initiate'}
                   </div>
                   <div className="profile-bio">
                     {user?.bio || 'AI Engineering & Full-Stack Systems Mastery'}
@@ -159,8 +173,8 @@ const Profile = () => {
                     <span className="profile-stat-label">Total Mastery XP</span>
                     <span className="profile-stat-icon"><Zap size={18} strokeWidth={1.8} style={{ color: '#FBBF24' }} aria-hidden="true" /></span>
                   </div>
-                  <div className="profile-stat-val">{user?.xp_earned || 0} XP</div>
-                  <div className="profile-stat-sub">Level 8 Champion progress</div>
+                  <div className="profile-stat-val">{progression.total_xp ?? user?.xp_earned ?? 0} XP</div>
+                  <div className="profile-stat-sub">Level {progression.level || 1} ({progression.progress_pct || 0}% progress)</div>
                 </div>
 
                 <div className="profile-stat-card glass-panel">
@@ -182,7 +196,44 @@ const Profile = () => {
                 </div>
               </div>
 
-              {/* 3. Profile Privacy Status Banner */}
+              {/* 3. Mastery Credentials & Achievements Showcase */}
+              <div className="profile-credentials-section glass-panel">
+                <div className="profile-credentials-header">
+                  <div className="credentials-header-left">
+                    <div className="credentials-title-row">
+                      <Award size={22} strokeWidth={2} style={{ color: 'var(--cyan)' }} />
+                      <h2 className="font-serif">Mastery Credentials & Verified Achievements</h2>
+                    </div>
+                    <p className="credentials-subtitle">
+                      Server-verified cryptographic credentials proving discipline, streak velocity, and protocol mastery.
+                    </p>
+                  </div>
+                  <span className="credentials-count-pill font-display">
+                    {credentials.length} Earned
+                  </span>
+                </div>
+
+                {credentials.length === 0 ? (
+                  <div className="credentials-empty-state">
+                    <Sparkles size={32} style={{ opacity: 0.4, color: 'var(--cyan)', marginBottom: '8px' }} />
+                    <h4>No Credentials Earned Yet</h4>
+                    <p>Complete daily protocols, maintain streaks, and execute blueprints to earn verified achievements.</p>
+                  </div>
+                ) : (
+                  <div className="credentials-gallery-grid">
+                    {credentials.map(cred => (
+                      <VictoryCredentialCard
+                        key={cred.id || cred.slug}
+                        credential={cred}
+                        userName={user?.full_name || user?.username || 'Mastery Practitioner'}
+                        onClick={() => setSelectedCert(cred)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Profile Privacy Status Banner */}
               <div className="profile-privacy-banner glass-panel">
                 <div className="profile-privacy-left">
                   <span className="profile-privacy-icon">
@@ -207,6 +258,15 @@ const Profile = () => {
                   Manage in Settings →
                 </Link>
               </div>
+
+              {/* Certificate Modal */}
+              {selectedCert && (
+                <CertificateModal
+                  credential={selectedCert}
+                  user={user}
+                  onClose={() => setSelectedCert(null)}
+                />
+              )}
 
               {/* 4. Edit Profile Modal */}
               {isEditModalOpen && (

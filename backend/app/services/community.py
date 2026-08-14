@@ -27,13 +27,22 @@ def list_community_posts(user_id: int, category: Optional[str] = None) -> List[D
         p.author_name,
         p.content,
         p.category,
+        p.credential_id,
         p.likes_count,
         p.created_at,
         s.profile_visibility,
         (SELECT COUNT(*) FROM community_comments c WHERE c.post_id = p.id) AS comments_count,
-        (SELECT COUNT(*) FROM community_likes l WHERE l.post_id = p.id AND l.user_id = ?) AS user_has_liked
+        (SELECT COUNT(*) FROM community_likes l WHERE l.post_id = p.id AND l.user_id = ?) AS user_has_liked,
+        uc.slug AS cred_slug,
+        uc.title AS cred_title,
+        uc.description AS cred_desc,
+        uc.tier AS cred_tier,
+        uc.xp_value AS cred_xp,
+        uc.credential_type AS cred_type,
+        uc.issued_at AS cred_issued_at
     FROM community_posts p
     LEFT JOIN user_settings s ON s.user_id = p.user_id
+    LEFT JOIN user_credentials uc ON uc.id = p.credential_id
     """
     params = [user_id]
 
@@ -54,6 +63,25 @@ def list_community_posts(user_id: int, category: Optional[str] = None) -> List[D
         if post.get("profile_visibility") == "private":
             post["author_name"] = "Anonymous Member"
         post.pop("profile_visibility", None)
+
+        if post.get("credential_id") and post.get("cred_title"):
+            post["credential"] = {
+                "id": post["credential_id"],
+                "slug": post["cred_slug"],
+                "title": post["cred_title"],
+                "description": post["cred_desc"],
+                "tier": post["cred_tier"] or "bronze",
+                "xp_value": post["cred_xp"] or 50,
+                "credential_type": post["cred_type"],
+                "issued_at": str(post["cred_issued_at"]) if post["cred_issued_at"] else None
+            }
+        else:
+            post["credential"] = None
+
+        # Clean temporary join columns
+        for k in ["cred_slug", "cred_title", "cred_desc", "cred_tier", "cred_xp", "cred_type", "cred_issued_at"]:
+            post.pop(k, None)
+
         result.append(post)
     return result
 
@@ -61,53 +89,79 @@ def list_community_posts(user_id: int, category: Optional[str] = None) -> List[D
 def get_post_by_id(post_id: int) -> Optional[Dict[str, Any]]:
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM community_posts WHERE id = ?", (post_id,))
+    cursor.execute(
+        """
+        SELECT 
+            p.*,
+            uc.slug AS cred_slug,
+            uc.title AS cred_title,
+            uc.description AS cred_desc,
+            uc.tier AS cred_tier,
+            uc.xp_value AS cred_xp,
+            uc.credential_type AS cred_type,
+            uc.issued_at AS cred_issued_at
+        FROM community_posts p
+        LEFT JOIN user_credentials uc ON uc.id = p.credential_id
+        WHERE p.id = ?
+        """,
+        (post_id,)
+    )
     row = cursor.fetchone()
     conn.close()
     if not row:
         return None
     post = dict(row)
     post["author_name"] = _mask_author_name(post["user_id"], post["author_name"])
+    if post.get("credential_id") and post.get("cred_title"):
+        post["credential"] = {
+            "id": post["credential_id"],
+            "slug": post["cred_slug"],
+            "title": post["cred_title"],
+            "description": post["cred_desc"],
+            "tier": post["cred_tier"] or "bronze",
+            "xp_value": post["cred_xp"] or 50,
+            "credential_type": post["cred_type"],
+            "issued_at": str(post["cred_issued_at"]) if post["cred_issued_at"] else None
+        }
+    else:
+        post["credential"] = None
+
+    for k in ["cred_slug", "cred_title", "cred_desc", "cred_tier", "cred_xp", "cred_type", "cred_issued_at"]:
+        post.pop(k, None)
+
     return post
 
 
-def create_community_post(user_id: int, author_name: str, content: str, category: str) -> Dict[str, Any]:
+def create_community_post(
+    user_id: int, 
+    author_name: str, 
+    content: str, 
+    category: str,
+    credential_id: Optional[int] = None
+) -> Dict[str, Any]:
     display_author = _mask_author_name(user_id, author_name)
     conn = get_connection()
     cursor = conn.cursor()
+
+    if credential_id is not None:
+        cursor.execute("SELECT id FROM user_credentials WHERE id = ? AND user_id = ?", (credential_id, user_id))
+        cred_row = cursor.fetchone()
+        if not cred_row:
+            conn.close()
+            raise ValueError("Invalid or unauthorized credential attachment")
+
     cursor.execute(
         """
-        INSERT INTO community_posts (user_id, author_name, content, category)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO community_posts (user_id, author_name, content, category, credential_id)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (user_id, display_author, content, category),
+        (user_id, display_author, content, category, credential_id),
     )
     conn.commit()
     post_id = cursor.lastrowid
-
-    cursor.execute(
-        """
-        SELECT
-            p.id,
-            p.user_id,
-            p.author_name,
-            p.content,
-            p.category,
-            p.likes_count,
-            p.created_at,
-            0 AS comments_count,
-            0 AS user_has_liked
-        FROM community_posts p
-        WHERE p.id = ?
-        """,
-        (post_id,),
-    )
-    row = cursor.fetchone()
     conn.close()
 
-    post = dict(row)
-    post["user_has_liked"] = False
-    return post
+    return get_post_by_id(post_id)
 
 
 def update_community_post(user_id: int, post_id: int, content: str) -> Dict[str, Any]:
@@ -150,7 +204,8 @@ def delete_community_post(user_id: int, post_id: int) -> bool:
     return True
 
 
-def toggle_community_like(user_id: int, post_id: int) -> Dict[str, Any]:
+async def toggle_community_like(user_id: int, post_id: int) -> Dict[str, Any]:
+    from .notifications import create_notification
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -170,26 +225,27 @@ def toggle_community_like(user_id: int, post_id: int) -> Dict[str, Any]:
         cursor.execute("DELETE FROM community_likes WHERE post_id = ? AND user_id = ?", (post_id, user_id))
         cursor.execute("UPDATE community_posts SET likes_count = MAX(0, likes_count - 1) WHERE id = ?", (post_id,))
         user_has_liked = False
+        conn.commit()
     else:
         # Like
         cursor.execute("INSERT OR IGNORE INTO community_likes (post_id, user_id) VALUES (?, ?)", (post_id, user_id))
         cursor.execute("UPDATE community_posts SET likes_count = likes_count + 1 WHERE id = ?", (post_id,))
         user_has_liked = True
+        conn.commit()
 
         # Trigger notification for post author if not self
         if post_author_id != user_id:
             cursor.execute("SELECT username, full_name FROM users WHERE id = ?", (user_id,))
             liker_row = cursor.fetchone()
             liker_name = (liker_row["full_name"] or liker_row["username"]) if liker_row else "Someone"
-            cursor.execute(
-                """
-                INSERT INTO notifications (user_id, type, title, message, reference_type, reference_id)
-                VALUES (?, 'community_like', 'New Post Like', ?, 'post', ?)
-                """,
-                (post_author_id, f"{liker_name} liked your post", post_id)
+            await create_notification(
+                user_id=post_author_id,
+                type='community_like',
+                title='New Post Like',
+                message=f"{liker_name} liked your post",
+                reference_type='post',
+                reference_id=post_id
             )
-
-    conn.commit()
 
     cursor.execute("SELECT likes_count FROM community_posts WHERE id = ?", (post_id,))
     likes_count = cursor.fetchone()["likes_count"]
@@ -265,7 +321,8 @@ def list_community_comments(post_id: int) -> List[Dict[str, Any]]:
     return result
 
 
-def create_community_comment(user_id: int, author_name: str, post_id: int, content: str) -> Dict[str, Any]:
+async def create_community_comment(user_id: int, author_name: str, post_id: int, content: str) -> Dict[str, Any]:
+    from .notifications import create_notification
     display_author = _mask_author_name(user_id, author_name)
     conn = get_connection()
     cursor = conn.cursor()
@@ -286,21 +343,21 @@ def create_community_comment(user_id: int, author_name: str, post_id: int, conte
         (post_id, user_id, display_author, content),
     )
     comment_id = cursor.lastrowid
+    conn.commit()
 
     # Trigger notification for post author if not self
     if post_author_id != user_id:
         cursor.execute("SELECT username, full_name FROM users WHERE id = ?", (user_id,))
         commenter_row = cursor.fetchone()
         commenter_name = (commenter_row["full_name"] or commenter_row["username"]) if commenter_row else "Someone"
-        cursor.execute(
-            """
-            INSERT INTO notifications (user_id, type, title, message, reference_type, reference_id)
-            VALUES (?, 'community_comment', 'New Comment', ?, 'post', ?)
-            """,
-            (post_author_id, f"{commenter_name} commented on your post", post_id)
+        await create_notification(
+            user_id=post_author_id,
+            type='community_comment',
+            title='New Comment',
+            message=f"{commenter_name} commented on your post",
+            reference_type='post',
+            reference_id=post_id
         )
-
-    conn.commit()
 
     cursor.execute("SELECT * FROM community_comments WHERE id = ?", (comment_id,))
     row = cursor.fetchone()

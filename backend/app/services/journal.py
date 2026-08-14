@@ -10,13 +10,7 @@ from pathlib import Path
 
 from ..config import settings
 
-DB_PATH = Path(__file__).resolve().parent.parent / "app.db"
-
-
-def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+from ..database import get_connection
 
 
 def get_demo_user_id() -> int:

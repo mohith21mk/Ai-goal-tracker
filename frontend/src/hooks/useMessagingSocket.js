@@ -15,8 +15,11 @@ export function useMessagingSocket(onMessageReceived) {
   const maxReconnectAttempts = 5;
   const processedMessageIds = useRef(new Set());
   const connectRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
+  const isMountedRef = useRef(true);
 
   const connect = useCallback(() => {
+    if (!isMountedRef.current) return;
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -25,7 +28,7 @@ export function useMessagingSocket(onMessageReceived) {
 
     let wsUrl = import.meta.env.VITE_WS_URL;
     if (!wsUrl) {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const apiUrl = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:8000';
       if (apiUrl.startsWith('http')) {
         wsUrl = apiUrl.replace(/^http/, 'ws') + '/api/chat/ws';
       } else {
@@ -40,6 +43,7 @@ export function useMessagingSocket(onMessageReceived) {
       wsRef.current = socket;
 
       socket.onopen = () => {
+        if (!isMountedRef.current) return;
         setStatus(ConnectionStatus.CONNECTED);
         reconnectAttemptsRef.current = 0;
       };
@@ -63,7 +67,7 @@ export function useMessagingSocket(onMessageReceived) {
               processedMessageIds.current.add(msgId);
             }
 
-            if (onMessageReceived) {
+            if (onMessageReceived && isMountedRef.current) {
               onMessageReceived(data);
             }
           }
@@ -74,22 +78,28 @@ export function useMessagingSocket(onMessageReceived) {
 
       socket.onerror = (err) => {
         console.warn('WebSocket error:', err);
-        setStatus(ConnectionStatus.ERROR);
+        if (isMountedRef.current) {
+          setStatus(ConnectionStatus.ERROR);
+        }
       };
 
       socket.onclose = () => {
+        if (!isMountedRef.current) return;
         setStatus(ConnectionStatus.DISCONNECTED);
         if (reconnectAttemptsRef.current < maxReconnectAttempts) {
           const timeout = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000);
           reconnectAttemptsRef.current += 1;
-          setTimeout(() => {
-            if (connectRef.current) connectRef.current();
+          if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+          reconnectTimerRef.current = setTimeout(() => {
+            if (connectRef.current && isMountedRef.current) connectRef.current();
           }, timeout);
         }
       };
     } catch (err) {
       console.error('WebSocket connection setup failed:', err);
-      setStatus(ConnectionStatus.ERROR);
+      if (isMountedRef.current) {
+        setStatus(ConnectionStatus.ERROR);
+      }
     }
   }, [onMessageReceived]);
 
@@ -98,8 +108,13 @@ export function useMessagingSocket(onMessageReceived) {
   }, [connect]);
 
   useEffect(() => {
+    isMountedRef.current = true;
     connect();
     return () => {
+      isMountedRef.current = false;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
       if (wsRef.current) {
         wsRef.current.close();
       }

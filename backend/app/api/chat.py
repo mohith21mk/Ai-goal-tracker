@@ -55,6 +55,23 @@ async def create_or_get_conversation(
         conn.close()
         raise HTTPException(status_code=404, detail="Target user not found")
 
+    # Verify accepted connection exists between the two users
+    cursor.execute(
+        """
+        SELECT status FROM user_connections
+        WHERE (requester_id = ? AND recipient_id = ?)
+           OR (requester_id = ? AND recipient_id = ?)
+        """,
+        (current_user["id"], target_id, target_id, current_user["id"])
+    )
+    connection = cursor.fetchone()
+    if not connection or connection["status"] != "accepted":
+        conn.close()
+        raise HTTPException(
+            status_code=403,
+            detail="You must be connected to message this user."
+        )
+
     # Check for existing 1-to-1 conversation
     cursor.execute(
         """
@@ -80,6 +97,35 @@ async def create_or_get_conversation(
     conn.close()
 
     return {"id": conv_id, "conversation_id": conv_id, "is_new": True}
+
+
+@router.delete("/messages/{message_id}", response_model=Dict[str, Any])
+async def delete_message(
+    message_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id, sender_id, conversation_id FROM chat_messages WHERE id = ?",
+        (message_id,)
+    )
+    message = cursor.fetchone()
+
+    if not message:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    if message["sender_id"] != current_user["id"]:
+        conn.close()
+        raise HTTPException(status_code=403, detail="You can only delete your own messages")
+
+    cursor.execute("DELETE FROM chat_messages WHERE id = ?", (message_id,))
+    conn.commit()
+    conn.close()
+
+    return {"status": "success", "message": "Message deleted", "id": message_id}
 
 
 @router.get("/conversations", response_model=List[Dict[str, Any]])

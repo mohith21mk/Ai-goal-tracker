@@ -102,15 +102,13 @@ const Dashboard = () => {
           m.id === id ? { ...m, ...updatedMission } : m
         ));
 
-        const [freshTelemetry, freshProgress, freshReflection] = await Promise.all([
+        const [freshTelemetry, freshProgress] = await Promise.all([
           getTelemetry().catch(() => null),
-          getProgress().catch(() => null),
-          getDailyReflection().catch(() => null)
+          getProgress().catch(() => null)
         ]);
 
         if (freshTelemetry) setTelemetry(freshTelemetry);
         if (freshProgress) setProgressData(freshProgress);
-        if (freshReflection) setReflectionData(freshReflection);
       } catch (err) {
         console.error('Error toggling mission on server:', err.message);
       }

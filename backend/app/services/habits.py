@@ -3,13 +3,7 @@ from datetime import datetime, date, timedelta
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent.parent / "app.db"
-
-
-def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+from ..database import get_connection
 
 
 def get_demo_user_id() -> int:

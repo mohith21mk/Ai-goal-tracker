@@ -24,6 +24,7 @@ router = APIRouter()
 class PostCreateRequest(BaseModel):
     content: str
     category: Optional[str] = "general"
+    credential_id: Optional[int] = None
 
     @field_validator("content")
     @classmethod
@@ -126,12 +127,16 @@ async def create_post(
 ) -> Dict[str, Any]:
     user_id = current_user["id"]
     author_name = get_author_display_name(user_id)
-    return create_community_post(
-        user_id=user_id,
-        author_name=author_name,
-        content=payload.content,
-        category=payload.category or "general",
-    )
+    try:
+        return create_community_post(
+            user_id=user_id,
+            author_name=author_name,
+            content=payload.content,
+            category=payload.category or "general",
+            credential_id=payload.credential_id,
+        )
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err))
 
 
 @router.patch("/posts/{post_id}", response_model=Dict[str, Any])
@@ -173,7 +178,7 @@ async def toggle_like(
 ) -> Dict[str, Any]:
     user_id = current_user["id"]
     try:
-        return toggle_community_like(user_id=user_id, post_id=post_id)
+        return await toggle_community_like(user_id=user_id, post_id=post_id)
     except ValueError as err:
         raise HTTPException(status_code=404, detail=str(err))
     except Exception as err:
@@ -212,7 +217,7 @@ async def add_comment(
     user_id = current_user["id"]
     author_name = get_author_display_name(user_id)
     try:
-        return create_community_comment(
+        return await create_community_comment(
             user_id=user_id,
             author_name=author_name,
             post_id=post_id,

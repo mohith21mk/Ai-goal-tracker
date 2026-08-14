@@ -1,5 +1,9 @@
 import os
 import sys
+
+# Ensure UTF-8 output encoding for emojis
+sys.stdout.reconfigure(encoding='utf-8')
+
 from fastapi.testclient import TestClient
 from app.main import app
 from app.services.auth import create_session
@@ -12,26 +16,26 @@ client.cookies.set("mkc_session", session_token)
 test_prompts = [
     "hey",
     "how are you?",
-    "can you teach me python?",
+    "thanks",
+    "okay",
+    "can you teach me Python?",
     "I don't understand variables",
     "give me another example",
     "why am I getting a CORS error?",
-    "I'm tired today",
+    "I'm tired",
     "I failed my exam",
     "motivate me",
-    "what should I study today?",
-    "thanks",
-    "okay",
-    "I don't understand",
-    "what did you mean by that?",
-    "help me plan tomorrow",
-    "write a Python program to reverse a string",
-    "explain that code",
-    "I'm feeling lazy"
+    "how do I build consistency?",
+    "what should I focus on today?",
+    "analyze my current progress",
+    "make me a study plan",
+    "I feel like I'm wasting my time",
+    "what should I do next?",
+    "goodbye"
 ]
 
 print("\n==================================================")
-print("VERIFYING AI COACH 18-PROMPT TEST MATRIX")
+print("VERIFYING AI COACH 18-PROMPT TEST MATRIX (LIVE GEMINI)")
 print("==================================================\n")
 
 for idx, p in enumerate(test_prompts, 1):

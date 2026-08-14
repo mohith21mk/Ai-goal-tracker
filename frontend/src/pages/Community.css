@@ -88,6 +88,47 @@
   box-shadow: 0 0 24px rgba(56, 189, 248, 0.45);
 }
 
+/* Credential Attachment Picker */
+.community-credential-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: rgba(5, 11, 22, 0.5);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 12px;
+  margin-top: 10px;
+}
+
+.credential-picker-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.credential-picker-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.no-credentials-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* Attached Credential in Feed Card */
+.post-credential-attachment {
+  margin: 6px 0 2px 0;
+  max-width: 480px;
+}
+
 /* Category Filter Tabs */
 .community-filter-bar {
   display: flex;
@@ -289,4 +330,51 @@
   font-weight: 700;
   font-size: 12px;
   cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .community-container {
+    padding: 20px 16px;
+  }
+
+  .community-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .community-header-left h1 {
+    font-size: 24px;
+  }
+
+  .community-create-card {
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+
+  .community-create-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .community-category-select,
+  .btn-publish-post {
+    width: 100%;
+    text-align: center;
+  }
+
+  .post-card {
+    padding: 16px;
+  }
+
+  .post-footer {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .post-credential-attachment {
+    max-width: 100%;
+  }
 }

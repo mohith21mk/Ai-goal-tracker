@@ -22,7 +22,12 @@ def get_redis_client():
         _redis_client = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
         return _redis_client
     except Exception as err:
-        logger.warning(f"Redis initialization unavailable: {err}. Falling back to in-memory WebSocket ConnectionManager.")
+        # Check if error is related to connection/availability to avoid spamming
+        msg = str(err)
+        if "Error 22" in msg or "ConnectionRefusedError" in msg or "not found" in msg:
+            logger.info("Redis unavailable, using local WebSocket ConnectionManager fallback.")
+        else:
+            logger.warning(f"Redis initialization unavailable: {err}. Falling back to in-memory WebSocket ConnectionManager.")
         return None
 
 
@@ -90,33 +95,42 @@ async def start_redis_listener() -> None:
         return
 
     async def _listener_loop():
-        try:
-            pubsub = redis_cli.pubsub()
-            await pubsub.psubscribe("conversation:*", "user:*:notifications")
-            logger.info("Redis Pub/Sub listener active on channels 'conversation:*' and 'user:*:notifications'.")
-            async for message in pubsub.listen():
-                if message and message.get("type") in ("pmessage", "message"):
-                    data_str = message.get("data")
-                    channel = message.get("channel", "")
-                    if not data_str:
-                        continue
-                    try:
-                        data = json.loads(data_str)
-                        if channel.startswith("conversation:"):
-                            target_user_id = data.get("recipient_id") or data.get("sender_id")
-                            sender_id = data.get("sender_id")
-                            if sender_id:
-                                await manager.send_personal_message(data_str, sender_id)
-                            if target_user_id and target_user_id != sender_id:
-                                await manager.send_personal_message(data_str, target_user_id)
-                        elif "notifications" in channel:
-                            user_id = data.get("notification", {}).get("user_id") or data.get("user_id")
-                            if user_id:
-                                await manager.send_personal_json(data, user_id)
-                    except Exception as err:
-                        logger.warning(f"Error processing Redis Pub/Sub message: {err}")
-        except Exception as err:
-            logger.warning(f"Redis Pub/Sub listener terminated: {err}")
+        retry_delay = 1
+        while True:
+            try:
+                pubsub = redis_cli.pubsub()
+                await pubsub.psubscribe("conversation:*", "user:*:notifications")
+                logger.info("Redis Pub/Sub listener active on channels 'conversation:*' and 'user:*:notifications'.")
+                retry_delay = 1 # reset on successful connection
+                async for message in pubsub.listen():
+                    if message and message.get("type") in ("pmessage", "message"):
+                        data_str = message.get("data")
+                        channel = message.get("channel", "")
+                        if not data_str:
+                            continue
+                        try:
+                            data = json.loads(data_str)
+                            if channel.startswith("conversation:"):
+                                target_user_id = data.get("recipient_id") or data.get("sender_id")
+                                sender_id = data.get("sender_id")
+                                if sender_id:
+                                    await manager.send_personal_message(data_str, sender_id)
+                                if target_user_id and target_user_id != sender_id:
+                                    await manager.send_personal_message(data_str, target_user_id)
+                            elif "notifications" in channel:
+                                user_id = data.get("notification", {}).get("user_id") or data.get("user_id")
+                                if user_id:
+                                    await manager.send_personal_json(data, user_id)
+                        except Exception as err:
+                            logger.warning(f"Error processing Redis Pub/Sub message: {err}")
+            except asyncio.CancelledError:
+                break
+            except Exception as err:
+                msg = str(err)
+                if "Error 22" not in msg and "not found" not in msg:
+                    logger.warning(f"Redis Pub/Sub listener disconnected: {err}. Retrying in {retry_delay}s...")
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 60)
 
     _pubsub_task = asyncio.create_task(_listener_loop())
 

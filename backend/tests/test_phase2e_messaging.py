@@ -48,6 +48,15 @@ def test_phase2e_realtime_messaging_suite():
     assert "password_hash" not in found_b
     assert "email" not in found_b
 
+    # 2.5 Establish Connection between User A and User B
+    req_res = client.post("/api/social/connections/request", json={"user_id": found_b["id"]}, headers=headers_a)
+    assert req_res.status_code == 200
+
+    # User B accepts User A's connection request
+    user_a_id = res_a.json().get("user_id") or client.get("/api/auth/me", headers=headers_a).json()["id"]
+    acc_res = client.post("/api/social/connections/accept", json={"user_id": user_a_id}, headers=headers_b)
+    assert acc_res.status_code == 200
+
     # 3. Create Conversation (User A -> User B)
     conv_res = client.post("/api/chat/conversations", json={"target_user_id": found_b["id"]}, headers=headers_a)
     assert conv_res.status_code == 200
