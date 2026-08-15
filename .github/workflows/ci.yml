@@ -56,7 +56,15 @@ jobs:
           git rev-parse origin/main || true
           grep -n "from typing" backend/app/services/ai_coach.py
           git show HEAD:backend/app/services/ai_coach.py | grep "from typing"
-
+      - name: Run Database Migrations
+        env:
+          ENVIRONMENT: testing
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test_ci_secret_key_1234567890
+        run: |
+          cd backend
+          python -m alembic upgrade head
 
       - name: Run Backend Pytest Suite
         env:
