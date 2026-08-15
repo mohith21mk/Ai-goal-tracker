@@ -50,6 +50,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
           pip install pytest
+      - name: Verify CI checkout
+        run: |
+          git rev-parse HEAD
+          git rev-parse origin/main || true
+          grep -n "from typing" backend/app/services/ai_coach.py
+          git show HEAD:backend/app/services/ai_coach.py | grep "from typing"
+
 
       - name: Run Backend Pytest Suite
         env:
