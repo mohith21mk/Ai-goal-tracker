@@ -3,7 +3,7 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from .config import settings
-from .models_orm import Base
+from .models import Base
 
 def get_database_url() -> str:
     db_url = settings.DATABASE_URL

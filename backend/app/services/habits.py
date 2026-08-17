@@ -1,18 +1,9 @@
 import sqlite3
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 from ..database import get_connection
-
-
-def get_demo_user_id() -> int:
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id FROM users WHERE email = ?", ("demo@masterykeycoach.com",))
-    row = cursor.fetchone()
-    conn.close()
-    return row["id"] if row else 1
 
 
 def validate_target_date(target_date_str: str) -> date:
@@ -21,7 +12,7 @@ def validate_target_date(target_date_str: str) -> date:
     except ValueError:
         raise ValueError("Invalid date format. Expected YYYY-MM-DD.")
 
-    today_dt = date.today()
+    today_dt = datetime.now(timezone.utc).date()
     min_dt = today_dt - timedelta(days=7)
 
     if target_dt > today_dt:
@@ -51,7 +42,7 @@ def compute_habit_streaks(habit_id: int, user_id: int) -> Dict[str, Any]:
 
     completed_dates_set = {r["completed_date"] for r in rows}
 
-    today_dt = date.today()
+    today_dt = datetime.now(timezone.utc).date()
     past_7_days = [(today_dt - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(6, -1, -1)]
 
     recent_7_days_log = [
@@ -214,14 +205,14 @@ def delete_habit(habit_id: int, user_id: int) -> bool:
 
 
 def toggle_habit_log(habit_id: int, user_id: int, target_date_str: str) -> Dict[str, Any]:
-    # 1. Validate date window (today and previous 7 days only)
-    validated_dt = validate_target_date(target_date_str)
-    date_str = validated_dt.strftime("%Y-%m-%d")
-
-    # 2. Check if habit exists for user
+    # 1. Check if habit exists for user first (authorization / existence check)
     habit = get_habit_by_id(habit_id, user_id)
     if not habit:
         raise KeyError(f"Habit with ID {habit_id} not found.")
+
+    # 2. Validate date window (today and previous 7 days only)
+    validated_dt = validate_target_date(target_date_str)
+    date_str = validated_dt.strftime("%Y-%m-%d")
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -268,7 +259,7 @@ def get_aggregate_habit_stats(user_id: int) -> Dict[str, Any]:
             "habits_completed_today": 0,
         }
 
-    today_str = date.today().strftime("%Y-%m-%d")
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     total_habits = len(habits)
     avg_streak = round(sum(h["current_streak"] for h in habits) / total_habits, 1)

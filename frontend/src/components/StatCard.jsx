@@ -76,7 +76,19 @@ const StatCard = ({
     <div className="stat-card glass-panel">
       <div className="stat-card-header">
         <span className="stat-title">{title}</span>
-        {icon && <span className="stat-icon">{icon}</span>}
+        {icon && (
+          <div
+            className="stat-icon"
+            style={{
+              color: accentColor,
+              backgroundColor: `${accentColor}18`,
+              borderColor: `${accentColor}40`,
+              boxShadow: `0 0 16px ${accentColor}28, inset 0 1px 0 ${accentColor}25`
+            }}
+          >
+            {icon}
+          </div>
+        )}
       </div>
 
       <div className="stat-card-body">

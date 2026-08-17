@@ -115,15 +115,18 @@ def _compute_daily_snapshot(cursor: Any, user_id: int, date_cutoff: str) -> Dict
 
     # 4. Streak Days up to cutoff
     cursor.execute(
-        """
-        SELECT DISTINCT DATE(completed_at) as c_date FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL AND completed_at <= ?
-        UNION
-        SELECT DISTINCT completed_date as c_date FROM habit_logs WHERE user_id = ? AND completed_date <= ?
-        ORDER BY c_date DESC
-        """,
-        (user_id, date_cutoff, user_id, cutoff_date),
+        "SELECT DISTINCT DATE(completed_at) FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL AND completed_at <= ?",
+        (user_id, date_cutoff),
     )
-    active_dates = [r[0] for r in cursor.fetchall() if r[0]]
+    m_dates = [str(r[0])[:10] for r in cursor.fetchall() if r[0]]
+
+    cursor.execute(
+        "SELECT DISTINCT completed_date FROM habit_logs WHERE user_id = ? AND completed_date <= ?",
+        (user_id, cutoff_date),
+    )
+    h_dates = [str(r[0])[:10] for r in cursor.fetchall() if r[0]]
+
+    active_dates = sorted(set(m_dates + h_dates), reverse=True)
     streak = 0
     if active_dates:
         try:
@@ -214,8 +217,8 @@ def compute_telemetry_sync(user_id: int) -> Dict[str, Any]:
     conn = get_connection()
     cursor = conn.cursor()
 
-    today_dt = datetime.date.today()
-    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    today_dt = datetime.datetime.now(datetime.timezone.utc).date()
+    now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     # Current Live Snapshot
     current_snap = _compute_daily_snapshot(cursor, user_id, now_str)

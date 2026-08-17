@@ -297,6 +297,22 @@ def test_user_isolation_and_anti_spoofing():
         res_pub_none = client.get("/api/credentials/user/999999")
         assert res_pub_none.status_code == 404
 
+        # Public verify endpoint for valid credential
+        res_creds_a = client.get(f"/api/credentials/user/{user_a_id}").json()
+        if res_creds_a:
+            cred_id = res_creds_a[0]["id"]
+            res_verify = client.get(f"/api/credentials/verify/{cred_id}")
+            assert res_verify.status_code == 200
+            verify_data = res_verify.json()
+            assert verify_data["is_verified"] is True
+            assert "verification_hash" in verify_data
+            assert verify_data["authority"] == "MASTER CREDENTIAL AUTHORITY"
+            assert verify_data["username"] == f"user_cred_test_usera"
+
+        # Public verify endpoint for nonexistent credential returns 404
+        res_verify_none = client.get("/api/credentials/verify/999999")
+        assert res_verify_none.status_code == 404
+
         # Unauthenticated calls to private endpoints must return 401
         assert client.get("/api/credentials").status_code == 401
         assert client.post("/api/credentials/check").status_code == 401
@@ -305,6 +321,38 @@ def test_user_isolation_and_anti_spoofing():
     finally:
         cleanup_user(user_a_id)
         cleanup_user(user_b_id)
+
+
+def test_public_credential_verification_endpoint():
+    """Test public credential verification route and authoritative attributes."""
+    user_id, token = setup_user("cred_verify_test")
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO user_credentials (user_id, credential_type, slug, title, description, tier, xp_value, evidence_type, evidence_id)
+            VALUES (?, 'streak_badge', 'streak_30', '30-Day Momentum Vanguard', 'Completed 30-day streak', 'gold', 150, 'habit_streak', '30')
+            """,
+            (user_id,)
+        )
+        cred_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        res = client.get(f"/api/credentials/verify/{cred_id}")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["id"] == cred_id
+        assert data["title"] == "30-Day Momentum Vanguard"
+        assert data["tier"] == "gold"
+        assert data["xp_value"] == 150
+        assert data["is_verified"] is True
+        assert data["verification_hash"] == f"MKC-AUTH-STREAK_30-{cred_id}"
+        assert data["authority"] == "MASTER CREDENTIAL AUTHORITY"
+        assert data["username"] == "user_cred_verify_test"
+    finally:
+        cleanup_user(user_id)
 
 
 def main():
@@ -318,6 +366,7 @@ def main():
     test_mastery_level_20_credential()
     test_credential_idempotency()
     test_user_isolation_and_anti_spoofing()
+    test_public_credential_verification_endpoint()
     print("=" * 60)
     print("ALL CREDENTIAL ENGINE TESTS PASSED")
     print("=" * 60)

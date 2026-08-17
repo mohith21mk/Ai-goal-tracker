@@ -777,10 +777,13 @@ export async function requestConnection(userId) {
   return response.json();
 }
 
-export async function acceptConnection(userId) {
+export async function acceptConnection(payloadOrUserId) {
+  const body = typeof payloadOrUserId === 'object' && payloadOrUserId !== null
+    ? payloadOrUserId
+    : { user_id: payloadOrUserId };
   const response = await apiFetch('/api/social/connections/accept', {
     method: 'POST',
-    body: JSON.stringify({ user_id: userId }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
@@ -789,10 +792,13 @@ export async function acceptConnection(userId) {
   return response.json();
 }
 
-export async function rejectConnection(userId) {
+export async function rejectConnection(payloadOrUserId) {
+  const body = typeof payloadOrUserId === 'object' && payloadOrUserId !== null
+    ? payloadOrUserId
+    : { user_id: payloadOrUserId };
   const response = await apiFetch('/api/social/connections/reject', {
     method: 'POST',
-    body: JSON.stringify({ user_id: userId }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
@@ -944,6 +950,76 @@ export async function checkCredentials() {
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
     throw new Error(errBody.detail || `Failed to evaluate credentials: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getVerifiedCredential(credentialId) {
+  const response = await apiFetch(`/api/credentials/verify/${credentialId}`);
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to verify credential: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function submitFeedback(payload) {
+  const response = await apiFetch('/api/feedback', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to submit feedback: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getAdminFeedback(params = {}) {
+  const query = new URLSearchParams();
+  if (params.category) query.append('category', params.category);
+  if (params.status) query.append('status', params.status);
+  if (params.severity) query.append('severity', params.severity);
+  if (params.limit) query.append('limit', params.limit);
+  if (params.offset) query.append('offset', params.offset);
+
+  const qs = query.toString() ? `?${query.toString()}` : '';
+  const response = await apiFetch(`/api/admin/feedback${qs}`);
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to fetch admin feedback: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getAdminFeedbackStats() {
+  const response = await apiFetch('/api/admin/feedback/stats');
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to fetch feedback stats: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function updateAdminFeedback(id, payload) {
+  const response = await apiFetch(`/api/admin/feedback/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to update feedback: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function deleteAdminFeedback(id) {
+  const response = await apiFetch(`/api/admin/feedback/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to delete feedback: ${response.statusText}`);
   }
   return response.json();
 }

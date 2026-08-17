@@ -1,7 +1,7 @@
 import random
 import re
 import string
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, field_validator
@@ -9,6 +9,7 @@ from pydantic import BaseModel, field_validator
 from ..config import settings
 from ..database import get_connection
 from ..services.websocket import manager
+from ..services.rate_limiter import rate_limit
 from ..services.email import send_password_reset_email, send_verification_email
 from ..services.auth import (
     create_email_verification_token,
@@ -146,7 +147,11 @@ async def check_username_availability(username: str = Query(..., min_length=1)) 
     return {"available": available, "username": norm_or_msg}
 
 
-@router.post("/register", response_model=Dict[str, Any])
+@router.post(
+    "/register",
+    response_model=Dict[str, Any],
+    dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60, key_prefix="register"))]
+)
 async def register_user(payload: RegisterRequest, request: Request, response: Response) -> Dict[str, Any]:
     norm_username = normalize_username(payload.username)
     norm_email = payload.email.strip().lower()
@@ -259,7 +264,11 @@ async def register_user(payload: RegisterRequest, request: Request, response: Re
     return res_data
 
 
-@router.post("/login", response_model=Dict[str, Any])
+@router.post(
+    "/login",
+    response_model=Dict[str, Any],
+    dependencies=[Depends(rate_limit(max_requests=15, window_seconds=60, key_prefix="login"))]
+)
 async def login_user(payload: LoginRequest, request: Request, response: Response) -> Dict[str, Any]:
     raw_id = payload.identifier.strip()
     norm_id = normalize_username(raw_id)
@@ -336,7 +345,11 @@ async def get_me(current_user: Dict[str, Any] = Depends(get_current_user)) -> Di
     return current_user
 
 
-@router.post("/forgot-password", response_model=Dict[str, Any])
+@router.post(
+    "/forgot-password",
+    response_model=Dict[str, Any],
+    dependencies=[Depends(rate_limit(max_requests=5, window_seconds=60, key_prefix="forgot_pw"))]
+)
 async def forgot_password(payload: ForgotPasswordRequest) -> Dict[str, Any]:
     raw_id = payload.identifier.strip()
     norm_id = normalize_username(raw_id)
@@ -484,7 +497,7 @@ async def deactivate_account(
     response: Response,
     current_user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     conn = get_connection()
     cursor = conn.cursor()

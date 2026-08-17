@@ -12,6 +12,7 @@ class CommunityPost(Base):
     author_name = Column(String(255), nullable=False)
     content = Column(Text, nullable=False)
     category = Column(String(100), default="general")
+    credential_id = Column(Integer, ForeignKey("user_credentials.id", ondelete="SET NULL"), nullable=True)
     likes_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), server_default=func.now())
 
@@ -86,22 +87,34 @@ class Message(Base):
     __tablename__ = "messages"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    sender = Column(String(50), nullable=False) # user or coach (or other users in future)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    sender = Column(String(50), nullable=False)  # user or coach
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), server_default=func.now())
-    conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"))
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), server_default=func.now())
+    read_at = Column(DateTime, nullable=True)
 
 
 class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     type = Column(String(50), nullable=False)
     title = Column(String(255), nullable=False)
-    message = Column(Text, nullable=False)
-    action_url = Column(String(255))
+    message = Column(Text, nullable=True)
+    reference_type = Column(String(50), nullable=True)
+    reference_id = Column(Integer, nullable=True)
+    data = Column(Text, nullable=True)
     is_read = Column(Integer, default=0)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), server_default=func.now())
 

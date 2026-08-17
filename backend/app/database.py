@@ -146,6 +146,11 @@ def init_db() -> None:
             mkc_id TEXT UNIQUE,
             avatar_initials TEXT,
             bio TEXT,
+            email_verified INTEGER DEFAULT 0,
+            verified_at TIMESTAMP,
+            onboarding_completed INTEGER DEFAULT 0,
+            onboarding_data TEXT,
+            deactivated_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
@@ -167,6 +172,18 @@ def init_db() -> None:
         cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
     if "is_active" not in existing_cols:
         cursor.execute("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1")
+    if "email_verified" not in existing_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0")
+    if "verified_at" not in existing_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN verified_at TIMESTAMP")
+    if "onboarding_completed" not in existing_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN onboarding_completed INTEGER DEFAULT 0")
+    if "onboarding_data" not in existing_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN onboarding_data TEXT")
+    if "deactivated_at" not in existing_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN deactivated_at TIMESTAMP")
+    if "role" not in existing_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user' NOT NULL")
     conn.commit()
 
     cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_lower ON users(LOWER(username))")
@@ -179,9 +196,75 @@ def init_db() -> None:
         CREATE TABLE IF NOT EXISTS app_sessions (
             token TEXT PRIMARY KEY,
             user_id INTEGER NOT NULL,
+            last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            revoked_at TIMESTAMP,
+            user_agent TEXT,
+            ip_address TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             expires_at TIMESTAMP NOT NULL,
-            FOREIGN KEY(user_id) REFERENCES users(id)
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute("PRAGMA table_info(app_sessions)")
+    existing_session_cols = [r["name"] for r in cursor.fetchall()]
+    if "last_seen_at" not in existing_session_cols:
+        cursor.execute("ALTER TABLE app_sessions ADD COLUMN last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    if "revoked_at" not in existing_session_cols:
+        cursor.execute("ALTER TABLE app_sessions ADD COLUMN revoked_at TIMESTAMP")
+    if "user_agent" not in existing_session_cols:
+        cursor.execute("ALTER TABLE app_sessions ADD COLUMN user_agent TEXT")
+    if "ip_address" not in existing_session_cols:
+        cursor.execute("ALTER TABLE app_sessions ADD COLUMN ip_address TEXT")
+    conn.commit()
+
+    # 1.6 Create password_resets table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP NOT NULL,
+            used_at TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pwd_resets_user_hash ON password_resets(user_id, token_hash)")
+    conn.commit()
+
+    # 1.7 Create email_verifications table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS email_verifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            email TEXT NOT NULL,
+            token_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP NOT NULL,
+            used_at TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_email_verif_token ON email_verifications(token_hash)")
+    conn.commit()
+
+    # 1.8 Create ai_activity_logs table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ai_activity_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            action_type TEXT,
+            target_id INTEGER,
+            status TEXT DEFAULT 'success',
+            latency_ms INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         )
         """
     )
@@ -789,12 +872,17 @@ def init_db() -> None:
             message TEXT,
             reference_type TEXT,
             reference_id INTEGER,
+            data TEXT,
             is_read INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         )
         """
     )
+    cursor.execute("PRAGMA table_info(notifications)")
+    notif_cols = [r["name"] for r in cursor.fetchall()]
+    if "data" not in notif_cols:
+        cursor.execute("ALTER TABLE notifications ADD COLUMN data TEXT")
 
     # Notification indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at DESC)")
@@ -823,6 +911,31 @@ def init_db() -> None:
     )
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_credentials_user ON user_credentials(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_credentials_slug ON user_credentials(user_id, slug)")
+
+    # 19. Create feedback table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            category TEXT NOT NULL,
+            message TEXT NOT NULL,
+            severity TEXT DEFAULT 'Normal' NOT NULL,
+            status TEXT DEFAULT 'new' NOT NULL,
+            admin_notes TEXT,
+            page_url TEXT,
+            user_agent TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            resolved_at TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_feedback_category ON feedback(category)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at)")
 
     conn.commit()
     conn.close()

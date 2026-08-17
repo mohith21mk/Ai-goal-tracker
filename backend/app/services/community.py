@@ -228,7 +228,7 @@ async def toggle_community_like(user_id: int, post_id: int) -> Dict[str, Any]:
         conn.commit()
     else:
         # Like
-        cursor.execute("INSERT OR IGNORE INTO community_likes (post_id, user_id) VALUES (?, ?)", (post_id, user_id))
+        cursor.execute("INSERT INTO community_likes (post_id, user_id) VALUES (?, ?)", (post_id, user_id))
         cursor.execute("UPDATE community_posts SET likes_count = likes_count + 1 WHERE id = ?", (post_id,))
         user_has_liked = True
         conn.commit()

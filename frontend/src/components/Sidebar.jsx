@@ -18,79 +18,80 @@ import {
 } from 'lucide-react';
 import MKCLogo from './MKCLogo';
 import { getProgress } from '../services/api';
+import { ROUTES } from '../constants/routes';
 import './Sidebar.css';
 
 const rawNavItems = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    path: '/',
+    path: ROUTES.ROOT,
     icon: <LayoutDashboard size={18} strokeWidth={1.8} aria-hidden="true" />
   },
   {
     id: 'analytics',
     label: 'Analytics',
-    path: '/analytics',
+    path: ROUTES.ANALYTICS,
     icon: <BarChart3 size={18} strokeWidth={1.8} aria-hidden="true" />
   },
   {
     id: 'missions',
     label: 'Missions',
-    path: '/missions',
+    path: ROUTES.MISSIONS,
     icon: <CheckSquare size={18} strokeWidth={1.8} aria-hidden="true" />
   },
   {
     id: 'goals',
     label: 'Goals',
-    path: '/goals',
+    path: ROUTES.GOALS,
     icon: <Target size={18} strokeWidth={1.8} aria-hidden="true" />
   },
   {
     id: 'coach',
     label: 'AI Coach',
-    path: '/coach',
+    path: ROUTES.COACH,
     icon: <Bot size={18} strokeWidth={1.8} aria-hidden="true" />
   },
   {
     id: 'habits',
     label: 'Habits',
-    path: '/habits',
+    path: ROUTES.HABITS,
     icon: <Zap size={18} strokeWidth={1.8} aria-hidden="true" />
   },
   {
     id: 'journal',
     label: 'Journal',
-    path: '/journal',
+    path: ROUTES.JOURNAL,
     icon: <BookOpen size={18} strokeWidth={1.8} aria-hidden="true" />
   },
   {
     id: 'blueprint',
     label: 'Life Blueprint',
-    path: '/blueprint',
+    path: ROUTES.BLUEPRINT,
     icon: <Layers size={18} strokeWidth={1.8} aria-hidden="true" />
   },
   {
     id: 'settings',
     label: 'Settings',
-    path: '/settings',
+    path: ROUTES.SETTINGS,
     icon: <Settings size={18} strokeWidth={1.8} aria-hidden="true" />
   },
   {
     id: 'community',
     label: 'Community',
-    path: '/community',
+    path: ROUTES.COMMUNITY,
     icon: <Users size={18} strokeWidth={1.8} aria-hidden="true" />
   },
   {
     id: 'chat',
     label: 'Messages',
-    path: '/messages',
+    path: ROUTES.MESSAGES,
     icon: <MessageSquare size={18} strokeWidth={1.8} aria-hidden="true" />
   },
   {
     id: 'profile',
     label: 'My Identity',
-    path: '/profile',
+    path: ROUTES.PROFILE,
     icon: <User size={18} strokeWidth={1.8} aria-hidden="true" />
   },
 ];
@@ -133,27 +134,30 @@ const Sidebar = () => {
       {/* Navigation List */}
       <nav className="sidebar-nav">
         {rawNavItems.map((item) => {
-          const isActive = item.id === 'goals'
-            ? location.pathname === '/goals'
-            : item.id === 'missions'
-            ? location.pathname === '/missions'
-            : item.id === 'coach'
-            ? location.pathname === '/coach'
-            : item.id === 'streaks'
-            ? location.pathname === '/habits' || location.pathname === '/streaks'
-            : item.id === 'journal'
-            ? location.pathname === '/journal'
-            : item.id === 'blueprint'
-            ? location.pathname === '/blueprint'
-            : item.id === 'settings'
-            ? location.pathname === '/settings'
-            : item.id === 'community'
-            ? location.pathname === '/community'
-            : item.id === 'profile'
-            ? location.pathname === '/profile'
-            : item.id === 'analytics'
-            ? location.pathname === '/analytics'
-            : (location.pathname === '/' || location.pathname === '/dashboard') && item.id === 'dashboard';
+          const isActive =
+            item.id === 'goals'
+              ? location.pathname === ROUTES.GOALS
+              : item.id === 'missions'
+              ? location.pathname === ROUTES.MISSIONS
+              : item.id === 'coach'
+              ? location.pathname === ROUTES.COACH || location.pathname === ROUTES.AI_COACH_ALIAS
+              : item.id === 'habits'
+              ? location.pathname === ROUTES.HABITS || location.pathname === ROUTES.STREAKS_ALIAS
+              : item.id === 'journal'
+              ? location.pathname === ROUTES.JOURNAL
+              : item.id === 'blueprint'
+              ? location.pathname === ROUTES.BLUEPRINT || location.pathname === ROUTES.LIFE_BLUEPRINT_ALIAS
+              : item.id === 'settings'
+              ? location.pathname === ROUTES.SETTINGS
+              : item.id === 'community'
+              ? location.pathname === ROUTES.COMMUNITY
+              : item.id === 'chat'
+              ? location.pathname === ROUTES.MESSAGES || location.pathname === ROUTES.CHAT_ALIAS
+              : item.id === 'profile'
+              ? location.pathname === ROUTES.PROFILE || location.pathname === ROUTES.MY_IDENTITY_ALIAS
+              : item.id === 'analytics'
+              ? location.pathname === ROUTES.ANALYTICS
+              : (location.pathname === ROUTES.ROOT || location.pathname === ROUTES.DASHBOARD) && item.id === 'dashboard';
 
           if (item.path.startsWith('/')) {
             return (
@@ -223,7 +227,7 @@ const Sidebar = () => {
           }} />
         </div>
         
-        <Link to="/analytics" style={{
+        <Link to={ROUTES.ANALYTICS} style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',

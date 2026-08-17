@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Palette, Moon, Sun, Bot, Bell, Zap, Shield, TriangleAlert, CheckCircle2, LogOut } from 'lucide-react';
+import { Palette, Moon, Sun, Bot, Bell, Zap, Shield, TriangleAlert, CheckCircle2, LogOut, MessageSquare } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
+import FeedbackModal from '../components/FeedbackModal';
 import { getSettings, updateSettings, logoutUser } from '../services/api';
 import './Settings.css';
 
@@ -12,6 +13,7 @@ const Settings = () => {
   const [coachStyle, setCoachStyle] = useState('strategic');
   const [dailyReminderTime, setDailyReminderTime] = useState('08:00');
   const [profileVisibility, setProfileVisibility] = useState('public');
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -265,7 +267,49 @@ const Settings = () => {
                   </div>
                 </div>
 
-                {/* 5. Account Actions */}
+                {/* 5. Feedback & Support */}
+                <div className="settings-card glass-panel" style={{ borderColor: 'rgba(56, 189, 248, 0.25)' }}>
+                  <div className="settings-card-header">
+                    <span className="settings-card-icon" style={{ color: '#38BDF8' }}><MessageSquare size={20} /></span>
+                    <h3>Feedback & Support</h3>
+                  </div>
+                  <p className="settings-card-desc">Have a suggestion, found a bug, or want an improvement? Let our team know privately.</p>
+
+                  <div className="settings-field-group">
+                    <button
+                      type="button"
+                      onClick={() => setIsFeedbackOpen(true)}
+                      style={{
+                        padding: '12px 24px',
+                        background: 'rgba(56, 189, 248, 0.12)',
+                        border: '1px solid rgba(56, 189, 248, 0.35)',
+                        borderRadius: '8px',
+                        color: '#38BDF8',
+                        fontWeight: '600',
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        transition: 'all 0.2s',
+                        width: 'fit-content'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = 'rgba(56, 189, 248, 0.22)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(56, 189, 248, 0.12)';
+                        e.currentTarget.style.transform = 'none';
+                      }}
+                    >
+                      <MessageSquare size={18} />
+                      Submit Feedback
+                    </button>
+                  </div>
+                </div>
+
+                {/* 6. Account Actions */}
                 <div className="settings-card glass-panel" style={{ borderColor: 'rgba(239, 68, 68, 0.2)' }}>
                   <div className="settings-card-header">
                     <span className="settings-card-icon" style={{ color: 'var(--accent-red, #ef4444)' }}><LogOut size={20} /></span>
@@ -325,6 +369,11 @@ const Settings = () => {
           )}
         </div>
       </div>
+
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+      />
     </div>
   );
 };

@@ -18,8 +18,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 import os
 import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from app.models_orm import Base
+from app.models import Base
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
@@ -59,10 +58,8 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    from app.config import settings
-    url = settings.DATABASE_URL
-    if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
+    from app.db_session import get_database_url
+    url = get_database_url()
         
     configuration = config.get_section(config.config_ini_section, {})
     configuration["sqlalchemy.url"] = url
@@ -75,7 +72,7 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection, target_metadata=target_metadata, render_as_batch=True, compare_type=False
         )
 
         with context.begin_transaction():

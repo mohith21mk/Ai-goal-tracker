@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { TriangleAlert, CheckCircle2, Pencil, Flame, Zap, Target, Shield, Globe, X, Award, Sparkles } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import VictoryCredentialCard from '../components/VictoryCredentialCard';
 import CertificateModal from '../components/CertificateModal';
-import { getUser, updateUser, getProgression, getCredentials } from '../services/api';
+import { getUser, updateUser, getProgression, getCredentials, getVerifiedCredential } from '../services/api';
 import './Profile.css';
 
 const Profile = () => {
+  const [searchParams] = useSearchParams();
   const [user, setUser] = useState(null);
   const [progression, setProgression] = useState({ level: 1, rank: 'Initiate', total_xp: 0, next_level_xp: 100, progress_pct: 0 });
   const [credentials, setCredentials] = useState([]);
@@ -42,7 +43,22 @@ const Profile = () => {
             setBio(u.bio || '');
           }
           if (prog) setProgression(prog);
-          if (Array.isArray(creds)) setCredentials(creds);
+          const safeCreds = Array.isArray(creds) ? creds : [];
+          setCredentials(safeCreds);
+
+          const credParam = searchParams.get('cred');
+          if (credParam) {
+            const matching = safeCreds.find(c => String(c.id) === String(credParam) || c.slug === credParam);
+            if (matching) {
+              setSelectedCert(matching);
+            } else {
+              getVerifiedCredential(credParam).then(verified => {
+                if (isMounted && verified) setSelectedCert(verified);
+              }).catch((err) => {
+                console.warn('Could not fetch verified credential by param:', err);
+              });
+            }
+          }
           setLoading(false);
         }
       } catch (err) {
@@ -57,7 +73,7 @@ const Profile = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [searchParams]);
 
   const handleOpenEditModal = () => {
     if (user) {

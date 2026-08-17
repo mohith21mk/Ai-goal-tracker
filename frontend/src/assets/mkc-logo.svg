@@ -1,0 +1,89 @@
+<svg viewBox="0 0 1254 1254" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mastery Key Coach logo">
+  <defs>
+    <linearGradient id="p" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/><stop offset="16%" stop-color="#EAF4FF"/>
+      <stop offset="34%" stop-color="#61B3FF"/><stop offset="52%" stop-color="#1673EA"/>
+      <stop offset="76%" stop-color="#0D4FB9"/><stop offset="100%" stop-color="#061D42"/>
+    </linearGradient>
+    <linearGradient id="b" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/><stop offset="28%" stop-color="#F8FBFF"/>
+      <stop offset="52%" stop-color="#DCEBFF"/><stop offset="74%" stop-color="#74BAFF"/>
+      <stop offset="100%" stop-color="#2378E5"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#328BFA"/><stop offset="48%" stop-color="#0E59D0"/><stop offset="100%" stop-color="#06285E"/>
+    </linearGradient>
+    <linearGradient id="blade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0B3F9B"/><stop offset="40%" stop-color="#2E8BFF"/>
+      <stop offset="50%" stop-color="#FFFFFF"/><stop offset="60%" stop-color="#4AA2FF"/><stop offset="100%" stop-color="#0A3C93"/>
+    </linearGradient>
+    <radialGradient id="star"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="45%" stop-color="#EDF7FF"/><stop offset="100%" stop-color="#59AAFF"/></radialGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="10"/></filter>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#00132D" flood-opacity="0.75"/></filter>
+  </defs>
+
+  <rect width="1254" height="1254" rx="60" fill="#020A17"/>
+  <ellipse cx="627" cy="625" rx="335" ry="400" fill="#1471E8" opacity="0.075" filter="url(#soft)"/>
+
+  <!-- TOP DIAMOND -->
+  <g filter="url(#glow)">
+    <path d="M627 56 L697 119 L627 183 L557 119 Z" fill="none" stroke="url(#p)" stroke-width="17" stroke-linejoin="round"/>
+    <path d="M627 88 C622 108 614 117 595 124 C614 131 622 139 627 159 C632 139 640 131 659 124 C640 117 632 108 627 88 Z" fill="url(#star)"/>
+  </g>
+
+  <!-- CONTINUOUS SWORD / CROSSGUARD BEHIND MKC -->
+  <g filter="url(#shadow)">
+    <path d="M627 170 C614 194 600 210 584 223 C569 239 565 256 565 278 L565 395 L627 340 L689 395 L689 278 C689 256 685 239 670 223 C654 210 640 194 627 170 Z" fill="url(#p)"/>
+    <path d="M315 263 L564 263 L578 286 L563 311 L349 294 L375 309 L562 331 L379 317 L315 292 Z" fill="url(#p)"/>
+    <path d="M939 263 L690 263 L676 286 L691 311 L905 294 L879 309 L692 331 L875 317 L939 292 Z" fill="url(#p)"/>
+    <path d="M349 269 L548 269" stroke="#FFFFFF" stroke-width="4" opacity="0.55" stroke-linecap="round"/>
+    <path d="M706 269 L905 269" stroke="#FFFFFF" stroke-width="4" opacity="0.55" stroke-linecap="round"/>
+  </g>
+
+  <!-- LARGE MKC WORDMARK -->
+  <g filter="url(#shadow)" fill="url(#b)">
+    <path d="M190 355 L292 355 L382 459 L472 355 L572 355 L572 638 L470 638 L470 479 L409 554 L350 554 L291 479 L291 638 L190 638 Z"/>
+    <path d="M488 355 L580 355 L580 468 L673 355 L789 355 L678 488 L804 638 L690 638 L603 531 L580 559 L580 638 L488 638 Z"/>
+    <path d="M1030 355 L1030 434 L862 434 C829 434 812 451 812 489 L812 518 C812 555 829 573 862 573 L1030 573 L1030 638 L846 638 C769 638 723 591 723 519 L723 476 C723 401 769 355 846 355 Z"/>
+  </g>
+
+  <!-- CENTER BLADE VISIBLE THROUGH K GAP + BELOW -->
+  <g filter="url(#glow)">
+    <path d="M610 458 L627 430 L644 458 L644 842 L627 902 L610 842 Z" fill="url(#blade)"/>
+    <path d="M627 461 L634 484 L634 827 L627 870 Z" fill="#F4FAFF" opacity="0.62"/>
+    <path d="M610 839 L627 902 L644 839 L627 932 Z" fill="url(#p)"/>
+  </g>
+
+  <!-- ANCHOR BODY -->
+  <g filter="url(#shadow)">
+    <path d="M235 548 C201 606 181 670 184 728 C186 782 201 829 220 862 C225 824 240 793 265 763 C251 794 248 820 252 842 C305 900 373 932 445 948 C369 920 313 875 283 817 C254 761 240 700 246 638 C248 603 245 571 235 548 Z" fill="url(#b)"/>
+    <path d="M1019 548 C1053 606 1073 670 1070 728 C1068 782 1053 829 1034 862 C1029 824 1014 793 989 763 C1003 794 1006 820 1002 842 C949 900 881 932 809 948 C885 920 941 875 971 817 C1000 761 1014 700 1008 638 C1006 603 1009 571 1019 548 Z" fill="url(#b)"/>
+    <path d="M271 643 C298 723 349 787 416 821 C466 846 521 852 569 838 C596 830 608 805 608 766 L608 613 L627 593 L627 850 C627 891 606 918 573 931 C506 958 427 939 365 900 C309 865 270 813 251 748 C242 714 246 674 271 643 Z" fill="url(#blue)"/>
+    <path d="M983 643 C956 723 905 787 838 821 C788 846 733 852 685 838 C658 830 646 805 646 766 L646 613 L627 593 L627 850 C627 891 648 918 681 931 C748 958 827 939 889 900 C945 865 984 813 1003 748 C1012 714 1008 674 983 643 Z" fill="url(#blue)"/>
+  </g>
+
+  <!-- WIDE OUTER ANCHOR SWEEP -->
+  <g fill="none" stroke-linecap="round" filter="url(#glow)">
+    <path d="M211 776 C256 866 332 931 428 969 C505 1001 569 1018 627 1078 C685 1018 749 1001 826 969 C922 931 998 866 1043 776" stroke="url(#p)" stroke-width="21"/>
+    <path d="M245 815 C294 885 356 926 431 955 C510 985 569 1004 627 1059 C685 1004 744 985 823 955 C898 926 960 885 1009 815" stroke="#49A3FF" stroke-width="9" opacity="0.92"/>
+  </g>
+
+  <!-- BOTTOM DIAMOND -->
+  <path d="M627 900 L676 952 L627 1018 L578 952 Z" fill="url(#blue)" filter="url(#glow)"/>
+  <path d="M627 916 L660 953 L627 1000 L594 953 Z" fill="none" stroke="#67B8FF" stroke-width="3" opacity="0.45"/>
+
+  <!-- WORDMARK HIGHLIGHTS -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="4" opacity="0.50" stroke-linecap="round">
+    <path d="M209 371 L291 371 L382 470 L472 371"/>
+    <path d="M504 371 L569 371 L569 475"/>
+    <path d="M848 371 L1013 371"/>
+  </g>
+
+  <!-- FINAL ENERGY LINE -->
+  <g filter="url(#glow)">
+    <ellipse cx="627" cy="1130" rx="145" ry="3" fill="#46A6FF" opacity="0.88"/>
+    <ellipse cx="627" cy="1130" rx="80" ry="2" fill="#E5F3FF" opacity="0.65"/>
+    <path d="M627 1101 L633 1130 L627 1171 L621 1130 Z" fill="url(#star)"/>
+  </g>
+</svg>

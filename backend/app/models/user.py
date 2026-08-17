@@ -16,6 +16,7 @@ class User(Base):
     mkc_id = Column(String(255), unique=True, index=True)
     avatar_initials = Column(String(10))
     bio = Column(Text)
+    role = Column(String(50), default="user", nullable=False)
     email_verified = Column(Integer, default=0)
     verified_at = Column(DateTime)
     onboarding_completed = Column(Integer, default=0)

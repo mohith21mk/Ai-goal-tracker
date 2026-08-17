@@ -11,7 +11,7 @@ def test_controlled_telemetry_accuracy_sequence_and_isolation():
     conn = get_connection()
     cursor = conn.cursor()
 
-    today_str = datetime.date.today().strftime("%Y-%m-%d")
+    today_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
     cursor.execute("DELETE FROM users WHERE username IN ('audit_user_a', 'audit_user_b')")
     conn.commit()

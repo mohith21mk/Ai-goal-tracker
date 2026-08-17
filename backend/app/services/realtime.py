@@ -3,32 +3,60 @@ import asyncio
 from typing import Dict, Any, Optional
 from .logger import logger
 from .websocket import manager
+from ..config import settings
 
 _redis_client = None
 _pubsub_task = None
+_redis_available = False
+_logged_offline = False
+
 
 def get_redis_client():
     """
-    Returns initialized Redis client if REDIS_URL is configured and redis-py is installed.
+    Returns initialized async Redis client if REDIS_URL is configured and redis-py is installed.
+    Uses connection pooling and socket timeouts to prevent thread starvation.
     """
     global _redis_client
     if _redis_client is not None:
         return _redis_client
 
+    redis_url = settings.REDIS_URL or ""
+    if not redis_url:
+        return None
+
     try:
         import redis.asyncio as redis
-        import os
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-        _redis_client = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
+        _redis_client = redis.from_url(
+            redis_url,
+            encoding="utf-8",
+            decode_responses=True,
+            socket_timeout=5.0,
+            socket_connect_timeout=3.0,
+            retry_on_timeout=True,
+            health_check_interval=30,
+        )
         return _redis_client
     except Exception as err:
-        # Check if error is related to connection/availability to avoid spamming
-        msg = str(err)
-        if "Error 22" in msg or "ConnectionRefusedError" in msg or "not found" in msg:
-            logger.info("Redis unavailable, using local WebSocket ConnectionManager fallback.")
-        else:
-            logger.warning(f"Redis initialization unavailable: {err}. Falling back to in-memory WebSocket ConnectionManager.")
+        logger.warning(f"Redis client initialization error: {err}. Falling back to in-memory WebSocket manager.")
         return None
+
+
+async def check_redis_health() -> bool:
+    """
+    Pings Redis server and returns True if healthy, False otherwise.
+    """
+    global _redis_available
+    redis_cli = get_redis_client()
+    if not redis_cli:
+        _redis_available = False
+        return False
+    try:
+        await redis_cli.ping()
+        _redis_available = True
+        return True
+    except Exception:
+        _redis_available = False
+        return False
 
 
 async def publish_chat_event(conversation_id: int, event_data: Dict[str, Any]) -> None:
@@ -40,19 +68,19 @@ async def publish_chat_event(conversation_id: int, event_data: Dict[str, Any]) -
     redis_cli = get_redis_client()
 
     redis_published = False
-    if redis_cli:
+    if redis_cli and _redis_available:
         try:
             channel_name = f"conversation:{conversation_id}"
             await redis_cli.publish(channel_name, event_str)
             redis_published = True
         except Exception as err:
-            logger.warning(f"Failed to publish to Redis channel: {err}. Falling back to local dispatch.")
+            logger.debug(f"Redis publish failed: {err}. Falling back to local WebSocket dispatch.")
 
     if not redis_published:
         # Fallback: Dispatch directly to local active connections for recipient/sender
         target_user_id = event_data.get("recipient_id") or event_data.get("sender_id")
         sender_id = event_data.get("sender_id")
-        
+
         if sender_id:
             await manager.send_personal_message(event_str, sender_id)
         if target_user_id and target_user_id != sender_id:
@@ -72,13 +100,13 @@ async def publish_notification_event(user_id: int, notification_data: Dict[str, 
     redis_cli = get_redis_client()
 
     redis_published = False
-    if redis_cli:
+    if redis_cli and _redis_available:
         try:
             channel_name = f"user:{user_id}:notifications"
             await redis_cli.publish(channel_name, payload_str)
             redis_published = True
         except Exception as err:
-            logger.warning(f"Failed to publish notification to Redis: {err}. Falling back to local dispatch.")
+            logger.debug(f"Redis notification publish failed: {err}. Falling back to local WebSocket dispatch.")
 
     if not redis_published:
         await manager.send_personal_json(payload, user_id)
@@ -89,19 +117,28 @@ async def start_redis_listener() -> None:
     Background worker task subscribing to Redis Pub/Sub channels to distribute events
     across multiple production application workers.
     """
-    global _pubsub_task
+    global _pubsub_task, _redis_available, _logged_offline
     redis_cli = get_redis_client()
     if not redis_cli:
+        logger.info("Redis not configured. Operating in single-node in-memory WebSocket mode.")
         return
 
     async def _listener_loop():
+        global _redis_available, _logged_offline
         retry_delay = 1
         while True:
+            pubsub = None
             try:
+                # Test connectivity with ping before subscribing
+                await redis_cli.ping()
+                _redis_available = True
+                _logged_offline = False
+
                 pubsub = redis_cli.pubsub()
                 await pubsub.psubscribe("conversation:*", "user:*:notifications")
-                logger.info("Redis Pub/Sub listener active on channels 'conversation:*' and 'user:*:notifications'.")
-                retry_delay = 1 # reset on successful connection
+                logger.info("Redis Pub/Sub connected on 'conversation:*' and 'user:*:notifications'.")
+                retry_delay = 1
+
                 async for message in pubsub.listen():
                     if message and message.get("type") in ("pmessage", "message"):
                         data_str = message.get("data")
@@ -124,19 +161,37 @@ async def start_redis_listener() -> None:
                         except Exception as err:
                             logger.warning(f"Error processing Redis Pub/Sub message: {err}")
             except asyncio.CancelledError:
+                if pubsub:
+                    try:
+                        await pubsub.close()
+                    except Exception:
+                        pass
                 break
             except Exception as err:
-                msg = str(err)
-                if "Error 22" not in msg and "not found" not in msg:
-                    logger.warning(f"Redis Pub/Sub listener disconnected: {err}. Retrying in {retry_delay}s...")
+                _redis_available = False
+                if pubsub:
+                    try:
+                        await pubsub.close()
+                    except Exception:
+                        pass
+                if not _logged_offline:
+                    if settings.ENVIRONMENT == "production":
+                        logger.warning(f"Redis Pub/Sub connection offline: {err}. Retrying with backoff...")
+                    else:
+                        logger.info(f"Redis offline ({err}). Operating in local WebSocket fallback mode.")
+                    _logged_offline = True
+
                 await asyncio.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, 60)
+                retry_delay = min(retry_delay * 2, 30)
 
     _pubsub_task = asyncio.create_task(_listener_loop())
 
 
 async def stop_redis_listener() -> None:
-    global _pubsub_task
+    """
+    Gracefully shuts down Redis Pub/Sub task and closes client connections.
+    """
+    global _pubsub_task, _redis_client, _redis_available
     if _pubsub_task and not _pubsub_task.done():
         _pubsub_task.cancel()
         try:
@@ -144,3 +199,11 @@ async def stop_redis_listener() -> None:
         except asyncio.CancelledError:
             pass
     _pubsub_task = None
+
+    if _redis_client:
+        try:
+            await _redis_client.aclose()
+        except Exception:
+            pass
+        _redis_client = None
+    _redis_available = False

@@ -1,6 +1,38 @@
+import json
 from typing import Any, Dict, List, Optional
 from ..database import get_connection
 from .realtime import publish_notification_event
+
+
+def _format_notification_dict(row_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Helper to deserialize JSON data and ensure consistent payload attributes."""
+    data_raw = row_dict.get("data")
+    data_dict = {}
+    if data_raw:
+        try:
+            if isinstance(data_raw, str):
+                data_dict = json.loads(data_raw)
+            elif isinstance(data_raw, dict):
+                data_dict = data_raw
+        except Exception:
+            data_dict = {}
+    
+    row_dict["data"] = data_dict
+    
+    # Flatten key navigation and identification fields for direct client access
+    if "request_id" in data_dict:
+        row_dict["request_id"] = data_dict["request_id"]
+    elif row_dict.get("reference_type") == "connection_request" and row_dict.get("reference_id"):
+        row_dict["request_id"] = row_dict["reference_id"]
+        
+    if "sender_id" in data_dict:
+        row_dict["sender_id"] = data_dict["sender_id"]
+    if "sender_username" in data_dict:
+        row_dict["sender_username"] = data_dict["sender_username"]
+    if "action" in data_dict:
+        row_dict["action"] = data_dict["action"]
+        
+    return row_dict
 
 
 async def create_notification(
@@ -9,28 +41,33 @@ async def create_notification(
     title: str,
     message: str,
     reference_type: Optional[str] = None,
-    reference_id: Optional[int] = None
+    reference_id: Optional[int] = None,
+    data: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     conn = get_connection()
     cursor = conn.cursor()
     
+    data_str = json.dumps(data) if data else None
+    
     cursor.execute("""
-        INSERT INTO notifications (user_id, type, title, message, reference_type, reference_id)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (user_id, type, title, message, reference_type, reference_id))
+        INSERT INTO notifications (user_id, type, title, message, reference_type, reference_id, data)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (user_id, type, title, message, reference_type, reference_id, data_str))
     
     notification_id = cursor.lastrowid
     conn.commit()
 
     cursor.execute(
         """
-        SELECT id, user_id, type, title, message, reference_type, reference_id, is_read, created_at 
+        SELECT id, user_id, type, title, message, reference_type, reference_id, data, is_read, created_at 
         FROM notifications WHERE id = ?
         """,
         (notification_id,)
     )
-    notif = dict(cursor.fetchone())
+    raw_notif = dict(cursor.fetchone())
     conn.close()
+    
+    notif = _format_notification_dict(raw_notif)
     
     # Broadcast to recipient in real-time via Redis / local WS
     await publish_notification_event(user_id, notif)
@@ -43,7 +80,7 @@ def get_user_notifications(user_id: int, limit: int = 50, offset: int = 0) -> Li
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT id, type, title, message, reference_type, reference_id, is_read, created_at 
+        SELECT id, user_id, type, title, message, reference_type, reference_id, data, is_read, created_at 
         FROM notifications 
         WHERE user_id = ? 
         ORDER BY created_at DESC 
@@ -51,9 +88,10 @@ def get_user_notifications(user_id: int, limit: int = 50, offset: int = 0) -> Li
         """,
         (user_id, limit, offset)
     )
-    notifications = [dict(row) for row in cursor.fetchall()]
+    rows = cursor.fetchall()
     conn.close()
-    return notifications
+    
+    return [_format_notification_dict(dict(row)) for row in rows]
 
 
 def get_unread_notification_count(user_id: int) -> int:

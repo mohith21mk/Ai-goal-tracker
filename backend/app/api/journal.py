@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
@@ -49,7 +49,7 @@ class JournalUpsertRequest(BaseModel):
         if v:
             try:
                 dt = datetime.strptime(v, "%Y-%m-%d").date()
-                if dt > date.today():
+                if dt > datetime.now(timezone.utc).date():
                     raise ValueError("Cannot log journal reflections for future dates.")
             except ValueError as err:
                 if "Cannot log" in str(err):

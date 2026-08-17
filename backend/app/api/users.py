@@ -139,11 +139,11 @@ def _get_user_profile_dict(user_id: int) -> Dict[str, Any]:
         (user_id,),
     )
     date_rows = cursor.fetchall()
-    dates = [r["comp_date"] for r in date_rows if r["comp_date"]]
+    dates = [str(r["comp_date"])[:10] for r in date_rows if r["comp_date"]]
 
     streak_days = 0
     if dates:
-        today = datetime.date.today()
+        today = datetime.datetime.now(datetime.timezone.utc).date()
         latest_date = datetime.datetime.strptime(dates[0], "%Y-%m-%d").date()
         if (today - latest_date).days <= 1:
             streak_days = 1
@@ -185,24 +185,39 @@ async def get_user_profile_endpoint(current_user: Dict[str, Any] = Depends(get_c
 
 @router.get("/search", response_model=Dict[str, Any])
 async def search_public_users(
-    q: str = Query(..., min_length=2),
+    q: Optional[str] = Query(default=None, min_length=2),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    search_term = f"%{q.strip().lower()}%"
+    search_q = q.strip().lower() if q else ""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT id, mkc_id, username, full_name, avatar_initials, bio
-        FROM users
-        WHERE (LOWER(COALESCE(username, '')) LIKE ? 
-            OR LOWER(COALESCE(full_name, '')) LIKE ? 
-            OR LOWER(COALESCE(mkc_id, '')) LIKE ?) 
-          AND id != ?
-        ORDER BY id ASC LIMIT 20
-        """,
-        (search_term, search_term, search_term, current_user["id"])
-    )
+
+    if search_q:
+        search_term = f"%{search_q}%"
+        cursor.execute(
+            """
+            SELECT id, mkc_id, username, full_name, avatar_initials, bio
+            FROM users
+            WHERE (LOWER(COALESCE(username, '')) LIKE ?
+                OR LOWER(COALESCE(full_name, '')) LIKE ?
+                OR LOWER(COALESCE(mkc_id, '')) LIKE ?)
+              AND id != ?
+              AND deactivated_at IS NULL
+            ORDER BY id ASC LIMIT 20
+            """,
+            (search_term, search_term, search_term, current_user["id"])
+        )
+    else:
+        cursor.execute(
+            """
+            SELECT id, mkc_id, username, full_name, avatar_initials, bio
+            FROM users
+            WHERE id != ?
+              AND deactivated_at IS NULL
+            ORDER BY id DESC LIMIT 20
+            """,
+            (current_user["id"],)
+        )
     rows = cursor.fetchall()
 
     users_list = []

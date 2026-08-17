@@ -1,18 +1,26 @@
+from contextlib import asynccontextmanager
 from typing import Any, Dict
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings as app_settings
 from .services.logger import logger
 from .services.realtime import start_redis_listener, stop_redis_listener
 
-from .api import auth, blueprints, coach, community, goals, habits, health, journal, missions, progress, reflection, search, settings as api_settings, users, social, chat, notifications, progression, credentials
+from .api import auth, blueprints, coach, community, goals, habits, health, journal, missions, progress, reflection, search, settings as api_settings, users, social, chat, notifications, progression, credentials, feedback
 from .api.auth import get_current_user
 from .api.progress import compute_telemetry
 from .database import init_db
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await start_redis_listener()
+    yield
+    await stop_redis_listener()
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title="AI Goal Coach API", version="0.1.0")
+    app = FastAPI(title="AI Goal Coach API", version="0.1.0", lifespan=lifespan)
 
     logger.info("Initializing AI Goal Coach application...")
     logger.info(f"Environment: {app_settings.ENVIRONMENT}")
@@ -28,14 +36,6 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    @app.on_event("startup")
-    async def on_startup():
-        await start_redis_listener()
-
-    @app.on_event("shutdown")
-    async def on_shutdown():
-        await stop_redis_listener()
 
     app.include_router(health.router, prefix="/api/health", tags=["health"])
     app.include_router(health.router, prefix="/health", tags=["health"])
@@ -57,10 +57,15 @@ def create_app() -> FastAPI:
     app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
     app.include_router(progression.router, prefix="/api/progression", tags=["progression"])
     app.include_router(credentials.router, prefix="/api/credentials", tags=["credentials"])
+    app.include_router(feedback.router, tags=["feedback"])
 
     @app.get("/api/telemetry", response_model=Dict[str, Any], tags=["telemetry"])
     async def get_telemetry_endpoint(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
         return await compute_telemetry(current_user["id"])
+
+    @app.get("/ready", response_model=Dict[str, Any], tags=["health"])
+    async def ready_endpoint(response: Response) -> Dict[str, Any]:
+        return await health.health_readiness(response)
 
     @app.get("/")
     async def root() -> Dict[str, str]:

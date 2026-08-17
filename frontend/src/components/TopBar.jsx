@@ -10,7 +10,8 @@ import {
   Bell,
   LogOut,
   CheckCheck,
-  Trash2
+  Trash2,
+  MessageSquare
 } from 'lucide-react';
 import {
   searchApplication,
@@ -23,6 +24,8 @@ import {
   deleteNotification
 } from '../services/api';
 import { useNotificationsSocket } from '../hooks/useNotificationsSocket';
+import FeedbackModal from './FeedbackModal';
+import { ROUTES } from '../constants/routes';
 import './TopBar.css';
 
 const TopBar = ({ user }) => {
@@ -32,6 +35,7 @@ const TopBar = ({ user }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [userProfile, setUserProfile] = useState(user || null);
@@ -62,6 +66,40 @@ const TopBar = ({ user }) => {
     }
   };
 
+  const handleNotificationClick = async (n) => {
+    if (!n) return;
+    if (!n.is_read) {
+      handleMarkSingleRead(n.id);
+    }
+    setIsNotifDropdownOpen(false);
+
+    const notifType = n.type || n.data?.type || n.reference_type;
+    const reqId = n.request_id || n.data?.request_id || (notifType === 'connection_request' ? n.reference_id : null);
+    const convId = n.conversation_id || n.data?.conversation_id || (notifType === 'message' || notifType === 'chat_message' ? n.reference_id : null);
+    const senderId = n.sender_id || n.data?.sender_id;
+    const credId = n.credential_id || n.data?.credential_id || (notifType === 'credential_unlocked' ? n.reference_id : null);
+
+    if (notifType === 'connection_request') {
+      const qs = reqId ? `&requestId=${reqId}` : '';
+      navigate(`${ROUTES.CHAT_ALIAS}?tab=requests${qs}`, { state: { tab: 'requests', requestId: reqId, senderId } });
+    } else if (notifType === 'message' || notifType === 'chat_message' || notifType === 'new_message') {
+      const convParam = convId ? `&conversationId=${convId}` : (senderId ? `&userId=${senderId}` : '');
+      navigate(`${ROUTES.CHAT_ALIAS}?tab=conversations${convParam}`, { state: { tab: 'conversations', conversationId: convId, userId: senderId } });
+    } else if (notifType === 'connection_accepted') {
+      const userParam = senderId ? `&userId=${senderId}` : '';
+      navigate(`${ROUTES.CHAT_ALIAS}?tab=conversations${userParam}`, { state: { tab: 'conversations', userId: senderId } });
+    } else if (notifType === 'post_like' || notifType === 'post_comment') {
+      navigate(ROUTES.COMMUNITY);
+    } else if (notifType === 'credential_unlocked' || notifType === 'level_up') {
+      const credParam = credId ? `?cred=${credId}` : '';
+      navigate(`${ROUTES.PROFILE}${credParam}`);
+    } else if (notifType === 'admin_feedback') {
+      navigate(ROUTES.SETTINGS);
+    } else {
+      navigate(ROUTES.DASHBOARD);
+    }
+  };
+
   const handleMarkAllRead = async () => {
     try {
       await markAllNotificationsRead();
@@ -86,10 +124,10 @@ const TopBar = ({ user }) => {
   const handleLogout = async () => {
     try {
       await logoutUser();
-      navigate('/login');
+      navigate(ROUTES.LOGIN);
     } catch (err) {
       console.error('Logout failed:', err);
-      navigate('/login');
+      navigate(ROUTES.LOGIN);
     }
   };
 
@@ -464,7 +502,7 @@ const TopBar = ({ user }) => {
                   notifications.map((n) => (
                     <div
                       key={n.id}
-                      onClick={() => !n.is_read && handleMarkSingleRead(n.id)}
+                      onClick={() => handleNotificationClick(n)}
                       style={{
                         padding: '10px 16px',
                         borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
@@ -474,6 +512,8 @@ const TopBar = ({ user }) => {
                         cursor: 'pointer',
                         transition: 'background 0.2s'
                       }}
+                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.12)'}
+                      onMouseOut={(e) => e.currentTarget.style.background = n.is_read ? 'transparent' : 'rgba(56, 189, 248, 0.06)'}
                     >
                       <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: n.is_read ? 'transparent' : 'var(--cyan)', marginTop: '6px', flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -546,7 +586,7 @@ const TopBar = ({ user }) => {
               <div
                 onClick={() => {
                   setIsProfileDropdownOpen(false);
-                  navigate('/profile');
+                  navigate(ROUTES.PROFILE);
                 }}
                 style={{
                   padding: '10px 12px',
@@ -564,6 +604,29 @@ const TopBar = ({ user }) => {
                 onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
               >
                 My Identity Profile
+              </div>
+              <div
+                onClick={() => {
+                  setIsProfileDropdownOpen(false);
+                  setIsFeedbackOpen(true);
+                }}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: 'var(--text-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+              >
+                <MessageSquare size={16} strokeWidth={1.8} />
+                Send Feedback
               </div>
               <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '4px 0' }} />
               <div
@@ -590,6 +653,11 @@ const TopBar = ({ user }) => {
           )}
         </div>
       </div>
+
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+      />
     </header>
   );
 };

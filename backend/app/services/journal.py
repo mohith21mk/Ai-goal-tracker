@@ -4,7 +4,7 @@ import sqlite3
 import urllib.request
 import urllib.error
 import asyncio
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
@@ -13,17 +13,8 @@ from ..config import settings
 from ..database import get_connection
 
 
-def get_demo_user_id() -> int:
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id FROM users WHERE email = ?", ("demo@masterykeycoach.com",))
-    row = cursor.fetchone()
-    conn.close()
-    return row["id"] if row else 1
-
-
 def get_today_date_str() -> str:
-    return date.today().strftime("%Y-%m-%d")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
 def get_journal_entry_by_id(entry_id: int, user_id: int) -> Optional[Dict[str, Any]]:
@@ -163,7 +154,7 @@ def compute_journal_stats(user_id: int) -> Dict[str, Any]:
     entry_dates = {r["entry_date"] for r in rows}
 
     # Reflection Streak
-    today_dt = date.today()
+    today_dt = datetime.now(timezone.utc).date()
     today_str = today_dt.strftime("%Y-%m-%d")
     yesterday_str = (today_dt - timedelta(days=1)).strftime("%Y-%m-%d")
 

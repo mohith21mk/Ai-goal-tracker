@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, TriangleAlert } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import MKCLogo from '../components/MKCLogo';
 import './Login.css';
 
 const Login = () => {
@@ -37,11 +38,8 @@ const Login = () => {
       <div className="auth-card">
         {/* Header */}
         <div className="auth-header">
-          <div className="auth-brand-logo">
-            <svg width="24" height="24" viewBox="0 0 36 36" fill="none">
-              <path d="M18 4L28 14L18 32L8 14L18 4Z" fill="#38BDF8" fillOpacity="0.3" stroke="#38BDF8" strokeWidth="2"/>
-              <circle cx="18" cy="14" r="4" fill="#FBBF24"/>
-            </svg>
+          <div className="auth-brand-logo" style={{ background: 'none', border: 'none', boxShadow: 'none' }}>
+            <MKCLogo size={48} className="login-logo-svg" />
           </div>
           <h1 className="font-serif">Welcome back</h1>
           <p>Your next level of discipline is waiting.</p>

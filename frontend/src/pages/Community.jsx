@@ -369,46 +369,123 @@ const Community = () => {
             })}
           </div>
 
+          {/* Error State with Retry Button */}
+          {error && (
+            <div style={{
+              padding: '24px',
+              margin: '20px 0',
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              borderRadius: '16px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <TriangleAlert size={28} color="#F87171" />
+              <div style={{ color: '#F87171', fontWeight: '600', fontSize: '15px' }}>
+                Community is temporarily unavailable.
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '13px', maxWidth: '400px' }}>
+                {error}
+              </div>
+              <button
+                onClick={() => {
+                  setLoading(true);
+                  setError(null);
+                  loadPosts(selectedCategory);
+                }}
+                style={{
+                  padding: '8px 20px',
+                  background: 'linear-gradient(135deg, #22B8FF 0%, #0877C9 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#020914',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  marginTop: '6px'
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           {/* Posts Feed */}
           {loading ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-tertiary)' }}>Syncing Community Network Feed...</div>
-          ) : posts.length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
-              No community posts found in this feed. Be the first to publish your breakthrough above!
+            <div className="community-feed">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="post-card glass-panel" style={{ opacity: 0.6, animation: 'pulse 1.5s infinite ease-in-out' }}>
+                  <div className="post-header">
+                    <div className="post-author-info">
+                      <div className="post-author-avatar" style={{ background: 'rgba(34, 184, 255, 0.15)' }} />
+                      <div style={{ width: '120px', height: '14px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px' }} />
+                    </div>
+                  </div>
+                  <div style={{ height: '36px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '6px', margin: '14px 0' }} />
+                </div>
+              ))}
+            </div>
+          ) : (!posts || posts.length === 0) && !error ? (
+            <div style={{
+              padding: '60px 20px',
+              textAlign: 'center',
+              background: 'var(--card-bg)',
+              borderRadius: '16px',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-secondary)'
+            }}>
+              <Globe size={40} color="#22B8FF" style={{ margin: '0 auto 16px', opacity: 0.8 }} />
+              <h3 style={{ margin: '0 0 8px', color: 'var(--text-primary)', fontSize: '18px' }}>No Feed Posts Found</h3>
+              <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-tertiary)' }}>
+                Be the vanguard of this discipline circle. Share your first victory or insight above!
+              </p>
             </div>
           ) : (
             <div className="community-feed">
-              {posts.map((post) => {
+              {Array.isArray(posts) && posts.map((post) => {
+                if (!post || typeof post !== 'object') return null;
+
                 const cState = commentsState[post.id];
                 const isOwned = post.user_id === currentUserId;
+                const authorName = post.author_name || post.username || 'MKC Member';
+                const avatarLetter = authorName.charAt(0).toUpperCase() || 'M';
+                const likesCount = typeof post.likes_count === 'number' ? post.likes_count : 0;
+                const commentsCount = typeof post.comments_count === 'number' ? post.comments_count : 0;
 
                 return (
                   <div key={post.id} className="post-card glass-panel">
                     <div className="post-header">
                       <div className="post-author-info">
                         <div className="post-author-avatar">
-                          {post.author_name ? post.author_name.charAt(0).toUpperCase() : 'M'}
+                          {avatarLetter}
                         </div>
                         <div>
-                          <div className="post-author-name">{post.author_name}</div>
+                          <div className="post-author-name">{authorName}</div>
                           <div className="post-time">{post.created_at || 'Just now'}</div>
                         </div>
                       </div>
                       <span className="post-category-pill">{post.category || 'general'}</span>
                     </div>
 
-                    <div className="post-body">{post.content}</div>
+                    <div className="post-body">{post.content || ''}</div>
 
                     {/* Attached Verified Credential Badge */}
                     {post.credential && (
                       <div className="post-credential-attachment">
                         <VictoryCredentialCard
                           credential={post.credential}
-                          userName={post.author_name}
+                          userName={authorName}
                           interactive={true}
                           onClick={() => setCertModalData({
                             credential: post.credential,
-                            user: { full_name: post.author_name }
+                            user: {
+                              full_name: authorName,
+                              username: post.username,
+                              id: post.user_id
+                            }
                           })}
                         />
                       </div>
@@ -426,7 +503,7 @@ const Community = () => {
                             color={post.user_has_liked ? '#EF4444' : 'currentColor'}
                           />
                         </span>
-                        <span>{post.likes_count ?? 0} Likes</span>
+                        <span>{likesCount} Likes</span>
                       </button>
 
                       <button
@@ -434,7 +511,7 @@ const Community = () => {
                         className="post-action-btn"
                       >
                         <span><MessageSquare size={16} /></span>
-                        <span>{post.comments_count ?? 0} Comments</span>
+                        <span>{commentsCount} Comments</span>
                       </button>
 
                       {!isOwned && (
@@ -464,27 +541,31 @@ const Community = () => {
                       <div className="comments-section">
                         {cState.loading ? (
                           <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Loading comments...</div>
-                        ) : cState.comments.length === 0 ? (
+                        ) : !Array.isArray(cState.comments) || cState.comments.length === 0 ? (
                           <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>No comments yet. Start the conversation!</div>
                         ) : (
-                          cState.comments.map((c) => (
-                            <div key={c.id} className="comment-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div>
-                                <div className="comment-author">{c.author_name}</div>
-                                <div className="comment-text">{c.content}</div>
+                          cState.comments.map((c) => {
+                            if (!c) return null;
+                            const commentAuthor = c.author_name || c.username || 'Member';
+                            return (
+                              <div key={c.id} className="comment-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <div className="comment-author">{commentAuthor}</div>
+                                  <div className="comment-text">{c.content || ''}</div>
+                                </div>
+                                {c.user_id === currentUserId && (
+                                  <button
+                                    onClick={() => handleDeleteComment(post.id, c.id)}
+                                    className="btn-delete-post"
+                                    title="Delete comment"
+                                    style={{ padding: '2px 6px', fontSize: '11px' }}
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                )}
                               </div>
-                              {c.user_id === currentUserId && (
-                                <button
-                                  onClick={() => handleDeleteComment(post.id, c.id)}
-                                  className="btn-delete-post"
-                                  title="Delete comment"
-                                  style={{ padding: '2px 6px', fontSize: '11px' }}
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              )}
-                            </div>
-                          ))
+                            );
+                          })
                         )}
 
                         <form
@@ -497,7 +578,7 @@ const Community = () => {
                             value={cState.input || ''}
                             onChange={(e) => setCommentsState(prev => ({
                               ...prev,
-                              [post.id]: { ...prev[post.id], input: e.target.value }
+                              [post.id]: { ...(prev[post.id] || {}), input: e.target.value }
                             }))}
                             className="comment-input"
                           />

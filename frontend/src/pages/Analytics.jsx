@@ -16,6 +16,7 @@ import {
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import StatCard from '../components/StatCard';
+import MKCLogo from '../components/MKCLogo';
 import { getTelemetry, getProgress, getMissions, getUser } from '../services/api';
 import './Analytics.css';
 
@@ -99,7 +100,7 @@ const Analytics = () => {
             <div className="analytics-header-content">
               <div className="analytics-title-group">
                 <div className="analytics-icon-badge">
-                  <BarChart3 size={24} strokeWidth={1.8} />
+                  <MKCLogo size={36} />
                 </div>
                 <div>
                   <h1 className="analytics-title font-display">Performance Analytics</h1>
@@ -130,8 +131,8 @@ const Analytics = () => {
                 subtitle={getStatusLabel(telemetry.discipline_score)}
                 change={`${telemetry.discipline_score_change >= 0 ? '+' : ''}${telemetry.discipline_score_change || 0}`}
                 trend={telemetry.discipline_score_change >= 0 ? 'up' : 'down'}
-                icon={<Flame size={22} strokeWidth={1.8} />}
-                accentColor="#38BDF8"
+                icon={<Flame size={20} strokeWidth={1.8} />}
+                accentColor="#10B981"
                 sparklineData={telemetry.sparklines?.discipline_score || [0, 0, 0, 0, 0, 0, 0]}
               />
               <StatCard
@@ -141,8 +142,8 @@ const Analytics = () => {
                 subtitle={getStatusLabel(telemetry.mindset_strength)}
                 change={`${telemetry.mindset_strength_change >= 0 ? '+' : ''}${telemetry.mindset_strength_change || 0}`}
                 trend={telemetry.mindset_strength_change >= 0 ? 'up' : 'down'}
-                icon={<Brain size={22} strokeWidth={1.8} />}
-                accentColor="#3B82F6"
+                icon={<Brain size={20} strokeWidth={1.8} />}
+                accentColor="#A78BFA"
                 sparklineData={telemetry.sparklines?.mindset_strength || [0, 0, 0, 0, 0, 0, 0]}
               />
               <StatCard
@@ -151,8 +152,8 @@ const Analytics = () => {
                 subtitle={`${progress.completed || 0} / ${progress.total || 0} Actions`}
                 change={`${telemetry.missions_completed_change >= 0 ? '+' : ''}${telemetry.missions_completed_change || 0}`}
                 trend={telemetry.missions_completed_change >= 0 ? 'up' : 'down'}
-                icon={<CheckCircle2 size={22} strokeWidth={1.8} />}
-                accentColor="#10B981"
+                icon={<CheckCircle2 size={20} strokeWidth={1.8} />}
+                accentColor="#38BDF8"
                 sparklineData={telemetry.sparklines?.missions_completed || [0, 0, 0, 0, 0, 0, 0]}
               />
               <StatCard
@@ -162,8 +163,8 @@ const Analytics = () => {
                 subtitle={getStatusLabel(telemetry.consistency)}
                 change={`${telemetry.consistency_change >= 0 ? '+' : ''}${telemetry.consistency_change || 0}`}
                 trend={telemetry.consistency_change >= 0 ? 'up' : 'down'}
-                icon={<Zap size={22} strokeWidth={1.8} />}
-                accentColor="#FBBF24"
+                icon={<Zap size={20} strokeWidth={1.8} />}
+                accentColor="#3B82F6"
                 sparklineData={telemetry.sparklines?.consistency || [0, 0, 0, 0, 0, 0, 0]}
               />
             </div>
@@ -184,8 +185,8 @@ const Analytics = () => {
                 subtitle={getStatusLabel(telemetry.growth_index)}
                 change={`${telemetry.growth_index_change >= 0 ? '+' : ''}${telemetry.growth_index_change || 0}`}
                 trend={telemetry.growth_index_change >= 0 ? 'up' : 'down'}
-                icon={<TrendingUp size={22} strokeWidth={1.8} />}
-                accentColor="#A78BFA"
+                icon={<TrendingUp size={20} strokeWidth={1.8} />}
+                accentColor="#F97316"
                 sparklineData={telemetry.sparklines?.growth_index || [0, 0, 0, 0, 0, 0, 0]}
               />
               <StatCard
@@ -194,7 +195,7 @@ const Analytics = () => {
                 subtitle="Financial Freedom Protocol"
                 change={`${telemetry.financial_goal_change >= 0 ? '+' : ''}${telemetry.financial_goal_change || 0}%`}
                 trend={telemetry.financial_goal_change >= 0 ? 'up' : 'down'}
-                icon={<DollarSign size={22} strokeWidth={1.8} />}
+                icon={<DollarSign size={20} strokeWidth={1.8} />}
                 accentColor="#FBBF24"
                 sparklineData={telemetry.sparklines?.financial_goal || [0, 0, 0, 0, 0, 0, 0]}
               />
@@ -205,7 +206,7 @@ const Analytics = () => {
                 subtitle={telemetry.streak_days > 0 ? 'Active Streak' : 'Ready to Start'}
                 change={`${telemetry.streak_days_change >= 0 ? '+' : ''}${telemetry.streak_days_change || 0}`}
                 trend={telemetry.streak_days_change >= 0 ? 'up' : 'down'}
-                icon={<Flame size={22} strokeWidth={1.8} />}
+                icon={<Flame size={20} strokeWidth={1.8} />}
                 accentColor="#F97316"
                 sparklineData={telemetry.sparklines?.streak_days || [0, 0, 0, 0, 0, 0, 0]}
               />
@@ -215,7 +216,7 @@ const Analytics = () => {
                 subtitle={`${telemetry.xp_earned || 0} Total XP`}
                 change={`${telemetry.xp_earned_change >= 0 ? '+' : ''}${telemetry.xp_earned_change || 0} XP`}
                 trend={telemetry.xp_earned_change >= 0 ? 'up' : 'down'}
-                icon={<Rocket size={22} strokeWidth={1.8} />}
+                icon={<Rocket size={20} strokeWidth={1.8} />}
                 accentColor="#EC4899"
                 sparklineData={telemetry.sparklines?.xp_earned || [0, 0, 0, 0, 0, 0, 0]}
               />

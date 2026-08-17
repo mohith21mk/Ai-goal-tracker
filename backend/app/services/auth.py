@@ -2,7 +2,7 @@ import hashlib
 import hmac
 import re
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Tuple
 
 from ..database import get_connection
@@ -137,7 +137,7 @@ def hash_token(token: str) -> str:
 def create_session(user_id: int, user_agent: Optional[str] = None, ip_address: Optional[str] = None) -> str:
     """Create session token and store in app_sessions DB table with device metadata."""
     token = secrets.token_urlsafe(32)
-    now_dt = datetime.utcnow()
+    now_dt = datetime.now(timezone.utc)
     expires_at = now_dt + timedelta(days=SESSION_DURATION_DAYS)
     now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -163,7 +163,7 @@ def get_user_from_session(token: str) -> Optional[Dict[str, Any]]:
 
     conn = get_connection()
     cursor = conn.cursor()
-    now_dt = datetime.utcnow()
+    now_dt = datetime.now(timezone.utc)
     now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     cursor.execute(
@@ -211,7 +211,7 @@ def revoke_all_sessions(user_id: int, except_token: Optional[str] = None) -> int
     """Revoke all active sessions for a user, optionally preserving current_token."""
     conn = get_connection()
     cursor = conn.cursor()
-    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     if except_token:
         cursor.execute(
@@ -242,7 +242,7 @@ def list_user_sessions(user_id: int, current_token: Optional[str] = None) -> lis
     """List active sessions for user with sanitized metadata."""
     conn = get_connection()
     cursor = conn.cursor()
-    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     cursor.execute(
         """
@@ -286,7 +286,7 @@ def revoke_session_by_id(user_id: int, session_id: str) -> bool:
     """Revoke specific session by matching truncated identifier."""
     conn = get_connection()
     cursor = conn.cursor()
-    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     cursor.execute(
         """
@@ -310,7 +310,7 @@ def create_password_reset_token(user_id: int) -> str:
     """Create secure, random, single-use reset token (15-min expiry) and invalidate prior active tokens."""
     token = secrets.token_urlsafe(32)
     token_h = hash_token(token)
-    now_dt = datetime.utcnow()
+    now_dt = datetime.now(timezone.utc)
     expires_at = now_dt + timedelta(minutes=15)
     now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -341,7 +341,7 @@ def verify_and_use_reset_token(token: str, new_password: str) -> bool:
         return False
 
     token_h = hash_token(token)
-    now_dt = datetime.utcnow()
+    now_dt = datetime.now(timezone.utc)
     now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     conn = get_connection()
@@ -380,7 +380,7 @@ def create_email_verification_token(user_id: int, email: str) -> str:
     """Create single-use email verification token (24-hr expiry)."""
     token = secrets.token_urlsafe(32)
     token_h = hash_token(token)
-    now_dt = datetime.utcnow()
+    now_dt = datetime.now(timezone.utc)
     expires_at = now_dt + timedelta(hours=24)
     now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -410,7 +410,7 @@ def verify_email_token(token: str) -> bool:
         return False
 
     token_h = hash_token(token)
-    now_dt = datetime.utcnow()
+    now_dt = datetime.now(timezone.utc)
     now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     conn = get_connection()

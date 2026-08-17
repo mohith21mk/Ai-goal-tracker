@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from ..config import settings
 from ..db_session import engine
-from ..services.realtime import get_redis_client
+from ..services.realtime import check_redis_health
 
 router = APIRouter()
 
@@ -35,18 +35,17 @@ async def health_readiness(response: Response) -> Dict[str, Any]:
         checks["database_error"] = str(err)
 
     # Check Redis
-    try:
-        redis_cli = get_redis_client()
-        if redis_cli:
-            checks["redis"] = True
-        else:
-            checks["redis"] = False
-            checks["redis_note"] = "Running in fallback mode"
-    except Exception as err:
-        checks["redis"] = False
-        checks["redis_error"] = str(err)
+    redis_healthy = await check_redis_health()
+    checks["redis"] = redis_healthy
+    if not redis_healthy:
+        checks["redis_note"] = "Running in local fallback mode"
 
-    is_ready = checks["database"]
+    # In production, if Redis is configured, require both DB and Redis
+    if settings.ENVIRONMENT == "production" and settings.REDIS_URL:
+        is_ready = checks["database"] and checks["redis"]
+    else:
+        is_ready = checks["database"]
+
     if not is_ready:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 

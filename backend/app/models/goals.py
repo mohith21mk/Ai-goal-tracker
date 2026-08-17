@@ -58,7 +58,7 @@ class Mission(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    goal_id = Column(Integer, ForeignKey("goals.id", ondelete="CASCADE"), nullable=False)
+    goal_id = Column(Integer, ForeignKey("goals.id", ondelete="CASCADE"), nullable=True)
     title = Column(String(255), nullable=False)
     description = Column(Text)
     category = Column(String(100), default="general")
@@ -67,6 +67,7 @@ class Mission(Base):
     xp_reward = Column(Integer, default=10)
     completed = Column(Integer, default=0)
     completed_at = Column(DateTime)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), server_default=func.now())
 
 
 class JournalEntry(Base):

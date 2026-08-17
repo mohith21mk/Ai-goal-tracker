@@ -1,23 +1,54 @@
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap');
 
-/* Mastery Key Coach - Target Color System */
+/* Mastery Key Coach - Premium Target Color System */
 :root {
-  --dark-bg: #050B16;
-  --mid-bg: #071426;
-  --card-bg: rgba(10, 22, 40, 0.75);
-  --cyan: #38BDF8;
-  --cyan-glow: rgba(56, 189, 248, 0.35);
-  --primary-blue: #3B82F6;
-  --dark-blue: #2563EB;
-  --blue-glow: rgba(59, 130, 246, 0.3);
+  /* Premium Dark-Luxury Foundations */
+  --obsidian: #020914;
+  --dark-navy: #061426;
+  --mkc-obsidian: #020914;
+  --mkc-navy: #061426;
+  --dark-bg: #020914;
+  --mid-bg: #061426;
+  --card-bg: rgba(6, 20, 38, 0.85);
+
+  /* Mastery Key Coach - Standardized Brand Color System */
+  --mkc-primary: #22B8FF;
+  --mkc-primary-light: #4DA3FF;
+  --mkc-secondary: #0877C9;
+  --mkc-deep: #06285E;
+  --mkc-navy: #061426;
+  --mkc-highlight: #FFFFFF;
+  --mkc-highlight-subtle: #DCEBFF;
+  --mkc-silver: #F8FBFF;
+  --mkc-blade-bright: #4AA2FF;
+  --mkc-star-core: #EDF7FF;
+  --mkc-glow: rgba(34, 184, 255, 0.35);
+  --mkc-glow-subtle: rgba(34, 184, 255, 0.15);
+  --mkc-shadow: rgba(0, 19, 45, 0.75);
+
+  --electric-blue: #22B8FF;
+  --bright-cyan: #38C8FF;
+  --deep-blue: #0877C9;
+  --mkc-bright-cyan: #38C8FF;
+  
+  --cyan: #22B8FF;
+  --cyan-glow: rgba(34, 184, 255, 0.25);
+  --primary-blue: #22B8FF;
+  --dark-blue: #0877C9;
+  --blue-glow: rgba(8, 119, 201, 0.25);
+  --soft-blue-glow: rgba(34, 184, 255, 0.12);
+
+  /* Prestige & Achievements */
   --accent-gold: #FBBF24;
   --gold-glow: rgba(251, 191, 36, 0.3);
   --success: #10B981;
-  --text-primary: #F1F5F9;
+
+  /* Typography & Structure */
+  --text-primary: #F8FAFC;
   --text-secondary: #94A3B8;
   --text-tertiary: #64748B;
-  --border-subtle: rgba(148, 163, 184, 0.12);
-  --border-glow: rgba(56, 189, 248, 0.3);
+  --border-subtle: rgba(34, 184, 255, 0.15);
+  --border-glow: rgba(34, 184, 255, 0.35);
 }
 
 /* Light Theme Variable Overrides */

@@ -4,7 +4,7 @@ from typing import Dict, Any, List
 
 from ..database import get_connection
 from .blueprints import get_blueprint_telemetry
-from .habits import get_aggregate_habit_stats, get_demo_user_id
+from .habits import get_aggregate_habit_stats
 from .journal import compute_journal_stats
 
 
@@ -32,16 +32,17 @@ def generate_daily_reflection(user_id: int) -> Dict[str, Any]:
         """
         SELECT DISTINCT DATE(completed_at) as comp_date
         FROM missions
-        WHERE completed = 1 AND completed_at IS NOT NULL
+        WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL
         ORDER BY comp_date DESC
-        """
+        """,
+        (user_id,),
     )
     date_rows = cursor.fetchall()
-    dates = [r["comp_date"] for r in date_rows if r["comp_date"]]
+    dates = [str(r["comp_date"])[:10] for r in date_rows if r["comp_date"]]
 
     streak_days = 0
     if dates:
-        today = datetime.date.today()
+        today = datetime.datetime.now(datetime.timezone.utc).date()
         latest_date = datetime.datetime.strptime(dates[0], "%Y-%m-%d").date()
         if (today - latest_date).days <= 1:
             streak_days = 1
@@ -72,13 +73,13 @@ def generate_daily_reflection(user_id: int) -> Dict[str, Any]:
         blueprint_progress = active_phase_obj.get("progress_pct", 0)
 
     # 6. Goals Progress
-    cursor.execute("SELECT title, category, status FROM goals WHERE status = 'active' ORDER BY id ASC LIMIT 1")
+    cursor.execute("SELECT title, category, status FROM goals WHERE user_id = ? AND status = 'active' ORDER BY id ASC LIMIT 1", (user_id,))
     active_goal_row = cursor.fetchone()
     active_goal_title = active_goal_row["title"] if active_goal_row else "AI Engineering Mastery"
 
     conn.close()
 
-    today_date_str = datetime.date.today().strftime("%B %d, %Y")
+    today_date_str = datetime.datetime.now(datetime.timezone.utc).strftime("%B %d, %Y")
 
     # 7. Generate Data-Driven Deterministic Reflection Messages
     reflections: List[Dict[str, Any]] = []

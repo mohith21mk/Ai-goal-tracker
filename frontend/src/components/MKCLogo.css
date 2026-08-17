@@ -1,0 +1,43 @@
+.mkc-logo-wrapper {
+  display: inline-block;
+  line-height: 0;
+  background: transparent; /* never give the wrapper its own background/box */
+}
+
+.mkc-logo-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+
+  /* Shape-following shadow (like the cake trick) — NOT box-shadow.
+     This hugs the outline of the sword/anchor/letters instead of
+     drawing a rectangle behind them. */
+  filter: drop-shadow(0 12px 24px rgba(15, 60, 180, 0.35))
+          drop-shadow(0 0 30px rgba(70, 140, 255, 0.25));
+
+  /* Gentle float so it reads as "alive" content, not a pasted image */
+  animation: mkcFloat 5s ease-in-out infinite;
+}
+
+@keyframes mkcFloat {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Extra glow + slight lift on hover — optional, remove if not wanted */
+.mkc-logo-wrapper:hover .mkc-logo-svg {
+  filter: drop-shadow(0 16px 30px rgba(15, 60, 180, 0.45))
+          drop-shadow(0 0 40px rgba(90, 160, 255, 0.4));
+}
+
+/* If a user has motion-sensitivity preferences, respect it */
+@media (prefers-reduced-motion: reduce) {
+  .mkc-logo-svg {
+    animation: none;
+  }
+}

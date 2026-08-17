@@ -7,6 +7,7 @@ from ..services.ai_coach import (
     fetch_chat_history,
     generate_coaching_response,
 )
+from ..services.rate_limiter import rate_limit
 from .auth import get_current_user
 
 router = APIRouter()
@@ -41,7 +42,11 @@ async def clear_history(current_user: Dict[str, Any] = Depends(get_current_user)
         raise HTTPException(status_code=500, detail=f"Failed to clear chat history: {err}")
 
 
-@router.post("/chat", response_model=Dict[str, Any])
+@router.post(
+    "/chat",
+    response_model=Dict[str, Any],
+    dependencies=[Depends(rate_limit(max_requests=25, window_seconds=60, key_prefix="ai_chat"))]
+)
 async def chat_with_coach(
     payload: ChatRequest,
     current_user: Dict[str, Any] = Depends(get_current_user),

@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { Search, UserPlus, Check, X, Send, MessageSquare, MessageCircle, Trash2 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import { useMessagingSocket } from '../hooks/useMessagingSocket';
+import { useNotificationsSocket } from '../hooks/useNotificationsSocket';
 import UserProfilePanel from '../components/UserProfilePanel';
 import {
   searchPublicUsers,
@@ -20,6 +22,8 @@ import {
 import './Chat.css';
 
 const Chat = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedProfileUserId, setSelectedProfileUserId] = useState(null);
   
@@ -57,6 +61,31 @@ const Chat = () => {
       console.error(err);
     }
   }, []);
+
+  // Listen for real-time notification socket events to refresh connections & requests
+  const handleNotificationEvent = useCallback((notif) => {
+    const nType = notif.type || notif.data?.type || notif.reference_type;
+    if (nType === 'connection_request' || nType === 'connection_accepted') {
+      loadConnections();
+      loadConversations();
+    }
+  }, [loadConnections, loadConversations]);
+
+  useNotificationsSocket(handleNotificationEvent);
+
+  // Sync tab with URL search parameter (?tab=requests) or router navigation state
+  useEffect(() => {
+    const tabParam = searchParams.get('tab') || location.state?.tab;
+    if (tabParam && ['conversations', 'discover', 'requests'].includes(tabParam)) {
+      setActiveTab(tabParam);
+      if (tabParam === 'requests' || tabParam === 'discover') {
+        loadConnections();
+      }
+      if (tabParam === 'conversations') {
+        loadConversations();
+      }
+    }
+  }, [searchParams, location.state, loadConnections, loadConversations]);
 
   const scrollToBottom = useCallback(() => {
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
@@ -138,10 +167,32 @@ const Chat = () => {
           getConversations().catch(() => []),
           getConnections().catch(() => ({ accepted: [], pending_received: [], pending_sent: [], blocked: [] }))
         ]);
+
         if (isMounted) {
-          if (Array.isArray(convs)) setConversations(convs);
+          const safeConvs = Array.isArray(convs) ? convs : [];
+          setConversations(safeConvs);
           if (conns && typeof conns === 'object' && !Array.isArray(conns)) {
             setConnections(conns);
+          }
+
+          // Auto-select conversation or user from query parameters
+          const convIdParam = searchParams.get('conversationId') || location.state?.conversationId;
+          const userIdParam = searchParams.get('userId') || location.state?.userId;
+
+          if (convIdParam) {
+            const target = safeConvs.find(c => String(c.id) === String(convIdParam));
+            if (target) {
+              openConversation(target);
+              setActiveTab('conversations');
+            }
+          } else if (userIdParam) {
+            const target = safeConvs.find(c => String(c.other_user?.id) === String(userIdParam));
+            if (target) {
+              openConversation(target);
+              setActiveTab('conversations');
+            } else {
+              handleStartConversation(Number(userIdParam));
+            }
           }
         }
       } catch (err) {
@@ -153,18 +204,12 @@ const Chat = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [searchParams, location.state]);
 
   const executeSearch = useCallback(async (query) => {
     const q = (query || '').trim();
-    if (q.length < 2) {
-      setSearchResults([]);
-      setSearchPerformed(false);
-      return;
-    }
-
     setIsSearching(true);
-    setSearchPerformed(true);
+    setSearchPerformed(Boolean(q));
     try {
       const res = await searchPublicUsers(q);
       const list = res?.users || (Array.isArray(res) ? res : []);
@@ -185,12 +230,7 @@ const Chat = () => {
   useEffect(() => {
     if (activeTab !== 'discover') return;
     const timer = setTimeout(() => {
-      if (searchQuery.trim().length >= 2) {
-        executeSearch(searchQuery);
-      } else if (searchQuery.trim().length === 0) {
-        setSearchResults([]);
-        setSearchPerformed(false);
-      }
+      executeSearch(searchQuery);
     }, 250);
     return () => clearTimeout(timer);
   }, [searchQuery, activeTab, executeSearch]);
@@ -199,6 +239,9 @@ const Chat = () => {
     setActiveTab(tab);
     if (tab === 'requests' || tab === 'discover') {
       loadConnections();
+    }
+    if (tab === 'discover') {
+      executeSearch(searchQuery);
     }
   };
 
@@ -227,20 +270,19 @@ const Chat = () => {
     }
   };
 
-  const handleAcceptRequest = async (userId) => {
+  const handleAcceptRequest = async (userId, requestId) => {
     try {
-      await acceptConnection(userId);
-      loadConnections();
-      loadConversations();
+      await acceptConnection({ user_id: userId, request_id: requestId });
+      await Promise.all([loadConnections(), loadConversations()]);
     } catch (err) {
       alert(err.message || 'Failed to accept request');
     }
   };
 
-  const handleRejectRequest = async (userId) => {
+  const handleRejectRequest = async (userId, requestId) => {
     try {
-      await rejectConnection(userId);
-      loadConnections();
+      await rejectConnection({ user_id: userId, request_id: requestId });
+      await loadConnections();
     } catch (err) {
       alert(err.message || 'Failed to reject request');
     }
@@ -439,31 +481,58 @@ const Chat = () => {
                   {(!connections.pending_received || connections.pending_received.length === 0) ? (
                     <div className="empty-state">No pending requests</div>
                   ) : (
-                    connections.pending_received.map(req => (
-                      <div key={req.id} className="user-card">
+                    connections.pending_received.map(req => {
+                      const targetUserId = req.user_id || req.id;
+                      const reqId = req.request_id || req.connection_id || req.id;
+                      const isHighlighted = String(reqId) === String(searchParams.get('requestId') || location.state?.requestId) ||
+                                            String(targetUserId) === String(location.state?.senderId);
+                      return (
                         <div 
-                          className="avatar clickable" 
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => setSelectedProfileUserId(req.id)}
-                          title="View Profile"
+                          key={reqId} 
+                          className={`user-card ${isHighlighted ? 'highlighted-request' : ''}`}
+                          style={isHighlighted ? { border: '1px solid var(--electric-blue, #22B8FF)', boxShadow: '0 0 16px rgba(34, 184, 255, 0.3)' } : undefined}
                         >
-                          {req.avatar_initials}
+                          <div 
+                            className="avatar clickable" 
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => setSelectedProfileUserId(targetUserId)}
+                            title="View Profile"
+                          >
+                            {req.avatar_initials || req.username?.slice(0, 2).toUpperCase() || 'MK'}
+                          </div>
+                          <div 
+                            className="user-info clickable" 
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => setSelectedProfileUserId(targetUserId)}
+                            title="View Profile"
+                          >
+                            <span className="name">{req.full_name || req.username}</span>
+                            <span className="username">@{req.username}</span>
+                            {req.bio && (
+                              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', maxWidth: '180px' }}>
+                                {req.bio}
+                              </span>
+                            )}
+                          </div>
+                          <div className="action-group">
+                            <button 
+                              onClick={() => handleAcceptRequest(targetUserId, reqId)} 
+                              className="btn-icon success"
+                              title="Accept Connection Request"
+                            >
+                              <Check size={16} strokeWidth={1.8}/>
+                            </button>
+                            <button 
+                              onClick={() => handleRejectRequest(targetUserId, reqId)} 
+                              className="btn-icon danger"
+                              title="Decline Connection Request"
+                            >
+                              <X size={16} strokeWidth={1.8}/>
+                            </button>
+                          </div>
                         </div>
-                        <div 
-                          className="user-info clickable" 
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => setSelectedProfileUserId(req.id)}
-                          title="View Profile"
-                        >
-                          <span className="name">{req.full_name}</span>
-                          <span className="username">@{req.username}</span>
-                        </div>
-                        <div className="action-group">
-                          <button onClick={() => handleAcceptRequest(req.id)} className="btn-icon success"><Check size={16} strokeWidth={1.8}/></button>
-                          <button onClick={() => handleRejectRequest(req.id)} className="btn-icon danger"><X size={16} strokeWidth={1.8}/></button>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               )}
