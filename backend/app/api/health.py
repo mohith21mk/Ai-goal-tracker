@@ -40,11 +40,8 @@ async def health_readiness(response: Response) -> Dict[str, Any]:
     if not redis_healthy:
         checks["redis_note"] = "Running in local fallback mode"
 
-    # In production, if Redis is configured, require both DB and Redis
-    if settings.ENVIRONMENT == "production" and settings.REDIS_URL:
-        is_ready = checks["database"] and checks["redis"]
-    else:
-        is_ready = checks["database"]
+    # Database is strictly required for readiness. Redis operates with built-in in-memory fallback when not connected.
+    is_ready = checks["database"]
 
     if not is_ready:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
