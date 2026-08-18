@@ -2,11 +2,12 @@ services:
   # Backend API Web Service
   - type: web
     name: mkc-backend
-    env: docker
-    dockerContext: ./backend
-    dockerfilePath: ./backend/Dockerfile
-    region: singapore
-    plan: starter
+    env: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$PORT
+    healthCheckPath: /ready
     envVars:
       - key: ENVIRONMENT
         value: production
@@ -18,53 +19,18 @@ services:
         fromDatabase:
           name: mkc-db
           property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: mkc-redis
-          property: connectionString
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: SESSION_COOKIE_SAMESITE
+        value: "none"
       - key: GEMINI_API_KEY
         sync: false
-      - key: FRONTEND_URL
-        fromService:
-          type: web
-          name: mkc-frontend
-          property: url
-      - key: CORS_ORIGINS
-        fromService:
-          type: web
-          name: mkc-frontend
-          property: url
-
-  # Frontend Static Site
-  - type: web
-    name: mkc-frontend
-    env: static
-    buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: ./frontend/dist
-    region: singapore
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: VITE_API_URL
-        fromService:
-          type: web
-          name: mkc-backend
-          property: url
-
-  # Redis Instance (Pub/Sub & WebSocket event broker)
-  - type: redis
-    name: mkc-redis
-    region: singapore
-    plan: starter
-    ipAllowList: []
+      - key: GEMINI_MODEL
+        value: gemini-flash-latest
 
 databases:
   # Managed PostgreSQL Database
   - name: mkc-db
-    region: singapore
-    plan: starter
+    plan: free
     databaseName: mkc_db
     user: mkc_user
