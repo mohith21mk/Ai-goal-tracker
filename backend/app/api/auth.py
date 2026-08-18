@@ -8,6 +8,7 @@ from pydantic import BaseModel, field_validator
 
 from ..config import settings
 from ..database import get_connection
+from ..services.logger import logger
 from ..services.websocket import manager
 from ..services.rate_limiter import rate_limit
 from ..services.email import send_password_reset_email, send_verification_email
@@ -221,6 +222,7 @@ async def register_user(payload: RegisterRequest, request: Request, response: Re
 
     except Exception as err:
         conn.close()
+        logger.error(f"Registration exception: {err}", exc_info=True)
         raise HTTPException(
             status_code=409,
             detail="Registration conflict: Username or email is already taken.",
