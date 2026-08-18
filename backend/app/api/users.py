@@ -428,6 +428,11 @@ async def delete_account_endpoint(
     delete_user_account(user_id)
 
     # Clear auth cookie
-    response.delete_cookie(key=COOKIE_NAME, path="/")
+    response.delete_cookie(
+        key=COOKIE_NAME,
+        path="/",
+        samesite=settings.SESSION_COOKIE_SAMESITE.lower(),
+        secure=settings.SESSION_COOKIE_SECURE,
+    )
     return {"message": "Your account and all associated data have been permanently deleted."}
 

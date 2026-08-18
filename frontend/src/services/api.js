@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:8000';
+const rawApiUrl = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:8000';
+const API_BASE_URL = (rawApiUrl || '').replace(/\/+$/, '');
 
 async function apiFetch(endpoint, options = {}) {
   const defaultHeaders = options.body ? { 'Content-Type': 'application/json' } : {};

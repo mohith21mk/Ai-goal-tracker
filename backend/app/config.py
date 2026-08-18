@@ -42,7 +42,7 @@ class Settings:
 
     # Security & Cookie Session Configurations
     SESSION_COOKIE_SECURE: bool = os.getenv("SESSION_COOKIE_SECURE", "True" if ENVIRONMENT == "production" else "False").lower() == "true"
-    SESSION_COOKIE_SAMESITE: str = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
+    SESSION_COOKIE_SAMESITE: str = os.getenv("SESSION_COOKIE_SAMESITE", "none" if ENVIRONMENT == "production" else "lax")
 
     # SMTP Production Email Configuration
     SMTP_HOST: str = os.getenv("SMTP_HOST", "")

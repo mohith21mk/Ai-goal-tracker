@@ -238,8 +238,8 @@ async def register_user(payload: RegisterRequest, request: Request, response: Re
         key=COOKIE_NAME,
         value=token,
         httponly=True,
-        samesite="lax",
-        secure=settings.ENVIRONMENT == "production",
+        samesite=settings.SESSION_COOKIE_SAMESITE.lower(),
+        secure=settings.SESSION_COOKIE_SECURE,
         max_age=30 * 24 * 3600,
         path="/",
     )
@@ -315,8 +315,8 @@ async def login_user(payload: LoginRequest, request: Request, response: Response
         key=COOKIE_NAME,
         value=token,
         httponly=True,
-        samesite="lax",
-        secure=settings.ENVIRONMENT == "production",
+        samesite=settings.SESSION_COOKIE_SAMESITE.lower(),
+        secure=settings.SESSION_COOKIE_SECURE,
         max_age=30 * 24 * 3600,
         path="/",
     )
@@ -336,7 +336,12 @@ async def logout_user(request: Request, response: Response) -> Dict[str, Any]:
         if user:
             await manager.disconnect_user(user["id"])
         delete_session(token)
-    response.delete_cookie(key=COOKIE_NAME, path="/")
+    response.delete_cookie(
+        key=COOKIE_NAME,
+        path="/",
+        samesite=settings.SESSION_COOKIE_SAMESITE.lower(),
+        secure=settings.SESSION_COOKIE_SECURE,
+    )
     return {"message": "Successfully logged out."}
 
 
@@ -509,6 +514,11 @@ async def deactivate_account(
     revoke_all_sessions(current_user["id"])
     await manager.disconnect_user(current_user["id"])
     
-    response.delete_cookie(key=COOKIE_NAME, path="/")
+    response.delete_cookie(
+        key=COOKIE_NAME,
+        path="/",
+        samesite=settings.SESSION_COOKIE_SAMESITE.lower(),
+        secure=settings.SESSION_COOKIE_SECURE,
+    )
     return {"message": "Account deactivated successfully."}
 
