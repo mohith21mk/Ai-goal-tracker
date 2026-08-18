@@ -1,4 +1,5 @@
 import React, { useId } from "react";
+import "./MKCLogo.css";
 
 export const MKC_LOGO_SVG_STRING = `
 <svg
@@ -314,12 +315,12 @@ export const MKC_LOGO_SVG_STRING = `
   <!-- =====================================================
        3. ANCHOR
        
-       Slightly narrower than previous version.
-       Height preserved.
+       OUTER GEOMETRY UNCHANGED.
+       INNER DARK-BLUE CURVES EXTENDED DOWNWARD.
   ====================================================== -->
 
   <g
-    transform="translate(62, -10) scale(0.90, 1.025)"
+    transform="translate(62,-10) scale(0.90,1.025)"
     filter="url(#mkcGlow)"
   >
 
@@ -379,7 +380,10 @@ export const MKC_LOGO_SVG_STRING = `
     />
 
 
-    <!-- LEFT INNER CURVE -->
+    <!-- =================================================
+         LEFT INNER DARK-BLUE BODY
+         Extended lower with sharper point.
+    ================================================== -->
 
     <path
       d="
@@ -395,15 +399,21 @@ export const MKC_LOGO_SVG_STRING = `
 
         L627 571
 
-        L627 849
+        L627 850
 
-        C627 880 608 901 580 914
+        C627 877 621 897 610 914
 
-        C519 942 448 925 388 890
+        L592 939
 
-        C326 853 284 793 267 720
+        L570 954
 
-        C260 689 262 666 287 649
+        L548 938
+
+        C494 923 438 905 388 875
+
+        C326 838 284 782 267 716
+
+        C260 686 262 664 287 649
 
         Z
       "
@@ -411,7 +421,10 @@ export const MKC_LOGO_SVG_STRING = `
     />
 
 
-    <!-- RIGHT INNER CURVE -->
+    <!-- =================================================
+         RIGHT INNER DARK-BLUE BODY
+         Mirrored sharp lower point.
+    ================================================== -->
 
     <path
       d="
@@ -427,19 +440,125 @@ export const MKC_LOGO_SVG_STRING = `
 
         L627 571
 
-        L627 849
+        L627 850
 
-        C627 880 646 901 674 914
+        C627 877 633 897 644 914
 
-        C731 942 802 925 862 890
+        L662 939
 
-        C924 853 966 793 983 720
+        L684 954
 
-        C990 689 988 666 963 649
+        L706 938
+
+        C760 923 816 905 866 875
+
+        C928 838 970 782 987 716
+
+        C994 686 992 664 963 649
 
         Z
       "
       fill="url(#mkcPrimary)"
+    />
+
+
+    <!-- =================================================
+         LEFT SHARP INNER EDGE
+    ================================================== -->
+
+    <path
+      d="
+        M286 671
+
+        C312 748 368 804 438 836
+
+        C492 860 544 864 582 844
+
+        L607 829
+
+        L599 861
+
+        C592 889 578 912 558 928
+
+        L539 943
+      "
+      fill="none"
+      stroke="#4B9EFF"
+      stroke-width="5"
+      opacity="0.72"
+      stroke-linecap="round"
+      stroke-linejoin="miter"
+    />
+
+
+    <!-- =================================================
+         RIGHT SHARP INNER EDGE
+    ================================================== -->
+
+    <path
+      d="
+        M968 671
+
+        C942 748 886 804 816 836
+
+        C762 860 710 864 672 844
+
+        L647 829
+
+        L655 861
+
+        C662 889 676 912 696 928
+
+        L715 943
+      "
+      fill="none"
+      stroke="#4B9EFF"
+      stroke-width="5"
+      opacity="0.72"
+      stroke-linecap="round"
+      stroke-linejoin="miter"
+    />
+
+
+    <!-- =================================================
+         CRISP DARK EDGE LEFT
+    ================================================== -->
+
+    <path
+      d="
+        M602 846
+        L594 880
+        L576 912
+        L553 935
+        L534 946
+      "
+      fill="none"
+      stroke="#03295F"
+      stroke-width="6"
+      opacity="0.92"
+      stroke-linecap="square"
+      stroke-linejoin="miter"
+    />
+
+
+    <!-- =================================================
+         CRISP DARK EDGE RIGHT
+    ================================================== -->
+
+    <path
+      d="
+        M652 846
+        L660 880
+        L678 912
+        L701 935
+        L720 946
+      "
+      fill="none"
+      stroke="#03295F"
+      stroke-width="6"
+      opacity="0.92"
+      stroke-linecap="square"
+      stroke-linejoin="miter"
     />
 
   </g>
@@ -450,7 +569,7 @@ export const MKC_LOGO_SVG_STRING = `
   ====================================================== -->
 
   <g
-    transform="translate(62, -5) scale(0.90, 1.025)"
+    transform="translate(62,-5) scale(0.90,1.025)"
     fill="none"
     stroke="url(#mkcPrimary)"
     stroke-linecap="round"
@@ -524,7 +643,6 @@ export const MKC_LOGO_SVG_STRING = `
       fill="url(#mkcSword)"
     />
 
-
     <path
       d="
         M627 205
@@ -549,7 +667,6 @@ export const MKC_LOGO_SVG_STRING = `
       opacity="0.88"
     />
 
-
     <path
       d="
         M627 205
@@ -567,10 +684,6 @@ export const MKC_LOGO_SVG_STRING = `
 
   <!-- =====================================================
        6. M + K
-       
-       Still ONE joined MK group.
-       K left stem slightly narrowed so M remains
-       more visible without separating M and K.
   ====================================================== -->
 
   <g
@@ -608,34 +721,22 @@ export const MKC_LOGO_SVG_STRING = `
     />
 
 
-    <!-- K
-         Slightly narrower left stem
-    -->
+    <!-- K -->
 
     <path
       d="
         M493 372
-
         L548 372
         L548 474
-
         L630 372
         L720 372
-
         L632 490
-
         L730 628
-
         L666 628
-
         L595 532
-
         L548 566
-
         L548 628
-
         L493 628
-
         Z
       "
     />
@@ -645,7 +746,6 @@ export const MKC_LOGO_SVG_STRING = `
 
   <!-- =====================================================
        7. C
-       UNCHANGED
   ====================================================== -->
 
   <g
@@ -659,6 +759,7 @@ export const MKC_LOGO_SVG_STRING = `
         M960 372
 
         L960 430
+
         L850 430
 
         C815 430 796 448 796 482
@@ -718,9 +819,7 @@ export const MKC_LOGO_SVG_STRING = `
   </g>
 
 
-  <!-- =====================================================
-       9. C HIGHLIGHT
-  ====================================================== -->
+  <!-- C HIGHLIGHT -->
 
   <g
     transform="translate(83.91,30) scale(0.86,0.94)"
@@ -742,7 +841,7 @@ export const MKC_LOGO_SVG_STRING = `
 
 
   <!-- =====================================================
-       10. BOTTOM DIAMOND
+       9. BOTTOM DIAMOND
   ====================================================== -->
 
   <path
@@ -765,13 +864,9 @@ export const MKC_LOGO_SVG_STRING = `
   <path
     d="
       M627 920
-
       L662 959
-
       L627 1008
-
       L592 959
-
       Z
     "
     fill="none"
@@ -782,7 +877,7 @@ export const MKC_LOGO_SVG_STRING = `
 
 
   <!-- =====================================================
-       11. SWORD / DIAMOND CONTACT
+       10. SWORD / DIAMOND CONTACT
   ====================================================== -->
 
   <path
@@ -807,7 +902,7 @@ export const MKC_LOGO_SVG_STRING = `
 
 
   <!-- =====================================================
-       12. FINAL ENERGY LIGHT
+       11. FINAL ENERGY LIGHT
   ====================================================== -->
 
   <g filter="url(#mkcGlow)">
@@ -1124,8 +1219,6 @@ export default function MKCLogo({
         )}
 
 
-        {/* CENTER ATMOSPHERE */}
-
         <ellipse
           cx="627"
           cy="620"
@@ -1137,7 +1230,7 @@ export default function MKCLogo({
         />
 
 
-        {/* 1. TOP DIAMOND */}
+        {/* TOP DIAMOND */}
 
         <g
           transform="translate(75.24,20) scale(0.88,0.88)"
@@ -1176,7 +1269,7 @@ export default function MKCLogo({
         </g>
 
 
-        {/* 2. CROSSBAR */}
+        {/* CROSSBAR */}
 
         <g filter={`url(#${glowId})`}>
 
@@ -1229,7 +1322,7 @@ export default function MKCLogo({
         </g>
 
 
-        {/* 3. ANCHOR */}
+        {/* ANCHOR */}
 
         <g
           transform="translate(62,-10) scale(0.90,1.025)"
@@ -1268,6 +1361,8 @@ export default function MKCLogo({
             fill={`url(#${brightId})`}
           />
 
+          {/* LEFT INNER DARK BLUE */}
+
           <path
             d="
               M287 649
@@ -1276,15 +1371,20 @@ export default function MKCLogo({
               C584 829 599 806 599 761
               L599 599
               L627 571
-              L627 849
-              C627 880 608 901 580 914
-              C519 942 448 925 388 890
-              C326 853 284 793 267 720
-              C260 689 262 666 287 649
+              L627 850
+              C627 877 621 897 610 914
+              L592 939
+              L570 954
+              L548 938
+              C494 923 438 905 388 875
+              C326 838 284 782 267 716
+              C260 686 262 664 287 649
               Z
             "
             fill={`url(#${primaryId})`}
           />
+
+          {/* RIGHT INNER DARK BLUE */}
 
           <path
             d="
@@ -1294,14 +1394,93 @@ export default function MKCLogo({
               C670 829 655 806 655 761
               L655 599
               L627 571
-              L627 849
-              C627 880 646 901 674 914
-              C731 942 802 925 862 890
-              C924 853 966 793 983 720
-              C990 689 988 666 963 649
+              L627 850
+              C627 877 633 897 644 914
+              L662 939
+              L684 954
+              L706 938
+              C760 923 816 905 866 875
+              C928 838 970 782 987 716
+              C994 686 992 664 963 649
               Z
             "
             fill={`url(#${primaryId})`}
+          />
+
+          {/* LEFT SHARP INNER EDGE */}
+
+          <path
+            d="
+              M286 671
+              C312 748 368 804 438 836
+              C492 860 544 864 582 844
+              L607 829
+              L599 861
+              C592 889 578 912 558 928
+              L539 943
+            "
+            fill="none"
+            stroke="#4B9EFF"
+            strokeWidth="5"
+            opacity="0.72"
+            strokeLinecap="round"
+            strokeLinejoin="miter"
+          />
+
+          {/* RIGHT SHARP INNER EDGE */}
+
+          <path
+            d="
+              M968 671
+              C942 748 886 804 816 836
+              C762 860 710 864 672 844
+              L647 829
+              L655 861
+              C662 889 676 912 696 928
+              L715 943
+            "
+            fill="none"
+            stroke="#4B9EFF"
+            strokeWidth="5"
+            opacity="0.72"
+            strokeLinecap="round"
+            strokeLinejoin="miter"
+          />
+
+          {/* LEFT CRISP EDGE */}
+
+          <path
+            d="
+              M602 846
+              L594 880
+              L576 912
+              L553 935
+              L534 946
+            "
+            fill="none"
+            stroke="#03295F"
+            strokeWidth="6"
+            opacity="0.92"
+            strokeLinecap="square"
+            strokeLinejoin="miter"
+          />
+
+          {/* RIGHT CRISP EDGE */}
+
+          <path
+            d="
+              M652 846
+              L660 880
+              L678 912
+              L701 935
+              L720 946
+            "
+            fill="none"
+            stroke="#03295F"
+            strokeWidth="6"
+            opacity="0.92"
+            strokeLinecap="square"
+            strokeLinejoin="miter"
           />
 
         </g>
@@ -1342,7 +1521,7 @@ export default function MKCLogo({
         </g>
 
 
-        {/* 5. ONE CONTINUOUS CENTER SWORD */}
+        {/* CONTINUOUS SWORD */}
 
         <g filter={`url(#${glowId})`}>
 
@@ -1384,7 +1563,10 @@ export default function MKCLogo({
           />
 
           <path
-            d="M627 205 L627 905"
+            d="
+              M627 205
+              L627 905
+            "
             fill="none"
             stroke="#FFFFFF"
             strokeWidth="2.5"
@@ -1395,15 +1577,13 @@ export default function MKCLogo({
         </g>
 
 
-        {/* 6. M + K — JOINED GROUP */}
+        {/* M + K */}
 
         <g
           transform="translate(120,30) scale(0.86,0.94)"
           filter={`url(#${glowId})`}
           fill={`url(#${brightId})`}
         >
-
-          {/* M */}
 
           <path
             d="
@@ -1423,8 +1603,6 @@ export default function MKCLogo({
               Z
             "
           />
-
-          {/* K */}
 
           <path
             d="
@@ -1447,7 +1625,7 @@ export default function MKCLogo({
         </g>
 
 
-        {/* 7. C — UNCHANGED */}
+        {/* C */}
 
         <g
           transform="translate(83.91,30) scale(0.86,0.94)"
@@ -1476,7 +1654,7 @@ export default function MKCLogo({
         </g>
 
 
-        {/* 8. M + K HIGHLIGHTS */}
+        {/* M + K HIGHLIGHTS */}
 
         <g
           transform="translate(120,30) scale(0.86,0.94)"
@@ -1507,7 +1685,7 @@ export default function MKCLogo({
         </g>
 
 
-        {/* 9. C HIGHLIGHT */}
+        {/* C HIGHLIGHT */}
 
         <g
           transform="translate(83.91,30) scale(0.86,0.94)"
@@ -1528,7 +1706,7 @@ export default function MKCLogo({
         </g>
 
 
-        {/* 10. BOTTOM DIAMOND */}
+        {/* BOTTOM DIAMOND */}
 
         <path
           d="
@@ -1541,6 +1719,7 @@ export default function MKCLogo({
           fill={`url(#${deepId})`}
           filter={`url(#${glowId})`}
         />
+
 
         <path
           d="
@@ -1557,7 +1736,7 @@ export default function MKCLogo({
         />
 
 
-        {/* 11. SWORD / DIAMOND CONTACT */}
+        {/* SWORD / DIAMOND CONTACT */}
 
         <path
           d="
@@ -1580,7 +1759,7 @@ export default function MKCLogo({
         />
 
 
-        {/* 12. FINAL ENERGY LIGHT */}
+        {/* FINAL ENERGY LIGHT */}
 
         <g filter={`url(#${glowId})`}>
 
