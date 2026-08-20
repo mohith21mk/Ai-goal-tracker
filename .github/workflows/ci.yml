@@ -74,7 +74,7 @@ jobs:
           SECRET_KEY: test_ci_secret_key_1234567890
         run: |
           cd backend
-          python -m pytest
+          python -m pytest -v --tb=short
 
   frontend-build:
     name: Frontend Lint & Production Build
