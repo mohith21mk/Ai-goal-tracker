@@ -15,7 +15,10 @@ class _CompatRow(dict):
     """A dict subclass that also supports integer indexing like sqlite3.Row."""
     def __getitem__(self, key):
         if isinstance(key, int):
-            return list(self.values())[key]
+            vals = list(self.values())
+            if 0 <= key < len(vals):
+                return vals[key]
+            return None
         return super().__getitem__(key)
 
 
@@ -43,7 +46,10 @@ class _PgCompatCursor:
                 returning_sql = stripped.rstrip().rstrip(';') + ' RETURNING id'
                 self._cursor.execute(returning_sql, params)
                 row = self._cursor.fetchone()
-                self._last_insert_id = row['id'] if row else None
+                if row:
+                    self._last_insert_id = row['id'] if (isinstance(row, dict) and 'id' in row) else (row[0] if isinstance(row, (list, tuple)) else None)
+                else:
+                    self._last_insert_id = None
                 return
         return self._cursor.execute(sql, params)
 

@@ -68,7 +68,7 @@ def test_phase2e_realtime_messaging_suite():
     assert dup_res.json()["conversation_id"] == conv_id
 
     # 5. Prevent Self Conversation
-    self_res = client.post("/api/chat/conversations", json={"target_user_id": res_a.json().get("user_id", 999999)}, headers=headers_a)
+    self_res = client.post("/api/chat/conversations", json={"target_user_id": user_a_id}, headers=headers_a)
     assert self_res.status_code in (400, 404)
 
     # 6. User Conversations List for User A & User B

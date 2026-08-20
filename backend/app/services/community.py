@@ -223,7 +223,7 @@ async def toggle_community_like(user_id: int, post_id: int) -> Dict[str, Any]:
     if like_row:
         # Unlike
         cursor.execute("DELETE FROM community_likes WHERE post_id = ? AND user_id = ?", (post_id, user_id))
-        cursor.execute("UPDATE community_posts SET likes_count = MAX(0, likes_count - 1) WHERE id = ?", (post_id,))
+        cursor.execute("UPDATE community_posts SET likes_count = CASE WHEN likes_count > 0 THEN likes_count - 1 ELSE 0 END WHERE id = ?", (post_id,))
         user_has_liked = False
         conn.commit()
     else:
@@ -268,7 +268,7 @@ def delete_community_like(user_id: int, post_id: int) -> Dict[str, Any]:
         raise ValueError("Post not found")
 
     cursor.execute("DELETE FROM community_likes WHERE post_id = ? AND user_id = ?", (post_id, user_id))
-    cursor.execute("UPDATE community_posts SET likes_count = MAX(0, likes_count - 1) WHERE id = ?", (post_id,))
+    cursor.execute("UPDATE community_posts SET likes_count = CASE WHEN likes_count > 0 THEN likes_count - 1 ELSE 0 END WHERE id = ?", (post_id,))
     conn.commit()
 
     cursor.execute("SELECT likes_count FROM community_posts WHERE id = ?", (post_id,))

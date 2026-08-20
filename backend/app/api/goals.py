@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..database import get_connection
 from .auth import get_current_user
@@ -9,14 +9,14 @@ router = APIRouter()
 
 
 class GoalCreateRequest(BaseModel):
-    title: str
+    title: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = ""
     category: Optional[str] = "general"
     target_date: Optional[str] = None
 
 
 class GoalUpdateRequest(BaseModel):
-    title: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     category: Optional[str] = None
     status: Optional[str] = None

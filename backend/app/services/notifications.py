@@ -47,7 +47,7 @@ async def create_notification(
     conn = get_connection()
     cursor = conn.cursor()
     
-    data_str = json.dumps(data) if data else None
+    data_str = json.dumps(data, default=str) if data else None
     
     cursor.execute("""
         INSERT INTO notifications (user_id, type, title, message, reference_type, reference_id, data)

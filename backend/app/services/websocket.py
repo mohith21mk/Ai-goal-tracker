@@ -34,7 +34,7 @@ class ConnectionManager:
 
     async def send_personal_json(self, data: dict, user_id: int):
         if user_id in self.active_connections:
-            message = json.dumps(data)
+            message = json.dumps(data, default=str)
             for connection in self.active_connections[user_id]:
                 await connection.send_text(message)
 

@@ -64,7 +64,7 @@ async def publish_chat_event(conversation_id: int, event_data: Dict[str, Any]) -
     Publishes real-time message event to Redis pub/sub channel conversation:{id}.
     Falls back gracefully to local WebSocket manager if Redis is offline.
     """
-    event_str = json.dumps(event_data)
+    event_str = json.dumps(event_data, default=str)
     redis_cli = get_redis_client()
 
     redis_published = False
@@ -96,7 +96,7 @@ async def publish_notification_event(user_id: int, notification_data: Dict[str, 
         "type": "new_notification",
         "notification": notification_data
     }
-    payload_str = json.dumps(payload)
+    payload_str = json.dumps(payload, default=str)
     redis_cli = get_redis_client()
 
     redis_published = False

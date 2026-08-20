@@ -25,7 +25,7 @@ def test_phase2f_community_social_suite():
     assert res_a.status_code == 200
     token_a = res_a.cookies.get("mkc_session") or res_a.json().get("session_token")
     headers_a = {"Cookie": f"mkc_session={token_a}"}
-    user_a_id = res_a.json().get("user_id", 1)
+    user_a_id = res_a.json().get("id") or res_a.json().get("user_id")
 
     res_b = client.post("/api/auth/register", json={
         "email": "commb@example.com", "password": "Password123!", "full_name": "Comm User B", "username": "comm_user_b"

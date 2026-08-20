@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..services.habits import (
     create_habit,
@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 class HabitCreate(BaseModel):
-    title: str
+    title: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = ""
     category: Optional[str] = "general"
     frequency: Optional[str] = "daily"
@@ -25,7 +25,7 @@ class HabitCreate(BaseModel):
 
 
 class HabitUpdate(BaseModel):
-    title: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     category: Optional[str] = None
     frequency: Optional[str] = None
