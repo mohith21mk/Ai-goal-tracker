@@ -74,7 +74,17 @@ jobs:
           SECRET_KEY: test_ci_secret_key_1234567890
         run: |
           cd backend
-          python -m pytest -v --tb=short
+          python -m pytest -v --tb=short 2>&1 | tee pytest_output.txt
+
+      - name: Report Pytest Failures to Summary
+        if: always()
+        run: |
+          if [ -f backend/pytest_output.txt ]; then
+            echo "### Pytest Execution Summary" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -n 120 backend/pytest_output.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
 
   frontend-build:
     name: Frontend Lint & Production Build
