@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, MessageSquare, Send, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { submitFeedback } from '../services/api';
 import './FeedbackModal.css';
@@ -30,24 +30,23 @@ export default function FeedbackModal({ isOpen, onClose }) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (!isOpen) {
-      // Reset form on close
-      setCategory('Bug');
-      setSeverity('Normal');
-      setMessage('');
-      setError(null);
-      setSuccess(false);
-    }
-  }, [isOpen]);
+  const handleClose = useCallback(() => {
+    if (loading) return;
+    setCategory('Bug');
+    setSeverity('Normal');
+    setMessage('');
+    setError(null);
+    setSuccess(false);
+    onClose();
+  }, [loading, onClose]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isOpen && !loading) onClose();
+      if (e.key === 'Escape' && isOpen && !loading) handleClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, loading, onClose]);
+  }, [isOpen, loading, handleClose]);
 
   if (!isOpen) return null;
 
@@ -70,7 +69,7 @@ export default function FeedbackModal({ isOpen, onClose }) {
       });
       setSuccess(true);
       setTimeout(() => {
-        onClose();
+        handleClose();
       }, 2000);
     } catch (err) {
       setError(err.message || 'Failed to submit feedback. Please try again.');
@@ -80,7 +79,7 @@ export default function FeedbackModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="feedback-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
+    <div className="feedback-modal-backdrop" onClick={handleClose} role="dialog" aria-modal="true">
       <div className="feedback-modal-card glass-panel" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="feedback-modal-header">
@@ -95,7 +94,7 @@ export default function FeedbackModal({ isOpen, onClose }) {
           </div>
           <button 
             className="feedback-close-btn" 
-            onClick={onClose} 
+            onClick={handleClose} 
             disabled={loading}
             aria-label="Close modal"
           >

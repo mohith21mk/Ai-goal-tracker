@@ -146,6 +146,7 @@ def init_db() -> None:
             mkc_id TEXT UNIQUE,
             avatar_initials TEXT,
             bio TEXT,
+            role TEXT DEFAULT 'user' NOT NULL,
             email_verified INTEGER DEFAULT 0,
             verified_at TIMESTAMP,
             onboarding_completed INTEGER DEFAULT 0,

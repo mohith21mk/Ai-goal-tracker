@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Download, ShieldCheck, Copy, Check, Award, AlertTriangle, RotateCcw } from 'lucide-react';
+import { X, Download, ShieldCheck, Copy, Check, Award, AlertTriangle } from 'lucide-react';
 import { MKC_LOGO_SVG_STRING } from './MKCLogo';
 import './CertificateModal.css';
 
@@ -14,35 +14,51 @@ const TIER_COLORS = {
   },
   silver: {
     name: 'SILVER',
-    primary: '#E2E8F0',
-    light: '#FFFFFF',
-    dark: '#64748B',
-    glow: 'rgba(226, 232, 240, 0.45)',
-    borderGrad: ['#FFFFFF', '#CBD5E1', '#64748B', '#FFFFFF']
+    primary: '#94A3B8',
+    light: '#E2E8F0',
+    dark: '#334155',
+    glow: 'rgba(148, 163, 184, 0.45)',
+    borderGrad: ['#F8FAFC', '#94A3B8', '#475569', '#E2E8F0']
   },
   gold: {
     name: 'GOLD',
     primary: '#F59E0B',
     light: '#FDE68A',
-    dark: '#B45309',
+    dark: '#78350F',
     glow: 'rgba(245, 158, 11, 0.55)',
-    borderGrad: ['#FDE68A', '#F59E0B', '#B45309', '#FDE68A']
+    borderGrad: ['#FEF3C7', '#F59E0B', '#92400E', '#FBBF24']
   },
   platinum: {
     name: 'PLATINUM',
     primary: '#38BDF8',
-    light: '#E0F2FE',
+    light: '#BAE6FD',
     dark: '#0369A1',
-    glow: 'rgba(56, 189, 248, 0.55)',
-    borderGrad: ['#E0F2FE', '#38BDF8', '#0284C7', '#E0F2FE']
+    glow: 'rgba(56, 189, 248, 0.65)',
+    borderGrad: ['#E0F2FE', '#38BDF8', '#0284C7', '#7DD3FC']
   },
   diamond: {
     name: 'DIAMOND',
-    primary: '#A78BFA',
-    light: '#EDE9FE',
-    dark: '#6D28D9',
-    glow: 'rgba(167, 139, 250, 0.6)',
-    borderGrad: ['#EDE9FE', '#A78BFA', '#7C3AED', '#EDE9FE']
+    primary: '#A855F7',
+    light: '#E9D5FF',
+    dark: '#581C87',
+    glow: 'rgba(168, 85, 247, 0.65)',
+    borderGrad: ['#F3E8FF', '#A855F7', '#6B21A8', '#C084FC']
+  },
+  obsidian: {
+    name: 'OBSIDIAN',
+    primary: '#10B981',
+    light: '#A7F3D0',
+    dark: '#064E3B',
+    glow: 'rgba(16, 185, 129, 0.65)',
+    borderGrad: ['#D1FAE5', '#10B981', '#047857', '#34D399']
+  },
+  default: {
+    name: 'MASTER',
+    primary: '#38BDF8',
+    light: '#BAE6FD',
+    dark: '#0369A1',
+    glow: 'rgba(56, 189, 248, 0.55)',
+    borderGrad: ['#E0F2FE', '#38BDF8', '#0284C7', '#7DD3FC']
   }
 };
 
@@ -62,7 +78,7 @@ function setCanvasLetterSpacing(ctx, spacing) {
     if (ctx && 'letterSpacing' in ctx) {
       ctx.letterSpacing = spacing;
     }
-  } catch (err) {
+  } catch {
     // Ignore unsupported browser property
   }
 }
@@ -77,28 +93,26 @@ function wrapAndRenderText(ctx, text, x, y, maxWidth, lineHeight, align = 'cente
 
   const words = str.split(' ');
   let line = '';
-  const lines = [];
+  let curY = y;
+
+  ctx.textAlign = align;
 
   for (let n = 0; n < words.length; n++) {
     const testLine = line + words[n] + ' ';
     const metrics = ctx.measureText(testLine);
-    const testWidth = metrics.width;
-    if (testWidth > maxWidth && n > 0) {
-      lines.push(line.trim());
+    if (metrics.width > maxWidth && n > 0) {
+      ctx.fillText(line.trim(), x, curY);
       line = words[n] + ' ';
+      curY += lineHeight;
     } else {
       line = testLine;
     }
   }
-  lines.push(line.trim());
-
-  ctx.textAlign = align;
-  let currentY = y;
-  for (let k = 0; k < lines.length; k++) {
-    ctx.fillText(lines[k], x, currentY);
-    currentY += lineHeight;
+  if (line.trim()) {
+    ctx.fillText(line.trim(), x, curY);
+    curY += lineHeight;
   }
-  return currentY - lineHeight;
+  return curY;
 }
 
 export default function CertificateModal({
@@ -109,7 +123,6 @@ export default function CertificateModal({
   const [aspectRatio, setAspectRatio] = useState('16:9'); // '16:9' | '1:1' | '9:16'
   const [copied, setCopied] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(false);
-  const [canvasError, setCanvasError] = useState(null);
   const canvasRef = useRef(null);
   const heroLogoImgRef = useRef(null);
 
@@ -155,7 +168,7 @@ export default function CertificateModal({
         year: 'numeric'
       });
     }
-  } catch (err) {
+  } catch {
     issueDateFormatted = new Date().toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
@@ -219,10 +232,7 @@ export default function CertificateModal({
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        setCanvasError('Canvas 2D context unavailable.');
-        return;
-      }
+      if (!ctx) return;
 
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
@@ -1088,17 +1098,19 @@ export default function CertificateModal({
         setCanvasLetterSpacing(ctx, '1px');
         ctx.fillText(`HASH: ${credHash}`, centerX, subFooterY);
       }
-
-      setCanvasError(null);
     } catch (err) {
       console.error('Certificate preview render failed:', err);
-      setCanvasError('Could not render certificate canvas preview.');
+      throw err;
     }
-  }, [aspectRatio, credential, idTag, issueDateFormatted, credHash, quote, safeCredential.description, safeCredential.slug, safeCredential.title, safeCredential.xpValue, safeUser.fullName, tierConfig, logoLoaded]);
+  }, [aspectRatio, credential, idTag, issueDateFormatted, credHash, quote, safeCredential.description, safeCredential.title, safeCredential.xpValue, safeUser.fullName, tierConfig]);
 
   // Re-render when dependencies or logo changes
   useEffect(() => {
-    renderCertificate();
+    try {
+      renderCertificate();
+    } catch (err) {
+      console.error('Certificate preview render failed:', err);
+    }
   }, [renderCertificate, logoLoaded]);
 
   // Download High-Resolution PNG
@@ -1223,18 +1235,6 @@ export default function CertificateModal({
 
         {/* CERTIFICATE PREVIEW CONTAINER */}
         <div className="cert-canvas-container">
-          {canvasError && (
-            <div style={{ padding: '16px', color: '#F87171', background: 'rgba(239, 68, 68, 0.15)', borderRadius: '8px', marginBottom: '12px', textAlign: 'center', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-              <span>{canvasError}</span>
-              <button 
-                onClick={renderCertificate} 
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', background: 'rgba(56, 217, 255, 0.2)', border: '1px solid #38D9FF', borderRadius: '4px', color: '#38D9FF', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}
-              >
-                <RotateCcw size={12} />
-                <span>Retry Certificate</span>
-              </button>
-            </div>
-          )}
           <canvas 
             ref={canvasRef} 
             className={`cert-canvas aspect-${aspectRatio.replace(':', '-')}`} 

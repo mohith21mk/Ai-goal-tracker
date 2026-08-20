@@ -28,7 +28,12 @@ const Chat = () => {
   const [selectedProfileUserId, setSelectedProfileUserId] = useState(null);
   
   // Left Panel State
-  const [activeTab, setActiveTab] = useState('conversations'); // 'conversations' | 'discover' | 'requests'
+  const initialTab = searchParams.get('tab') || location.state?.tab;
+  const [activeTab, setActiveTab] = useState(
+    initialTab && ['conversations', 'discover', 'requests'].includes(initialTab)
+      ? initialTab
+      : 'conversations'
+  );
   const [conversations, setConversations] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -41,51 +46,7 @@ const Chat = () => {
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState('');
   const messagesEndRef = useRef(null);
-
-  const loadConversations = useCallback(async () => {
-    try {
-      const data = await getConversations();
-      setConversations(data);
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
   const scrollTimerRef = useRef(null);
-
-  const loadConnections = useCallback(async () => {
-    try {
-      const data = await getConnections();
-      setConnections(data);
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
-  // Listen for real-time notification socket events to refresh connections & requests
-  const handleNotificationEvent = useCallback((notif) => {
-    const nType = notif.type || notif.data?.type || notif.reference_type;
-    if (nType === 'connection_request' || nType === 'connection_accepted') {
-      loadConnections();
-      loadConversations();
-    }
-  }, [loadConnections, loadConversations]);
-
-  useNotificationsSocket(handleNotificationEvent);
-
-  // Sync tab with URL search parameter (?tab=requests) or router navigation state
-  useEffect(() => {
-    const tabParam = searchParams.get('tab') || location.state?.tab;
-    if (tabParam && ['conversations', 'discover', 'requests'].includes(tabParam)) {
-      setActiveTab(tabParam);
-      if (tabParam === 'requests' || tabParam === 'discover') {
-        loadConnections();
-      }
-      if (tabParam === 'conversations') {
-        loadConversations();
-      }
-    }
-  }, [searchParams, location.state, loadConnections, loadConversations]);
 
   const scrollToBottom = useCallback(() => {
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
@@ -101,6 +62,63 @@ const Chat = () => {
       if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
     };
   }, []);
+
+  const loadConversations = useCallback(async () => {
+    try {
+      const data = await getConversations();
+      setConversations(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  const loadConnections = useCallback(async () => {
+    try {
+      const data = await getConnections();
+      setConnections(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  const openConversation = useCallback(async (conv) => {
+    setActiveConversation(conv);
+    try {
+      const history = await getConversationMessages(conv.id);
+      setMessages(history);
+      scrollToBottom();
+      await markConversationRead(conv.id);
+      setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c));
+    } catch (err) {
+      console.error(err);
+    }
+  }, [scrollToBottom]);
+
+  const handleStartConversation = useCallback(async (targetUserId) => {
+    try {
+      const convRes = await createConversation(targetUserId);
+      const updatedConvs = await getConversations();
+      setConversations(updatedConvs);
+      const targetConv = updatedConvs.find(c => c.id === convRes.conversation_id || c.id === convRes.id);
+      if (targetConv) {
+        openConversation(targetConv);
+      }
+      setActiveTab('conversations');
+    } catch (err) {
+      alert(err.message || 'Failed to start conversation');
+    }
+  }, [openConversation]);
+
+  // Listen for real-time notification socket events to refresh connections & requests
+  const handleNotificationEvent = useCallback((notif) => {
+    const nType = notif.type || notif.data?.type || notif.reference_type;
+    if (nType === 'connection_request' || nType === 'connection_accepted') {
+      loadConnections();
+      loadConversations();
+    }
+  }, [loadConnections, loadConversations]);
+
+  useNotificationsSocket(handleNotificationEvent);
 
   const activeConvRef = useRef(activeConversation);
   useEffect(() => {
@@ -204,7 +222,7 @@ const Chat = () => {
     return () => {
       isMounted = false;
     };
-  }, [searchParams, location.state]);
+  }, [searchParams, location.state, openConversation, handleStartConversation]);
 
   const executeSearch = useCallback(async (query) => {
     const q = (query || '').trim();
@@ -245,21 +263,6 @@ const Chat = () => {
     }
   };
 
-  const handleStartConversation = async (targetUserId) => {
-    try {
-      const convRes = await createConversation(targetUserId);
-      const updatedConvs = await getConversations();
-      setConversations(updatedConvs);
-      const targetConv = updatedConvs.find(c => c.id === convRes.conversation_id || c.id === convRes.id);
-      if (targetConv) {
-        openConversation(targetConv);
-      }
-      setActiveTab('conversations');
-    } catch (err) {
-      alert(err.message || 'Failed to start conversation');
-    }
-  };
-
   const handleSendRequest = async (userId) => {
     try {
       await requestConnection(userId);
@@ -285,19 +288,6 @@ const Chat = () => {
       await loadConnections();
     } catch (err) {
       alert(err.message || 'Failed to reject request');
-    }
-  };
-
-  const openConversation = async (conv) => {
-    setActiveConversation(conv);
-    try {
-      const history = await getConversationMessages(conv.id);
-      setMessages(history);
-      scrollToBottom();
-      await markConversationRead(conv.id);
-      setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c));
-    } catch (err) {
-      console.error(err);
     }
   };
 
