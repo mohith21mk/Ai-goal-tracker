@@ -25,7 +25,10 @@ export function useNotificationsSocket(onNotificationReceived) {
 
     let wsUrl = import.meta.env.VITE_WS_URL;
     if (!wsUrl) {
-      const apiUrl = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:8000';
+      const defaultApiUrl = import.meta.env.PROD 
+        ? 'https://mkc-backend-iguj.onrender.com' 
+        : 'http://localhost:8000';
+      const apiUrl = import.meta.env.VITE_API_URL || defaultApiUrl;
       if (apiUrl.startsWith('http')) {
         wsUrl = apiUrl.replace(/^http/, 'ws') + '/api/notifications/ws';
       } else {
