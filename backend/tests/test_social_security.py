@@ -12,6 +12,12 @@ def test_social_isolation():
     cursor = conn.cursor()
 
     try:
+        # Pre-cleanup in case of prior test runs
+        cursor.execute("DELETE FROM chat_messages WHERE sender_id IN (SELECT id FROM users WHERE username IN ('userA', 'userB', 'userC') OR email IN ('a@test.com', 'b@test.com', 'c@test.com'))")
+        cursor.execute("DELETE FROM conversation_members WHERE user_id IN (SELECT id FROM users WHERE username IN ('userA', 'userB', 'userC') OR email IN ('a@test.com', 'b@test.com', 'c@test.com'))")
+        cursor.execute("DELETE FROM users WHERE username IN ('userA', 'userB', 'userC') OR email IN ('a@test.com', 'b@test.com', 'c@test.com')")
+        conn.commit()
+
         # Create users
         cursor.execute("INSERT INTO users (username, email, password_hash, full_name, mkc_id) VALUES ('userA', 'a@test.com', 'hash', 'User A', 'MKC-A')")
         user_a_id = cursor.lastrowid

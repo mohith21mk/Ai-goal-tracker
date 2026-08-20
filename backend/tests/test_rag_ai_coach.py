@@ -12,7 +12,11 @@ def test_rag_context_extraction_and_vector_search():
     cursor = conn.cursor()
 
     # Clean test user
-    cursor.execute("DELETE FROM users WHERE username = 'rag_test_user'")
+    cursor.execute("DELETE FROM journal_entries WHERE user_id IN (SELECT id FROM users WHERE username = 'rag_test_user' OR email = 'rag@example.com')")
+    cursor.execute("DELETE FROM habits WHERE user_id IN (SELECT id FROM users WHERE username = 'rag_test_user' OR email = 'rag@example.com')")
+    cursor.execute("DELETE FROM missions WHERE user_id IN (SELECT id FROM users WHERE username = 'rag_test_user' OR email = 'rag@example.com')")
+    cursor.execute("DELETE FROM goals WHERE user_id IN (SELECT id FROM users WHERE username = 'rag_test_user' OR email = 'rag@example.com')")
+    cursor.execute("DELETE FROM users WHERE username = 'rag_test_user' OR email = 'rag@example.com'")
     conn.commit()
 
     # 1. Create test user with Goals, Missions, Habits, and Reflections
@@ -87,7 +91,14 @@ def test_ai_coach_mocked_llm_response(monkeypatch):
     monkeypatch.setattr(ai_coach, "_call_gemini_rest_api", mock_gemini_api)
     monkeypatch.setattr(ai_coach.settings, "GEMINI_API_KEY", "mock_key_123")
 
-    res = asyncio.run(ai_coach.generate_coaching_response("Can you teach me Python?", 1))
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM users WHERE is_active = 1 LIMIT 1")
+    row = cursor.fetchone()
+    uid = row["id"] if row else 1
+    conn.close()
+
+    res = asyncio.run(ai_coach.generate_coaching_response("Can you teach me Python?", uid))
     assert res["live_llm"] is True
     assert res["reply"] == "Absolutely. Let's break down Python step-by-step starting with variables."
     assert "Insights retrieved" not in res["reply"]

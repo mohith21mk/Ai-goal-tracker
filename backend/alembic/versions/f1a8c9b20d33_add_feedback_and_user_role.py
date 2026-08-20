@@ -24,10 +24,12 @@ def upgrade() -> None:
     insp = sa.inspect(bind)
 
     # 1. Add role column to users if not present
-    user_cols = [c['name'] for c in insp.get_columns('users')]
-    with op.batch_alter_table('users') as batch_op:
-        if 'role' not in user_cols:
-            batch_op.add_column(sa.Column('role', sa.String(length=50), nullable=False, server_default='user'))
+    existing_tables = insp.get_table_names()
+    if 'users' in existing_tables:
+        user_cols = [c['name'] for c in insp.get_columns('users')]
+        with op.batch_alter_table('users') as batch_op:
+            if 'role' not in user_cols:
+                batch_op.add_column(sa.Column('role', sa.String(length=50), nullable=False, server_default='user'))
 
     # 2. Create feedback table if not present
     existing_tables = insp.get_table_names()

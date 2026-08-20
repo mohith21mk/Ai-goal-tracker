@@ -40,17 +40,19 @@ def upgrade() -> None:
         op.create_index(op.f('ix_chat_messages_conversation_id'), 'chat_messages', ['conversation_id'], unique=False)
         op.create_index(op.f('ix_chat_messages_sender_id'), 'chat_messages', ['sender_id'], unique=False)
 
-    post_cols = [c['name'] for c in insp.get_columns('community_posts')]
-    with op.batch_alter_table('community_posts') as batch_op:
-        if 'credential_id' not in post_cols:
-            batch_op.add_column(sa.Column('credential_id', sa.Integer(), nullable=True))
-            batch_op.create_foreign_key(None, 'user_credentials', ['credential_id'], ['id'], ondelete='SET NULL')
+    if 'community_posts' in tables:
+        post_cols = [c['name'] for c in insp.get_columns('community_posts')]
+        with op.batch_alter_table('community_posts') as batch_op:
+            if 'credential_id' not in post_cols:
+                batch_op.add_column(sa.Column('credential_id', sa.Integer(), nullable=True))
+                batch_op.create_foreign_key(None, 'user_credentials', ['credential_id'], ['id'], ondelete='SET NULL')
 
-    mission_cols = [c['name'] for c in insp.get_columns('missions')]
-    with op.batch_alter_table('missions') as batch_op:
-        if 'created_at' not in mission_cols:
-            batch_op.add_column(sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True))
-        batch_op.alter_column('goal_id', existing_type=sa.INTEGER(), nullable=True)
+    if 'missions' in tables:
+        mission_cols = [c['name'] for c in insp.get_columns('missions')]
+        with op.batch_alter_table('missions') as batch_op:
+            if 'created_at' not in mission_cols:
+                batch_op.add_column(sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True))
+            batch_op.alter_column('goal_id', existing_type=sa.INTEGER(), nullable=True)
 
 
 def downgrade() -> None:

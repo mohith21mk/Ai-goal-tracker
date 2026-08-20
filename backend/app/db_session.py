@@ -7,9 +7,6 @@ from .models import Base
 
 def get_database_url() -> str:
     db_url = settings.DATABASE_URL
-    if db_url.startswith("sqlite"):
-        db_file = (Path(__file__).resolve().parent / "app.db").resolve()
-        return f"sqlite:///{db_file.as_posix()}"
     if db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql://", 1)
     return db_url

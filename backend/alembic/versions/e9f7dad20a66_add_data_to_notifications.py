@@ -22,10 +22,12 @@ def upgrade() -> None:
     """Upgrade schema."""
     bind = op.get_bind()
     insp = sa.inspect(bind)
-    notif_cols = [c['name'] for c in insp.get_columns('notifications')]
-    with op.batch_alter_table('notifications') as batch_op:
-        if 'data' not in notif_cols:
-            batch_op.add_column(sa.Column('data', sa.Text(), nullable=True))
+    tables = insp.get_table_names()
+    if 'notifications' in tables:
+        notif_cols = [c['name'] for c in insp.get_columns('notifications')]
+        with op.batch_alter_table('notifications') as batch_op:
+            if 'data' not in notif_cols:
+                batch_op.add_column(sa.Column('data', sa.Text(), nullable=True))
 
 
 def downgrade() -> None:
