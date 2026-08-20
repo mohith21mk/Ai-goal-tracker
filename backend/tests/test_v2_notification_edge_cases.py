@@ -18,6 +18,7 @@ def setup_test_user(prefix: str, role: str = "user"):
     init_db()
     conn = get_connection()
     c = conn.cursor()
+    c.execute("DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email LIKE ?)", (f"{prefix}%",))
     c.execute("DELETE FROM app_sessions WHERE user_id IN (SELECT id FROM users WHERE email LIKE ?)", (f"{prefix}%",))
     c.execute("DELETE FROM users WHERE email LIKE ?", (f"{prefix}%",))
     conn.commit()

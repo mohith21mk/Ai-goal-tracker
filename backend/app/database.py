@@ -128,12 +128,35 @@ def get_connection():
     return conn
 
 
+def _ensure_demo_user():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE email = ?", ("demo@masterykeycoach.com",))
+        user_row = cursor.fetchone()
+        if not user_row:
+            from .services.auth import hash_password
+            default_pwd_hash = hash_password("Password123!")
+            cursor.execute(
+                """
+                INSERT INTO users (email, full_name, username, password_hash, avatar_initials, is_active, email_verified, onboarding_completed, mkc_id)
+                VALUES (?, ?, ?, ?, ?, 1, 1, 1, 'MKC-DEMO')
+                """,
+                ("demo@masterykeycoach.com", "Mohith", "mohith_ai", default_pwd_hash, "MK"),
+            )
+            conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
 def init_db() -> None:
     if _is_postgres():
         # PostgreSQL schema is managed by Alembic migrations + SQLAlchemy ORM
         from .db_session import engine, init_orm_db
         engine.dispose()
         init_orm_db()
+        _ensure_demo_user()
         return
 
     conn = get_connection()

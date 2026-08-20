@@ -9,7 +9,11 @@ def setup_module(module):
     init_db()
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM users WHERE username IN ('comm_user_a', 'comm_user_b')")
+    cursor.execute("DELETE FROM community_comments WHERE user_id IN (SELECT id FROM users WHERE username IN ('comm_user_a', 'comm_user_b') OR email IN ('comma@example.com', 'commb@example.com'))")
+    cursor.execute("DELETE FROM community_likes WHERE user_id IN (SELECT id FROM users WHERE username IN ('comm_user_a', 'comm_user_b') OR email IN ('comma@example.com', 'commb@example.com'))")
+    cursor.execute("DELETE FROM community_posts WHERE user_id IN (SELECT id FROM users WHERE username IN ('comm_user_a', 'comm_user_b') OR email IN ('comma@example.com', 'commb@example.com'))")
+    cursor.execute("DELETE FROM app_sessions WHERE user_id IN (SELECT id FROM users WHERE username IN ('comm_user_a', 'comm_user_b') OR email IN ('comma@example.com', 'commb@example.com'))")
+    cursor.execute("DELETE FROM users WHERE username IN ('comm_user_a', 'comm_user_b') OR email IN ('comma@example.com', 'commb@example.com')")
     conn.commit()
     conn.close()
 

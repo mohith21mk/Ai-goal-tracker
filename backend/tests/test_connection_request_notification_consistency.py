@@ -14,6 +14,9 @@ def setup_test_users():
     conn = get_connection()
     cursor = conn.cursor()
 
+    cursor.execute("DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email IN ('chinmayee_sync@mkc.test', 'user_b_sync@mkc.test', 'user_c_sync@mkc.test'))")
+    cursor.execute("DELETE FROM user_connections WHERE requester_id IN (SELECT id FROM users WHERE email IN ('chinmayee_sync@mkc.test', 'user_b_sync@mkc.test', 'user_c_sync@mkc.test')) OR recipient_id IN (SELECT id FROM users WHERE email IN ('chinmayee_sync@mkc.test', 'user_b_sync@mkc.test', 'user_c_sync@mkc.test'))")
+    cursor.execute("DELETE FROM app_sessions WHERE user_id IN (SELECT id FROM users WHERE email IN ('chinmayee_sync@mkc.test', 'user_b_sync@mkc.test', 'user_c_sync@mkc.test'))")
     cursor.execute("DELETE FROM users WHERE email IN ('chinmayee_sync@mkc.test', 'user_b_sync@mkc.test', 'user_c_sync@mkc.test')")
     conn.commit()
 

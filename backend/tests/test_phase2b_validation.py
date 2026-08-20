@@ -11,8 +11,15 @@ def setup_module(module):
     init_db()
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM users WHERE username IN ('user_2b_a', 'user_2b_b')")
+    cursor.execute("DELETE FROM habit_logs WHERE user_id IN (SELECT id FROM users WHERE username IN ('user_2b_a', 'user_2b_b') OR email IN ('user2ba@example.com', 'user2bb@example.com'))")
+    cursor.execute("DELETE FROM habits WHERE user_id IN (SELECT id FROM users WHERE username IN ('user_2b_a', 'user_2b_b') OR email IN ('user2ba@example.com', 'user2bb@example.com'))")
+    cursor.execute("DELETE FROM journal_entries WHERE user_id IN (SELECT id FROM users WHERE username IN ('user_2b_a', 'user_2b_b') OR email IN ('user2ba@example.com', 'user2bb@example.com'))")
+    cursor.execute("DELETE FROM missions WHERE user_id IN (SELECT id FROM users WHERE username IN ('user_2b_a', 'user_2b_b') OR email IN ('user2ba@example.com', 'user2bb@example.com'))")
+    cursor.execute("DELETE FROM goals WHERE user_id IN (SELECT id FROM users WHERE username IN ('user_2b_a', 'user_2b_b') OR email IN ('user2ba@example.com', 'user2bb@example.com'))")
+    cursor.execute("DELETE FROM app_sessions WHERE user_id IN (SELECT id FROM users WHERE username IN ('user_2b_a', 'user_2b_b') OR email IN ('user2ba@example.com', 'user2bb@example.com'))")
+    cursor.execute("DELETE FROM users WHERE username IN ('user_2b_a', 'user_2b_b') OR email IN ('user2ba@example.com', 'user2bb@example.com')")
     conn.commit()
+    conn.close()
 
 def test_phase2b_end_to_end_cloud_orm_validation():
     # 1. Register User A

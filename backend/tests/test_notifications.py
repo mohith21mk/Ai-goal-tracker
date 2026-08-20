@@ -1,9 +1,12 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.database import get_connection
+from app.database import get_connection, init_db
 
 client = TestClient(app)
+
+def setup_module(module):
+    init_db()
 
 def test_notifications_lifecycle():
     # 1. Login user

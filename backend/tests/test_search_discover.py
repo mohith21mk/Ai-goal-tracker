@@ -20,9 +20,9 @@ def setup_search_test_data():
     cursor = conn.cursor()
 
     # Clean up test users
-    cursor.execute("DELETE FROM user_connections WHERE requester_id IN (SELECT id FROM users WHERE username IN ('search_me', 'chinmayee_23', 'connected_friend') OR email LIKE 'search_test%') OR recipient_id IN (SELECT id FROM users WHERE username IN ('search_me', 'chinmayee_23', 'connected_friend') OR email LIKE 'search_test%')")
-    cursor.execute("DELETE FROM app_sessions WHERE user_id IN (SELECT id FROM users WHERE username IN ('search_me', 'chinmayee_23', 'connected_friend') OR email LIKE 'search_test%')")
-    cursor.execute("DELETE FROM users WHERE username IN ('search_me', 'chinmayee_23', 'connected_friend') OR email LIKE 'search_test%'")
+    cursor.execute("DELETE FROM user_connections WHERE requester_id IN (SELECT id FROM users WHERE username IN ('search_me', 'chinmayee_23', 'connected_friend') OR email LIKE 'search_test%' OR mkc_id = 'MKC-0559') OR recipient_id IN (SELECT id FROM users WHERE username IN ('search_me', 'chinmayee_23', 'connected_friend') OR email LIKE 'search_test%' OR mkc_id = 'MKC-0559')")
+    cursor.execute("DELETE FROM app_sessions WHERE user_id IN (SELECT id FROM users WHERE username IN ('search_me', 'chinmayee_23', 'connected_friend') OR email LIKE 'search_test%' OR mkc_id = 'MKC-0559')")
+    cursor.execute("DELETE FROM users WHERE username IN ('search_me', 'chinmayee_23', 'connected_friend') OR email LIKE 'search_test%' OR mkc_id = 'MKC-0559'")
     conn.commit()
 
     pwd = hash_password("Pass1234!")

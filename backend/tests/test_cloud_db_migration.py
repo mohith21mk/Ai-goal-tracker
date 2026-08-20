@@ -15,7 +15,14 @@ def test_sqlalchemy_orm_models_cloud_migration_readiness():
     db = SessionLocal()
     try:
         # Clean up test user
-        db.query(UserORM).filter(UserORM.username == "cloud_test_user").delete()
+        existing_users = db.query(UserORM).filter((UserORM.username == "cloud_test_user") | (UserORM.email == "cloud_test@example.com") | (UserORM.mkc_id == "MKC-CLOUD-001")).all()
+        for u in existing_users:
+            db.query(HabitLogORM).filter(HabitLogORM.user_id == u.id).delete()
+            db.query(HabitORM).filter(HabitORM.user_id == u.id).delete()
+            db.query(JournalEntryORM).filter(JournalEntryORM.user_id == u.id).delete()
+            db.query(MissionORM).filter(MissionORM.user_id == u.id).delete()
+            db.query(GoalORM).filter(GoalORM.user_id == u.id).delete()
+            db.query(UserORM).filter(UserORM.id == u.id).delete()
         db.commit()
 
         # 1. Create User via ORM

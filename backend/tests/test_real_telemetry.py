@@ -9,7 +9,13 @@ def test_real_telemetry_historical_accuracy_and_isolation():
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM users WHERE username IN ('test_user_telemetry_a', 'test_user_telemetry_b')")
+    cursor.execute("DELETE FROM habit_logs WHERE user_id IN (SELECT id FROM users WHERE username IN ('test_user_telemetry_a', 'test_user_telemetry_b') OR email IN ('tele_a@example.com', 'tele_b@example.com'))")
+    cursor.execute("DELETE FROM habits WHERE user_id IN (SELECT id FROM users WHERE username IN ('test_user_telemetry_a', 'test_user_telemetry_b') OR email IN ('tele_a@example.com', 'tele_b@example.com'))")
+    cursor.execute("DELETE FROM journal_entries WHERE user_id IN (SELECT id FROM users WHERE username IN ('test_user_telemetry_a', 'test_user_telemetry_b') OR email IN ('tele_a@example.com', 'tele_b@example.com'))")
+    cursor.execute("DELETE FROM missions WHERE user_id IN (SELECT id FROM users WHERE username IN ('test_user_telemetry_a', 'test_user_telemetry_b') OR email IN ('tele_a@example.com', 'tele_b@example.com'))")
+    cursor.execute("DELETE FROM goals WHERE user_id IN (SELECT id FROM users WHERE username IN ('test_user_telemetry_a', 'test_user_telemetry_b') OR email IN ('tele_a@example.com', 'tele_b@example.com'))")
+    cursor.execute("DELETE FROM app_sessions WHERE user_id IN (SELECT id FROM users WHERE username IN ('test_user_telemetry_a', 'test_user_telemetry_b') OR email IN ('tele_a@example.com', 'tele_b@example.com'))")
+    cursor.execute("DELETE FROM users WHERE username IN ('test_user_telemetry_a', 'test_user_telemetry_b') OR email IN ('tele_a@example.com', 'tele_b@example.com')")
     conn.commit()
 
     # 1. Create User A

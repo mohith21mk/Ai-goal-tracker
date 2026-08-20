@@ -9,8 +9,13 @@ def setup_module(module):
     init_db()
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM users WHERE username IN ('msg_user_a', 'msg_user_b', 'msg_user_c')")
+    cursor.execute("DELETE FROM chat_messages WHERE sender_id IN (SELECT id FROM users WHERE username IN ('msg_user_a', 'msg_user_b', 'msg_user_c') OR email IN ('msga@example.com', 'msgb@example.com', 'msgc@example.com'))")
+    cursor.execute("DELETE FROM conversation_members WHERE user_id IN (SELECT id FROM users WHERE username IN ('msg_user_a', 'msg_user_b', 'msg_user_c') OR email IN ('msga@example.com', 'msgb@example.com', 'msgc@example.com'))")
+    cursor.execute("DELETE FROM user_connections WHERE requester_id IN (SELECT id FROM users WHERE username IN ('msg_user_a', 'msg_user_b', 'msg_user_c') OR email IN ('msga@example.com', 'msgb@example.com', 'msgc@example.com')) OR recipient_id IN (SELECT id FROM users WHERE username IN ('msg_user_a', 'msg_user_b', 'msg_user_c') OR email IN ('msga@example.com', 'msgb@example.com', 'msgc@example.com'))")
+    cursor.execute("DELETE FROM app_sessions WHERE user_id IN (SELECT id FROM users WHERE username IN ('msg_user_a', 'msg_user_b', 'msg_user_c') OR email IN ('msga@example.com', 'msgb@example.com', 'msgc@example.com'))")
+    cursor.execute("DELETE FROM users WHERE username IN ('msg_user_a', 'msg_user_b', 'msg_user_c') OR email IN ('msga@example.com', 'msgb@example.com', 'msgc@example.com')")
     conn.commit()
+    conn.close()
 
 def test_phase2e_realtime_messaging_suite():
     # 1. Register User A, User B, and User C

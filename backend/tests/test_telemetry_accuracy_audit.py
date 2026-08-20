@@ -13,7 +13,13 @@ def test_controlled_telemetry_accuracy_sequence_and_isolation():
 
     today_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
-    cursor.execute("DELETE FROM users WHERE username IN ('audit_user_a', 'audit_user_b')")
+    cursor.execute("DELETE FROM habit_logs WHERE user_id IN (SELECT id FROM users WHERE username IN ('audit_user_a', 'audit_user_b') OR email IN ('audit_a@example.com', 'audit_b@example.com'))")
+    cursor.execute("DELETE FROM habits WHERE user_id IN (SELECT id FROM users WHERE username IN ('audit_user_a', 'audit_user_b') OR email IN ('audit_a@example.com', 'audit_b@example.com'))")
+    cursor.execute("DELETE FROM journal_entries WHERE user_id IN (SELECT id FROM users WHERE username IN ('audit_user_a', 'audit_user_b') OR email IN ('audit_a@example.com', 'audit_b@example.com'))")
+    cursor.execute("DELETE FROM missions WHERE user_id IN (SELECT id FROM users WHERE username IN ('audit_user_a', 'audit_user_b') OR email IN ('audit_a@example.com', 'audit_b@example.com'))")
+    cursor.execute("DELETE FROM goals WHERE user_id IN (SELECT id FROM users WHERE username IN ('audit_user_a', 'audit_user_b') OR email IN ('audit_a@example.com', 'audit_b@example.com'))")
+    cursor.execute("DELETE FROM app_sessions WHERE user_id IN (SELECT id FROM users WHERE username IN ('audit_user_a', 'audit_user_b') OR email IN ('audit_a@example.com', 'audit_b@example.com'))")
+    cursor.execute("DELETE FROM users WHERE username IN ('audit_user_a', 'audit_user_b') OR email IN ('audit_a@example.com', 'audit_b@example.com')")
     conn.commit()
 
     # 1. Create User A and User B

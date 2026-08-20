@@ -18,9 +18,11 @@ def setup():
     cursor = conn.cursor()
 
     # Clean previous test data
+    cursor.execute("DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'deltest%')")
     cursor.execute("DELETE FROM chat_messages WHERE sender_id IN (SELECT id FROM users WHERE email LIKE 'deltest%')")
     cursor.execute("DELETE FROM conversation_members WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'deltest%')")
     cursor.execute("DELETE FROM user_connections WHERE requester_id IN (SELECT id FROM users WHERE email LIKE 'deltest%') OR recipient_id IN (SELECT id FROM users WHERE email LIKE 'deltest%')")
+    cursor.execute("DELETE FROM app_sessions WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'deltest%')")
     cursor.execute("DELETE FROM users WHERE email LIKE 'deltest%'")
     conn.commit()
 

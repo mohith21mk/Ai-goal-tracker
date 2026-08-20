@@ -13,7 +13,11 @@ def setup_multi_users():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Clean up test users if existing
+    cursor.execute("DELETE FROM habit_logs WHERE user_id IN (SELECT id FROM users WHERE email IN ('sec_user_a@mkc.test', 'sec_user_b@mkc.test', 'sec_empty_user@mkc.test'))")
+    cursor.execute("DELETE FROM habits WHERE user_id IN (SELECT id FROM users WHERE email IN ('sec_user_a@mkc.test', 'sec_user_b@mkc.test', 'sec_empty_user@mkc.test'))")
+    cursor.execute("DELETE FROM missions WHERE user_id IN (SELECT id FROM users WHERE email IN ('sec_user_a@mkc.test', 'sec_user_b@mkc.test', 'sec_empty_user@mkc.test'))")
+    cursor.execute("DELETE FROM goals WHERE user_id IN (SELECT id FROM users WHERE email IN ('sec_user_a@mkc.test', 'sec_user_b@mkc.test', 'sec_empty_user@mkc.test'))")
+    cursor.execute("DELETE FROM app_sessions WHERE user_id IN (SELECT id FROM users WHERE email IN ('sec_user_a@mkc.test', 'sec_user_b@mkc.test', 'sec_empty_user@mkc.test'))")
     cursor.execute("DELETE FROM users WHERE email IN ('sec_user_a@mkc.test', 'sec_user_b@mkc.test', 'sec_empty_user@mkc.test')")
     conn.commit()
 

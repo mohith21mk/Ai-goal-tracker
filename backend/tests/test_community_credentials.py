@@ -20,7 +20,9 @@ def setup_test_users():
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM community_posts WHERE author_name LIKE 'TestUser%'")
+    cursor.execute("DELETE FROM community_comments WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'comm_test%' OR username LIKE 'comm_user_%')")
+    cursor.execute("DELETE FROM community_likes WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'comm_test%' OR username LIKE 'comm_user_%')")
+    cursor.execute("DELETE FROM community_posts WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'comm_test%' OR username LIKE 'comm_user_%')")
     cursor.execute("DELETE FROM user_credentials WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'comm_test%' OR username LIKE 'comm_user_%')")
     cursor.execute("DELETE FROM app_sessions WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'comm_test%' OR username LIKE 'comm_user_%')")
     cursor.execute("DELETE FROM users WHERE email LIKE 'comm_test%' OR username LIKE 'comm_user_%'")
