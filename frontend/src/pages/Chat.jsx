@@ -22,7 +22,7 @@ import {
 import './Chat.css';
 
 const Chat = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const location = useLocation();
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedProfileUserId, setSelectedProfileUserId] = useState(null);

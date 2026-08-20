@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import {
-  BarChart3,
   Flame,
   Brain,
   Zap,

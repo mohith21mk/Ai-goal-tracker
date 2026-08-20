@@ -239,7 +239,7 @@ export default function CertificateModal({
       ctx.fillRect(0, 0, width, height);
 
       const pseudoRandom = (seed) => {
-        const x = Math.sin(seed++) * 10000;
+        const x = Math.sin(seed) * 10000;
         return x - Math.floor(x);
       };
 
