@@ -185,26 +185,51 @@ async def register_user(payload: RegisterRequest, request: Request, response: Re
 
     hashed_pwd = hash_password(payload.password)
 
+    is_pg = settings.DATABASE_URL.startswith("postgres://") or settings.DATABASE_URL.startswith("postgresql://")
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute(
-            """
-            INSERT INTO users (email, username, password_hash, full_name, mkc_id, avatar_initials, bio, email_verified, onboarding_completed)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
-            """,
-            (
-                norm_email,
-                norm_username,
-                hashed_pwd,
-                payload.full_name,
-                mkc_id,
-                initials,
-                "AI Engineering & Full-Stack Systems Mastery",
-            ),
-        )
+        if is_pg:
+            cursor.execute(
+                """
+                INSERT INTO users (email, username, password_hash, full_name, mkc_id, avatar_initials, bio, email_verified, onboarding_completed)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
+                RETURNING id
+                """,
+                (
+                    norm_email,
+                    norm_username,
+                    hashed_pwd,
+                    payload.full_name,
+                    mkc_id,
+                    initials,
+                    "AI Engineering & Full-Stack Systems Mastery",
+                ),
+            )
+            row = cursor.fetchone()
+            user_id = row[0] if row else None
+        else:
+            cursor.execute(
+                """
+                INSERT INTO users (email, username, password_hash, full_name, mkc_id, avatar_initials, bio, email_verified, onboarding_completed)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
+                """,
+                (
+                    norm_email,
+                    norm_username,
+                    hashed_pwd,
+                    payload.full_name,
+                    mkc_id,
+                    initials,
+                    "AI Engineering & Full-Stack Systems Mastery",
+                ),
+            )
+            user_id = cursor.lastrowid
+
+        if not user_id:
+            raise RuntimeError("Failed to retrieve generated user ID from database insert.")
+
         conn.commit()
-        user_id = cursor.lastrowid
 
         # Seed default user settings for new user
         cursor.execute(
@@ -221,11 +246,19 @@ async def register_user(payload: RegisterRequest, request: Request, response: Re
         send_verification_email(norm_email, payload.full_name, verif_token)
 
     except Exception as err:
-        conn.close()
-        logger.error(f"Registration exception: {err}", exc_info=True)
+        err_msg = str(err).lower()
+        err_type = type(err).__name__
+        logger.error(f"Registration failure [{err_type}]: {err}", exc_info=True)
+
+        if "unique" in err_msg or "duplicate" in err_msg or "already taken" in err_msg:
+            raise HTTPException(
+                status_code=409,
+                detail="Registration conflict: Username or email is already taken.",
+            ) from err
+
         raise HTTPException(
-            status_code=409,
-            detail="Registration conflict: Username or email is already taken.",
+            status_code=500,
+            detail="Registration failed. Please try again later.",
         ) from err
     finally:
         conn.close()
