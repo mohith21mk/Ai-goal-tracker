@@ -32,8 +32,11 @@ export function useNotificationsSocket(onNotificationReceived) {
       if (import.meta.env.PROD && (apiUrl.includes('your-backend-service') || apiUrl.includes('localhost'))) {
         apiUrl = defaultApiUrl;
       }
-      if (apiUrl.startsWith('http')) {
-        wsUrl = apiUrl.replace(/^http/, 'ws') + '/api/notifications/ws';
+      apiUrl = apiUrl.replace(/\/+$/, '');
+      if (apiUrl.startsWith('https://')) {
+        wsUrl = apiUrl.replace(/^https:\/\//, 'wss://') + '/api/notifications/ws';
+      } else if (apiUrl.startsWith('http://')) {
+        wsUrl = apiUrl.replace(/^http:\/\//, 'ws://') + '/api/notifications/ws';
       } else {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host;

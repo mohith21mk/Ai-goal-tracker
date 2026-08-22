@@ -35,8 +35,11 @@ export function useMessagingSocket(onMessageReceived) {
       if (import.meta.env.PROD && (apiUrl.includes('your-backend-service') || apiUrl.includes('localhost'))) {
         apiUrl = defaultApiUrl;
       }
-      if (apiUrl.startsWith('http')) {
-        wsUrl = apiUrl.replace(/^http/, 'ws') + '/api/chat/ws';
+      apiUrl = apiUrl.replace(/\/+$/, '');
+      if (apiUrl.startsWith('https://')) {
+        wsUrl = apiUrl.replace(/^https:\/\//, 'wss://') + '/api/chat/ws';
+      } else if (apiUrl.startsWith('http://')) {
+        wsUrl = apiUrl.replace(/^http:\/\//, 'ws://') + '/api/chat/ws';
       } else {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host;
