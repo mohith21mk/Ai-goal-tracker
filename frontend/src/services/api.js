@@ -1,7 +1,10 @@
 const defaultApiUrl = import.meta.env.PROD 
   ? 'https://mkc-backend-iguj.onrender.com' 
   : 'http://localhost:8000';
-const rawApiUrl = import.meta.env.VITE_API_URL || defaultApiUrl;
+let rawApiUrl = import.meta.env.VITE_API_URL || defaultApiUrl;
+if (import.meta.env.PROD && (rawApiUrl.includes('your-backend-service') || rawApiUrl.includes('localhost'))) {
+  rawApiUrl = defaultApiUrl;
+}
 const API_BASE_URL = rawApiUrl.replace(/\/+$/, '');
 
 async function apiFetch(endpoint, options = {}) {
