@@ -134,8 +134,8 @@ def _ensure_demo_user():
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM users WHERE email = ?", ("demo@masterykeycoach.com",))
         user_row = cursor.fetchone()
+        from .services.auth import hash_password
         if not user_row:
-            from .services.auth import hash_password
             default_pwd_hash = hash_password("Password123!")
             cursor.execute(
                 """
@@ -143,6 +143,12 @@ def _ensure_demo_user():
                 VALUES (?, ?, ?, ?, ?, 1, 1, 1, 'MKC-DEMO')
                 """,
                 ("demo@masterykeycoach.com", "Mohith", "mohith_ai", default_pwd_hash, "MK"),
+            )
+            conn.commit()
+        else:
+            cursor.execute(
+                "UPDATE users SET username = ?, password_hash = ? WHERE email = ?",
+                ("mohith_ai", hash_password("Password123!"), "demo@masterykeycoach.com"),
             )
             conn.commit()
         conn.close()
@@ -317,15 +323,12 @@ def init_db() -> None:
         cursor.execute("SELECT id FROM users WHERE email = ?", ("demo@masterykeycoach.com",))
         user_row = cursor.fetchone()
     else:
-        # Migrate existing demo user if username or password_hash is missing
-        cursor.execute("SELECT username, password_hash FROM users WHERE email = ?", ("demo@masterykeycoach.com",))
-        demo_cols = cursor.fetchone()
-        if demo_cols:
-            if not demo_cols["username"]:
-                cursor.execute("UPDATE users SET username = 'mohith_ai' WHERE email = ?", ("demo@masterykeycoach.com",))
-            if not demo_cols["password_hash"]:
-                cursor.execute("UPDATE users SET password_hash = ? WHERE email = ?", (hash_password("Password123!"), "demo@masterykeycoach.com"))
-            conn.commit()
+        # Update existing demo user credentials and username
+        cursor.execute(
+            "UPDATE users SET username = ?, password_hash = ? WHERE email = ?",
+            ("mohith_ai", hash_password("Password123!"), "demo@masterykeycoach.com"),
+        )
+        conn.commit()
 
     demo_user_id = user_row["id"]
 
