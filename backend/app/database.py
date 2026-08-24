@@ -153,7 +153,8 @@ def _ensure_demo_user():
             conn.commit()
         conn.close()
     except Exception as e:
-    print(f"ERROR ensuring demo user: {e}")
+        print(f"ERROR ensuring demo user: {e}")
+
 
 def init_db() -> None:
     if _is_postgres():
