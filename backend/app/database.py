@@ -195,8 +195,13 @@ def _ensure_demo_user() -> None:
         if conn:
             try:
                 conn.close()
-            except Exception:
+                        except Exception:
                 pass
+
+
+def init_db() -> None:
+    if _is_postgres():
+        # PostgreSQL schema is managed by Alembic migrations + SQLAlchemy ORM
         # PostgreSQL schema is managed by Alembic migrations + SQLAlchemy ORM
         from .db_session import engine, init_orm_db
         engine.dispose()
