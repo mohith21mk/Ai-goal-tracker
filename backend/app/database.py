@@ -195,7 +195,7 @@ def _ensure_demo_user() -> None:
         if conn:
             try:
                 conn.close()
-                        except Exception:
+            except Exception:
                 pass
 
 
