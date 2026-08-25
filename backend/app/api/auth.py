@@ -192,8 +192,8 @@ async def register_user(payload: RegisterRequest, request: Request, response: Re
         if is_pg:
             cursor.execute(
                 """
-                INSERT INTO users (email, username, password_hash, full_name, mkc_id, avatar_initials, bio, email_verified, onboarding_completed)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
+                INSERT INTO users (email, username, password_hash, full_name, mkc_id, avatar_initials, bio, role, email_verified, onboarding_completed)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'user', 0, 0)
                 RETURNING id
                 """,
                 (
@@ -211,8 +211,8 @@ async def register_user(payload: RegisterRequest, request: Request, response: Re
         else:
             cursor.execute(
                 """
-                INSERT INTO users (email, username, password_hash, full_name, mkc_id, avatar_initials, bio, email_verified, onboarding_completed)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
+                INSERT INTO users (email, username, password_hash, full_name, mkc_id, avatar_initials, bio, role, email_verified, onboarding_completed)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'user', 0, 0)
                 """,
                 (
                     norm_email,
