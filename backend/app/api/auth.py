@@ -207,7 +207,7 @@ async def register_user(payload: RegisterRequest, request: Request, response: Re
                 ),
             )
             row = cursor.fetchone()
-            user_id = row[0] if row else None
+            user_id = row["id"] if isinstance(row, dict) else (row[0] if row else None)
         else:
             cursor.execute(
                 """

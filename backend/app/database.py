@@ -128,36 +128,75 @@ def get_connection():
     return conn
 
 
-def _ensure_demo_user():
+def _ensure_demo_user() -> None:
+    """Ensures demo user exists with synchronized password. Safe for concurrent Gunicorn workers."""
+    conn = None
     try:
+        from .services.logger import logger
+        from .services.auth import hash_password
+
+        demo_pwd_hash = hash_password("Password123!")
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM users WHERE email = ?", ("demo@masterykeycoach.com",))
-        user_row = cursor.fetchone()
-        from .services.auth import hash_password
-        if not user_row:
-            default_pwd_hash = hash_password("Password123!")
+
+        if _is_postgres():
             cursor.execute(
                 """
-                INSERT INTO users (email, full_name, username, password_hash, avatar_initials, is_active, email_verified, onboarding_completed, mkc_id)
-                VALUES (?, ?, ?, ?, ?, 1, 1, 1, 'MKC-DEMO')
+                INSERT INTO users (email, username, password_hash, full_name, mkc_id, avatar_initials, bio, role, email_verified, onboarding_completed)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'user', 1, 1)
+                ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
+                RETURNING id
                 """,
-                ("demo@masterykeycoach.com", "Mohith", "mohith_ai", default_pwd_hash, "MK"),
+                ("demo@masterykeycoach.com", "mohith_ai", demo_pwd_hash, "Mastery Key Coach Demo", "MKC-2026-DEMO01", "MK", "AI Engineering & Full-Stack Systems Mastery Demo Account"),
             )
-            conn.commit()
+            row = cursor.fetchone()
+            user_id = row["id"] if isinstance(row, dict) else (row[0] if row else None)
+            if user_id:
+                cursor.execute(
+                    """
+                    INSERT INTO user_settings (user_id, theme, notifications_enabled, coach_style, daily_reminder_time, profile_visibility)
+                    VALUES (?, 'dark', 1, 'strategic', '08:00', 'public')
+                    ON CONFLICT (user_id) DO NOTHING
+                    """,
+                    (user_id,),
+                )
         else:
             cursor.execute(
-                "UPDATE users SET username = ?, password_hash = ? WHERE email = ?",
-                ("mohith_ai", hash_password("Password123!"), "demo@masterykeycoach.com"),
+                """
+                INSERT OR IGNORE INTO users (email, username, password_hash, full_name, mkc_id, avatar_initials, bio, role, email_verified, onboarding_completed)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'user', 1, 1)
+                """,
+                ("demo@masterykeycoach.com", "mohith_ai", demo_pwd_hash, "Mastery Key Coach Demo", "MKC-2026-DEMO01", "MK", "AI Engineering & Full-Stack Systems Mastery Demo Account"),
             )
-            conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"ERROR ensuring demo user: {e}")
+            cursor.execute("UPDATE users SET password_hash = ? WHERE email = ?", (demo_pwd_hash, "demo@masterykeycoach.com"))
+            cursor.execute("SELECT id FROM users WHERE email = ?", ("demo@masterykeycoach.com",))
+            row = cursor.fetchone()
+            user_id = row[0] if row else None
+            if user_id:
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO user_settings (user_id, theme, notifications_enabled, coach_style, daily_reminder_time, profile_visibility)
+                    VALUES (?, 'dark', 1, 'strategic', '08:00', 'public')
+                    """,
+                    (user_id,),
+                )
 
-
-def init_db() -> None:
-    if _is_postgres():
+        conn.commit()
+        logger.info("Demo user verified and synchronized (demo@masterykeycoach.com).")
+    except Exception as err:
+        if conn:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        from .services.logger import logger
+        logger.exception(f"Failed to ensure demo user: {err}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
         # PostgreSQL schema is managed by Alembic migrations + SQLAlchemy ORM
         from .db_session import engine, init_orm_db
         engine.dispose()
