@@ -369,6 +369,7 @@ async def compute_telemetry(user_id: int) -> Dict[str, Any]:
             "habits": {"active_habits_count": 0, "habits": []},
             "journal": {"total_entries": 0, "journal_streak": 0, "avg_energy_7d": 0.0, "latest_mood": None},
             "blueprint": {"active_blueprint": None, "completion_percentage": 0},
+            "debug_error": str(e),
         }
 
 
