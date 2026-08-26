@@ -175,3 +175,47 @@ def test_completed_3_missions_telemetry_live_update(sync_user):
     assert telem["progression"]["total_xp"] >= 150
     assert telem["progression"]["level"] >= 1
 
+
+def test_habit_completion_progression_authoritative_sync(sync_user):
+    cookies = sync_user["cookies"]
+    import datetime
+    today_str = datetime.date.today().strftime("%Y-%m-%d")
+
+    # 1. Clean missions to start from baseline 0 XP
+    init_prog = client.get("/api/progression", cookies=cookies).json()
+    base_xp = init_prog["total_xp"]
+
+    # 2. Create Habit
+    h1 = client.post(
+        "/api/habits",
+        json={"title": "Deep Focus Meditation", "category": "mindset"},
+        cookies=cookies,
+    ).json()["id"]
+
+    # 3. Complete Habit for today (+15 XP)
+    t1 = client.post(f"/api/habits/{h1}/toggle", json={"date": today_str}, cookies=cookies)
+    assert t1.status_code == 200
+    assert t1.json()["completed"] is True
+
+    # 4. Fetch authoritative progression
+    prog = client.get("/api/progression", cookies=cookies).json()
+    assert prog["total_xp"] == base_xp + 15
+    assert prog["habit_xp"] == 15
+    assert prog["level"] == 1
+    assert prog["rank"] == "INITIATE"
+    assert prog["current_level_xp"] == (base_xp + 15) % 500
+    assert prog["next_level_xp"] == 500
+    assert prog["xp_to_next_level"] == 500 - (base_xp + 15)
+    assert prog["level_progress_percent"] == round(((base_xp + 15) / 500.0) * 100, 2)
+    assert prog["progress_pct"] == prog["level_progress_percent"]
+    assert prog["xp_to_next"] == prog["xp_to_next_level"]
+
+    # 5. Toggle same habit again on same date -> deletes log, XP decreases by 15
+    t1_off = client.post(f"/api/habits/{h1}/toggle", json={"date": today_str}, cookies=cookies)
+    assert t1_off.status_code == 200
+    assert t1_off.json()["completed"] is False
+
+    prog_off = client.get("/api/progression", cookies=cookies).json()
+    assert prog_off["total_xp"] == base_xp
+    assert prog_off["habit_xp"] == 0
+

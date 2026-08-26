@@ -97,9 +97,9 @@ def get_user_progression(user_id: int) -> Dict[str, Any]:
     level = calculate_level(total_xp)
     rank = calculate_rank(level)
 
-    next_level_xp = level * 500
+    next_level_xp_threshold = level * 500
     xp_into_current_level = total_xp - ((level - 1) * 500)
-    xp_to_next_level = max(0, next_level_xp - total_xp)
+    xp_to_next_level = max(0, next_level_xp_threshold - total_xp)
     level_progress_percent = round((xp_into_current_level / 500.0) * 100, 2)
 
     return {
@@ -110,6 +110,11 @@ def get_user_progression(user_id: int) -> Dict[str, Any]:
         "rank": rank,
         "xp_to_next_level": xp_to_next_level,
         "level_progress_percent": level_progress_percent,
+        # Server-authoritative aliases for full interoperability across all frontend HUDs
+        "current_level_xp": xp_into_current_level,
+        "next_level_xp": 500,
+        "progress_pct": level_progress_percent,
+        "xp_to_next": xp_to_next_level,
     }
 
 

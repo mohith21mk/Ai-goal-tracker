@@ -35,12 +35,14 @@ const Habits = () => {
   });
   const [progression, setProgression] = useState({
     level: 1,
-    rank: 'Initiate',
+    rank: 'INITIATE',
     total_xp: 0,
     current_level_xp: 0,
-    next_level_xp: 100,
+    next_level_xp: 500,
     progress_pct: 0,
-    xp_to_next: 100
+    level_progress_percent: 0,
+    xp_to_next_level: 500,
+    xp_to_next: 500
   });
   const [levelUpEvent, setLevelUpEvent] = useState(null); // { oldLevel, newLevel, oldRank, newRank }
   const [floatingXp, setFloatingXp] = useState([]); // [{ id, habitId, text }]
@@ -249,16 +251,16 @@ const Habits = () => {
               <div className="hud-xp-meta">
                 <div className="xp-current-info font-display">
                   <Sparkles size={14} style={{ color: 'var(--cyan)' }} />
-                  <span>XP {progression.current_level_xp || 0} / {progression.next_level_xp || 100}</span>
+                  <span>XP {progression.current_level_xp !== undefined ? progression.current_level_xp : ((progression.total_xp || 0) % 500)} / {progression.next_level_xp || 500}</span>
                 </div>
                 <div className="xp-next-target font-display">
-                  +{progression.xp_to_next || Math.max(0, (progression.next_level_xp || 100) - (progression.current_level_xp || 0))} XP TO LEVEL {(progression.level || 1) + 1}
+                  +{progression.xp_to_next_level !== undefined ? progression.xp_to_next_level : (progression.xp_to_next !== undefined ? progression.xp_to_next : Math.max(0, 500 - ((progression.total_xp || 0) % 500)))} XP TO LEVEL {(progression.level || 1) + 1}
                 </div>
               </div>
               <div className="hud-xp-bar-track">
                 <div 
                   className="hud-xp-bar-fill" 
-                  style={{ width: `${Math.max(4, Math.min(100, progression.progress_pct || 0))}%` }}
+                  style={{ width: `${Math.max(4, Math.min(100, progression.level_progress_percent !== undefined ? progression.level_progress_percent : (progression.progress_pct || 0)))}%` }}
                 >
                   <div className="xp-bar-glow" />
                 </div>
