@@ -145,6 +145,30 @@ def test_admin_users_directory_and_actions(admin_and_user):
     assert role_res.status_code == 200
     assert role_res.json()["role"] == "admin"
 
+    # Admin updates user email
+    email_res = client.patch(
+        f"/api/admin/users/{reg_id}/email",
+        json={"email": "new_reg_user_email@mkc.com"},
+        cookies=adm_cookies,
+    )
+    assert email_res.status_code == 200
+    assert email_res.json()["new_email"] == "new_reg_user_email@mkc.com"
+
+    # Admin updates user email with duplicate email (409 Conflict)
+    dup_res = client.patch(
+        f"/api/admin/users/{reg_id}/email",
+        json={"email": ADMIN_EMAIL},
+        cookies=adm_cookies,
+    )
+    assert dup_res.status_code == 409
+
+    # Revert user email back
+    client.patch(
+        f"/api/admin/users/{reg_id}/email",
+        json={"email": USER_EMAIL},
+        cookies=adm_cookies,
+    )
+
     # Demote back to user
     role_demote = client.patch(
         f"/api/admin/users/{reg_id}/role",

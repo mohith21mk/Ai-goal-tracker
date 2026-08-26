@@ -1247,3 +1247,15 @@ export async function updateUserStatus(userId, isActive) {
   }
   return response.json();
 }
+
+export async function updateUserEmail(userId, email) {
+  const response = await apiFetch(`/api/admin/users/${userId}/email`, {
+    method: 'PATCH',
+    body: JSON.stringify({ email }),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to update user email: ${response.statusText}`);
+  }
+  return response.json();
+}

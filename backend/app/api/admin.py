@@ -29,6 +29,10 @@ class UserStatusUpdateRequest(BaseModel):
     is_active: bool = Field(..., description="Active status")
 
 
+class UserEmailUpdateRequest(BaseModel):
+    email: str = Field(..., description="New email address")
+
+
 @router.get("/overview", summary="Admin analytics overview")
 async def get_admin_overview(
     admin_user: Dict[str, Any] = Depends(require_admin)
@@ -434,4 +438,49 @@ async def update_user_status(
         "message": f"User {user_id} active status updated to {payload.is_active}.",
         "user_id": user_id,
         "is_active": payload.is_active,
+    }
+
+
+@router.patch("/users/{user_id}/email", summary="Update user email address (Admin only)")
+async def update_user_email(
+    user_id: int,
+    payload: UserEmailUpdateRequest,
+    admin_user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
+    new_email = payload.email.strip().lower()
+    import re
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", new_email):
+        raise HTTPException(status_code=400, detail="Invalid email format.")
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Check if target user exists
+    cursor.execute("SELECT id, username, email FROM users WHERE id = ?", (user_id,))
+    target = cursor.fetchone()
+    if not target:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    # Check email uniqueness
+    cursor.execute("SELECT id FROM users WHERE LOWER(email) = ? AND id != ?", (new_email, user_id))
+    existing = cursor.fetchone()
+    if existing:
+        conn.close()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Email '{new_email}' is already registered to another account (ID: {existing['id']})."
+        )
+
+    old_email = target["email"]
+    cursor.execute("UPDATE users SET email = ?, email_verified = 1 WHERE id = ?", (new_email, user_id))
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "message": f"User {user_id} email successfully updated from '{old_email}' to '{new_email}'.",
+        "user_id": user_id,
+        "old_email": old_email,
+        "new_email": new_email,
     }
