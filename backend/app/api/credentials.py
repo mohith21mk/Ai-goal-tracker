@@ -17,8 +17,10 @@ async def get_my_credentials(
 ) -> List[Dict[str, Any]]:
     """
     Get all credentials earned by the current authenticated user.
+    Server automatically evaluates and issues any newly qualified credentials.
     """
     user_id = current_user["id"]
+    evaluate_and_issue_credentials(user_id)
     return list_user_credentials(user_id)
 
 

@@ -426,6 +426,10 @@ def toggle_milestone(user_id: int, milestone_id: int) -> Optional[Dict[str, Any]
             )
             conn.commit()
 
+        # Automatically evaluate and issue any newly qualified credentials
+        from .progression import evaluate_and_issue_credentials
+        evaluate_and_issue_credentials(user_id)
+
     conn.close()
     return get_blueprint(user_id, blueprint_id)
 

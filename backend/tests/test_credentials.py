@@ -355,6 +355,30 @@ def test_public_credential_verification_endpoint():
         cleanup_user(user_id)
 
 
+def test_get_my_credentials_auto_evaluates_and_issues():
+    """Test that GET /api/credentials automatically evaluates server evidence and issues credentials."""
+    user_id, token = setup_user("cred_auto_eval")
+    try:
+        # User completes 7-day habit streak in DB
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO habits (user_id, title) VALUES (?, 'Strength Protocol')", (user_id,))
+        h_id = cursor.lastrowid
+        for i in range(7):
+            cursor.execute(f"INSERT INTO habit_logs (habit_id, user_id, completed_date) VALUES (?, ?, '2026-08-{i+1:02d}')", (h_id, user_id))
+        conn.commit()
+        conn.close()
+
+        # Calling standard GET /api/credentials should automatically issue and return streak_7
+        res = client.get("/api/credentials", cookies={"mkc_session": token})
+        assert res.status_code == 200
+        creds = res.json()
+        assert len(creds) >= 1
+        assert any(c["slug"] == "streak_7" for c in creds)
+    finally:
+        cleanup_user(user_id)
+
+
 def main():
     print("=" * 60)
     print("RUNNING TARGETED CREDENTIAL ENGINE TESTS")
@@ -367,6 +391,7 @@ def main():
     test_credential_idempotency()
     test_user_isolation_and_anti_spoofing()
     test_public_credential_verification_endpoint()
+    test_get_my_credentials_auto_evaluates_and_issues()
     print("=" * 60)
     print("ALL CREDENTIAL ENGINE TESTS PASSED")
     print("=" * 60)

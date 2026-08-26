@@ -847,6 +847,16 @@ def init_db() -> None:
         # Link default active goal to blueprint phase 2
         cursor.execute("UPDATE goals SET blueprint_id = ?, milestone_id = ? WHERE id = ?", (bp_id, milestones[3][0], default_goal_id))
         conn.commit()
+    else:
+        cursor.execute(
+            "UPDATE life_blueprints SET user_id = ? WHERE user_id = 1 OR user_id IS NULL",
+            (demo_user_id,),
+        )
+        cursor.execute(
+            "UPDATE blueprint_areas SET user_id = ? WHERE user_id = 1 OR user_id IS NULL",
+            (demo_user_id,),
+        )
+        conn.commit()
 
     # 13. Create user_settings table
     cursor.execute(
