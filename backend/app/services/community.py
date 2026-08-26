@@ -59,6 +59,7 @@ def list_community_posts(user_id: int, category: Optional[str] = None) -> List[D
     result = []
     for r in rows:
         post = dict(r)
+        post["likes_count"] = int(post.get("likes_count") or 0)
         post["user_has_liked"] = bool(post["user_has_liked"])
         if post.get("profile_visibility") == "private":
             post["author_name"] = "Anonymous Member"
@@ -111,6 +112,7 @@ def get_post_by_id(post_id: int) -> Optional[Dict[str, Any]]:
     if not row:
         return None
     post = dict(row)
+    post["likes_count"] = int(post.get("likes_count") or 0)
     post["author_name"] = _mask_author_name(post["user_id"], post["author_name"])
     if post.get("credential_id") and post.get("cred_title"):
         post["credential"] = {
