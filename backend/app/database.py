@@ -181,6 +181,43 @@ def _ensure_demo_user() -> None:
                     (user_id,),
                 )
 
+        if user_id:
+            # Seed demo missions if none exist
+            cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ?", (user_id,))
+            m_count = cursor.fetchone()[0] or 0
+            if m_count == 0:
+                demo_missions = [
+                    ("Morning Mindset Protocol", "Strategic planning and mental clarity routine", "mindset", "15 min", "easy", 15, 0, user_id),
+                    ("Deep Work Architecture Block", "High-focus deep work session on core engineering", "productivity", "45 min", "medium", 25, 0, user_id),
+                    ("Physical Conditioning & Workout", "High-intensity physical workout session", "wellness", "30 min", "medium", 20, 0, user_id),
+                ]
+                for m in demo_missions:
+                    cursor.execute(
+                        """
+                        INSERT INTO missions (title, description, category, time, difficulty, xp_reward, completed, user_id, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        """,
+                        m,
+                    )
+
+            # Seed demo habits if none exist
+            cursor.execute("SELECT COUNT(*) FROM habits WHERE user_id = ?", (user_id,))
+            h_count = cursor.fetchone()[0] or 0
+            if h_count == 0:
+                demo_habits = [
+                    ("Cold Plunge / Cold Shower", "wellness", "daily", 7, "active", user_id),
+                    ("Daily Code Commit & Review", "productivity", "daily", 7, "active", user_id),
+                    ("Read 20 Pages Non-Fiction", "learning", "daily", 7, "active", user_id),
+                ]
+                for h in demo_habits:
+                    cursor.execute(
+                        """
+                        INSERT INTO habits (title, category, frequency, target_days_per_week, status, user_id, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        """,
+                        h,
+                    )
+
         conn.commit()
         logger.info("Demo user verified and synchronized (demo@masterykeycoach.com).")
     except Exception as err:

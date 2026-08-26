@@ -88,8 +88,10 @@ def _compute_daily_snapshot(cursor: Any, user_id: int, date_cutoff: str) -> Dict
         j_streak_score = min(j_streak * 20, 100)
         energy_score = min(round(avg_energy_j * 10), 100)
         mind = round((mind_base * 0.40) + (j_streak_score * 0.30) + (energy_score * 0.30))
+    elif tot_mind > 0:
+        mind = round((mind_base * 0.60) + (m_pct * 0.40))
     else:
-        mind = mind_base
+        mind = m_pct
 
     # 3. Habits active & logged on or before cutoff
     cursor.execute(

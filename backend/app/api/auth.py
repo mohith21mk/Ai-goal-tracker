@@ -239,6 +239,22 @@ async def register_user(payload: RegisterRequest, request: Request, response: Re
             """,
             (user_id,),
         )
+
+        # Seed starter daily missions for new user
+        starter_missions = [
+            ("Morning Mindset Protocol", "Strategic planning and mental clarity routine", "mindset", "15 min", "easy", 15, user_id),
+            ("Deep Work Architecture Block", "High-focus deep work session on core engineering", "productivity", "45 min", "medium", 25, user_id),
+            ("Physical Conditioning & Workout", "High-intensity physical workout session", "wellness", "30 min", "medium", 20, user_id),
+        ]
+        for m in starter_missions:
+            cursor.execute(
+                """
+                INSERT INTO missions (title, description, category, time, difficulty, xp_reward, completed, user_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, 0, ?, CURRENT_TIMESTAMP)
+                """,
+                m,
+            )
+
         conn.commit()
 
         # Generate single-use verification token
