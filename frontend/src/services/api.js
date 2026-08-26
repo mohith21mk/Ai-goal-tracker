@@ -1215,6 +1215,15 @@ export async function getAdminUsers(params = {}) {
   return response.json();
 }
 
+export async function getAdminUserDetail(userId) {
+  const response = await apiFetch(`/api/admin/users/${userId}`);
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to fetch admin user detail: ${response.statusText}`);
+  }
+  return response.json();
+}
+
 export async function updateUserRole(userId, role) {
   const response = await apiFetch(`/api/admin/users/${userId}/role`, {
     method: 'PATCH',

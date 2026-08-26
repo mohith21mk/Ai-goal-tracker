@@ -11,12 +11,17 @@ import {
   Search, 
   CheckCircle2, 
   Lock,
-  RefreshCw
+  RefreshCw,
+  X,
+  Award,
+  Flame,
+  Target
 } from 'lucide-react';
 import { 
   getUser, 
   getAdminOverview, 
   getAdminUsers, 
+  getAdminUserDetail,
   updateUserRole, 
   updateUserStatus, 
   getAdminFeedback, 
@@ -40,6 +45,9 @@ const AdminDashboard = () => {
   const [userSearch, setUserSearch] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState('');
   const [userStatusFilter, setUserStatusFilter] = useState('');
+
+  // Selected User Detail Modal State
+  const [selectedUserDetail, setSelectedUserDetail] = useState(null);
 
   // Feedback Moderation State
   const [feedbackList, setFeedbackList] = useState({ items: [], total: 0 });
@@ -129,6 +137,15 @@ const AdminDashboard = () => {
       setTimeout(() => setFeedbackMessage(null), 3000);
     } catch (err) {
       alert(err.message || 'Failed to update status.');
+    }
+  };
+
+  const handleInspectUser = async (userId) => {
+    try {
+      const detail = await getAdminUserDetail(userId);
+      setSelectedUserDetail(detail);
+    } catch (err) {
+      alert(err.message || 'Failed to retrieve detailed user profile.');
     }
   };
 
@@ -538,6 +555,20 @@ const AdminDashboard = () => {
                           <td>
                             <div style={{ display: 'flex', gap: '6px' }}>
                               <button
+                                onClick={() => handleInspectUser(u.id)}
+                                className="feedback-btn"
+                                style={{
+                                  padding: '4px 8px',
+                                  fontSize: '11px',
+                                  color: 'var(--cyan)',
+                                  borderColor: 'rgba(56, 189, 248, 0.3)'
+                                }}
+                                title="Inspect Detailed User Progress"
+                              >
+                                Inspect
+                              </button>
+
+                              <button
                                 onClick={() => handleRoleToggle(u.id, u.role)}
                                 className="feedback-btn"
                                 style={{ padding: '4px 8px', fontSize: '11px' }}
@@ -716,6 +747,258 @@ const AdminDashboard = () => {
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================ */}
+          {/* USER DETAILS INSPECTION MODAL                               */}
+          {/* ============================================================ */}
+          {selectedUserDetail && (
+            <div className="feedback-modal-backdrop" style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(5, 10, 20, 0.85)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '20px'
+            }}>
+              <div style={{
+                background: 'var(--bg-card, #0f172a)',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: '750px',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                padding: '24px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(56, 189, 248, 0.15)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px'
+              }}>
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: '50%',
+                      background: 'rgba(56, 189, 248, 0.15)',
+                      border: '1px solid var(--cyan)',
+                      color: 'var(--cyan)',
+                      fontWeight: '800',
+                      fontSize: '18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      {selectedUserDetail.avatar_initials || 'U'}
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                          {selectedUserDetail.full_name || 'Anonymous User'}
+                        </h2>
+                        <span className={`role-badge ${selectedUserDetail.role === 'admin' ? 'admin' : 'user'}`}>
+                          {selectedUserDetail.role}
+                        </span>
+                        <span style={{
+                          fontSize: '10px',
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          background: selectedUserDetail.is_active ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                          color: selectedUserDetail.is_active ? '#10B981' : '#EF4444',
+                          fontWeight: '600'
+                        }}>
+                          {selectedUserDetail.is_active ? 'Active' : 'Disabled'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        @{selectedUserDetail.username} • {selectedUserDetail.email}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedUserDetail(null)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      padding: '4px'
+                    }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Identity Meta Bar */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                  gap: '10px',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
+                  fontSize: '11px'
+                }}>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)' }}>MKC ID: </span>
+                    <strong style={{ color: 'var(--cyan)' }}>{selectedUserDetail.mkc_id || `MKC-USER-${selectedUserDetail.id}`}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)' }}>User ID: </span>
+                    <strong>#{selectedUserDetail.id}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)' }}>Joined: </span>
+                    <strong>{selectedUserDetail.created_at ? new Date(selectedUserDetail.created_at).toLocaleDateString() : 'N/A'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)' }}>Last Activity: </span>
+                    <strong>{selectedUserDetail.last_activity ? new Date(selectedUserDetail.last_activity).toLocaleDateString() : 'N/A'}</strong>
+                  </div>
+                </div>
+
+                {/* Live Telemetry Progress Metrics */}
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                    Server-Authoritative Progression
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+                    <div className="admin-stat-card" style={{ padding: '12px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Level</div>
+                      <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--cyan)' }}>Level {selectedUserDetail.level || 1}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{selectedUserDetail.rank || 'INITIATE'}</div>
+                    </div>
+                    <div className="admin-stat-card" style={{ padding: '12px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Total XP</div>
+                      <div style={{ fontSize: '20px', fontWeight: '800', color: '#F59E0B' }}>{selectedUserDetail.total_xp || 0} XP</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{selectedUserDetail.mission_xp || 0}m / {selectedUserDetail.habit_xp || 0}h</div>
+                    </div>
+                    <div className="admin-stat-card" style={{ padding: '12px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Discipline Streak</div>
+                      <div style={{ fontSize: '20px', fontWeight: '800', color: '#EF4444' }}>🔥 {selectedUserDetail.streak_days || 0}d</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Current Max</div>
+                    </div>
+                    <div className="admin-stat-card" style={{ padding: '12px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Missions Done</div>
+                      <div style={{ fontSize: '20px', fontWeight: '800', color: '#10B981' }}>🎯 {selectedUserDetail.completed_missions || 0}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Completed</div>
+                    </div>
+                    <div className="admin-stat-card" style={{ padding: '12px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Active Goals</div>
+                      <div style={{ fontSize: '20px', fontWeight: '800', color: '#6366F1' }}>📍 {selectedUserDetail.active_goals || 0}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>In Progress</div>
+                    </div>
+                    <div className="admin-stat-card" style={{ padding: '12px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Credentials</div>
+                      <div style={{ fontSize: '20px', fontWeight: '800', color: '#EC4899' }}>🏆 {selectedUserDetail.earned_credentials_count || 0}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Verified</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Detail Breakdown Lists */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  {/* Goals */}
+                  <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color, rgba(255, 255, 255, 0.06))' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Target size={14} color="var(--cyan)" /> Active Goals ({selectedUserDetail.goals?.length || 0})
+                    </div>
+                    {(!selectedUserDetail.goals || selectedUserDetail.goals.length === 0) ? (
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>No active goals recorded.</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {selectedUserDetail.goals.map((g) => (
+                          <div key={g.id} style={{ fontSize: '11px', padding: '6px 8px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.03)' }}>
+                            <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{g.title}</div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Category: {g.category || 'General'} • Status: {g.status}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Habits */}
+                  <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color, rgba(255, 255, 255, 0.06))' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Flame size={14} color="#EF4444" /> Active Habits ({selectedUserDetail.habits?.length || 0})
+                    </div>
+                    {(!selectedUserDetail.habits || selectedUserDetail.habits.length === 0) ? (
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>No active habits recorded.</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {selectedUserDetail.habits.map((h) => (
+                          <div key={h.id} style={{ fontSize: '11px', padding: '6px 8px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.03)' }}>
+                            <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{h.title}</div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Freq: {h.frequency} ({h.target_days_per_week || 7}d/wk)</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Recent Missions & Credentials */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  {/* Missions */}
+                  <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color, rgba(255, 255, 255, 0.06))' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🎯 Recent Missions ({selectedUserDetail.recent_missions?.length || 0})
+                    </div>
+                    {(!selectedUserDetail.recent_missions || selectedUserDetail.recent_missions.length === 0) ? (
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>No missions recorded.</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {selectedUserDetail.recent_missions.map((m) => (
+                          <div key={m.id} style={{ fontSize: '11px', padding: '6px 8px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.03)' }}>
+                            <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{m.title}</div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>+{m.xp_reward} XP • {m.completed ? '✅ Completed' : '⏳ Pending'}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Credentials */}
+                  <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color, rgba(255, 255, 255, 0.06))' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Award size={14} color="#EC4899" /> Earned Credentials ({selectedUserDetail.credentials?.length || 0})
+                    </div>
+                    {(!selectedUserDetail.credentials || selectedUserDetail.credentials.length === 0) ? (
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>No credentials earned yet.</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {selectedUserDetail.credentials.map((c) => (
+                          <div key={c.id} style={{ fontSize: '11px', padding: '6px 8px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.03)' }}>
+                            <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{c.title}</div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Tier: {c.tier} • +{c.xp_value} XP</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                  <button
+                    onClick={() => setSelectedUserDetail(null)}
+                    className="admin-refresh-btn"
+                    style={{ padding: '8px 18px', fontSize: '12px' }}
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           )}

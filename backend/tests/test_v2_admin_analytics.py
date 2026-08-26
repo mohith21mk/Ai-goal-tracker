@@ -198,3 +198,62 @@ def test_admin_feedback_moderation_flow(admin_and_user):
     )
     assert resolve_res.status_code == 200
     assert resolve_res.json()["status"] == "resolved"
+
+
+def test_admin_user_detail_and_isolation(admin_and_user):
+    adm_cookies = admin_and_user["adm_cookies"]
+    reg_cookies = admin_and_user["reg_cookies"]
+    reg_id = admin_and_user["reg_id"]
+    adm_id = admin_and_user["adm_id"]
+
+    # 1. Non-admin cannot access user detail (403)
+    forbidden_res = client.get(f"/api/admin/users/{reg_id}", cookies=reg_cookies)
+    assert forbidden_res.status_code == 403
+
+    # 2. Unauthenticated request cannot access user detail (401)
+    fresh_client = TestClient(app)
+    unauth_res = fresh_client.get(f"/api/admin/users/{reg_id}")
+    assert unauth_res.status_code == 401
+
+    # 3. Admin can retrieve User A (Regular User) detail
+    user_a_res = client.get(f"/api/admin/users/{reg_id}", cookies=adm_cookies)
+    assert user_a_res.status_code == 200
+    user_a = user_a_res.json()
+    assert user_a["id"] == reg_id
+    assert user_a["email"] == USER_EMAIL
+    assert user_a["username"] == "reg_user"
+    assert "total_xp" in user_a
+    assert "level" in user_a
+    assert "rank" in user_a
+    assert "streak_days" in user_a
+    assert "completed_missions" in user_a
+    assert "active_goals" in user_a
+    assert "active_habits" in user_a
+    assert "earned_credentials_count" in user_a
+    assert "recent_missions" in user_a
+    assert "goals" in user_a
+    assert "habits" in user_a
+    assert "credentials" in user_a
+    # Security: No sensitive fields
+    assert "password_hash" not in user_a
+    assert "password" not in user_a
+    assert "token" not in user_a
+
+    # 4. Admin can retrieve User B (Admin User) detail
+    user_b_res = client.get(f"/api/admin/users/{adm_id}", cookies=adm_cookies)
+    assert user_b_res.status_code == 200
+    user_b = user_b_res.json()
+    assert user_b["id"] == adm_id
+    assert user_b["email"] == ADMIN_EMAIL
+    assert user_b["username"] == "admin_owner"
+
+    # 5. Verify Data Isolation between User A and User B
+    assert user_a["id"] != user_b["id"]
+    assert user_a["email"] != user_b["email"]
+    assert user_a["username"] != user_b["username"]
+    assert user_a["role"] != user_b["role"]
+
+    # 6. Non-existent user returns 404
+    not_found_res = client.get("/api/admin/users/999999", cookies=adm_cookies)
+    assert not_found_res.status_code == 404
+

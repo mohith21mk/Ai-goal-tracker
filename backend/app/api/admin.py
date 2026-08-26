@@ -247,6 +247,137 @@ async def get_admin_users(
     }
 
 
+@router.get("/users/{user_id}", summary="Get detailed user profile and progress (Admin only)")
+async def get_admin_user_detail(
+    user_id: int,
+    admin_user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
+    """
+    Retrieve comprehensive user detail including live progression, active goals, habits,
+    completed missions, earned credentials, and recent activity logs.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT id, username, email, full_name, mkc_id, avatar_initials, bio, role,
+               is_active, email_verified, onboarding_completed, created_at
+        FROM users
+        WHERE id = ?
+        """,
+        (user_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    u_dict = dict(row)
+    uid = u_dict["id"]
+
+    # Compute live progression
+    xp_data = calculate_user_xp(uid)
+    tot_xp = xp_data["total_xp"]
+    lvl = calculate_level(tot_xp)
+    rnk = calculate_rank(lvl)
+    streak = get_user_max_habit_streak(uid)
+
+    # Completed missions count and recent missions
+    cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ? AND completed = 1", (uid,))
+    comp_m = cursor.fetchone()[0] or 0
+
+    cursor.execute(
+        """
+        SELECT id, title, category, time, difficulty, xp_reward, completed, completed_at, created_at
+        FROM missions
+        WHERE user_id = ?
+        ORDER BY id DESC
+        LIMIT 10
+        """,
+        (uid,)
+    )
+    recent_missions = [dict(m) for m in cursor.fetchall()]
+
+    # Active goals
+    cursor.execute("SELECT COUNT(*) FROM goals WHERE user_id = ? AND status = 'active'", (uid,))
+    act_g = cursor.fetchone()[0] or 0
+
+    cursor.execute(
+        """
+        SELECT id, title, description, category, status, target_date, created_at
+        FROM goals
+        WHERE user_id = ?
+        ORDER BY id DESC
+        LIMIT 10
+        """,
+        (uid,)
+    )
+    goals_list = [dict(g) for g in cursor.fetchall()]
+
+    # Active habits
+    cursor.execute("SELECT COUNT(*) FROM habits WHERE user_id = ? AND status = 'active'", (uid,))
+    act_h = cursor.fetchone()[0] or 0
+
+    cursor.execute(
+        """
+        SELECT id, title, category, frequency, target_days_per_week, status, created_at
+        FROM habits
+        WHERE user_id = ?
+        ORDER BY id DESC
+        LIMIT 10
+        """,
+        (uid,)
+    )
+    habits_list = [dict(h) for h in cursor.fetchall()]
+
+    # Credentials
+    cursor.execute("SELECT COUNT(*) FROM user_credentials WHERE user_id = ?", (uid,))
+    cred_c = cursor.fetchone()[0] or 0
+
+    cursor.execute(
+        """
+        SELECT id, credential_type, slug, title, description, tier, xp_value, issued_at
+        FROM user_credentials
+        WHERE user_id = ?
+        ORDER BY id DESC
+        """,
+        (uid,)
+    )
+    credentials_list = [dict(c) for c in cursor.fetchall()]
+
+    # Session activity
+    cursor.execute("SELECT MAX(last_seen_at) FROM app_sessions WHERE user_id = ?", (uid,))
+    last_seen = cursor.fetchone()[0]
+
+    conn.close()
+
+    u_dict.update({
+        "user_id": uid,
+        "total_xp": tot_xp,
+        "xp": tot_xp,
+        "mission_xp": xp_data["mission_xp"],
+        "habit_xp": xp_data["habit_xp"],
+        "level": lvl,
+        "rank": rnk,
+        "streak_days": streak,
+        "discipline_streak": streak,
+        "completed_missions": comp_m,
+        "active_goals": act_g,
+        "active_habits": act_h,
+        "earned_credentials_count": cred_c,
+        "credentials_count": cred_c,
+        "last_seen_at": last_seen,
+        "last_activity": last_seen or (str(u_dict.get("created_at")) if u_dict.get("created_at") else None),
+        "recent_missions": recent_missions,
+        "goals": goals_list,
+        "habits": habits_list,
+        "credentials": credentials_list,
+    })
+
+    return u_dict
+
+
 @router.patch("/users/{user_id}/role", summary="Update user role (Admin only)")
 async def update_user_role(
     user_id: int,
