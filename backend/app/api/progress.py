@@ -25,8 +25,8 @@ def _compute_daily_snapshot(cursor: Any, user_id: int, date_cutoff: str) -> Dict
 
     # Missions completed on or before cutoff
     cursor.execute(
-        "SELECT COUNT(*), COALESCE(SUM(xp_reward), 0) FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL AND completed_at <= ?",
-        (user_id, date_cutoff),
+        "SELECT COUNT(*), COALESCE(SUM(xp_reward), 0) FROM missions WHERE user_id = ? AND completed = 1 AND (completed_at <= ? OR (completed_at IS NULL AND (created_at <= ? OR created_at IS NULL)))",
+        (user_id, date_cutoff, date_cutoff),
     )
     m_comp_row = cursor.fetchone()
     comp_m = m_comp_row[0] or 0
@@ -41,11 +41,15 @@ def _compute_daily_snapshot(cursor: Any, user_id: int, date_cutoff: str) -> Dict
     tot_mind = cursor.fetchone()[0] or 0
 
     cursor.execute(
-        "SELECT COUNT(*) FROM missions WHERE user_id = ? AND category = 'mindset' AND completed = 1 AND completed_at IS NOT NULL AND completed_at <= ?",
-        (user_id, date_cutoff),
+        "SELECT COUNT(*) FROM missions WHERE user_id = ? AND category = 'mindset' AND completed = 1 AND (completed_at <= ? OR (completed_at IS NULL AND (created_at <= ? OR created_at IS NULL)))",
+        (user_id, date_cutoff, date_cutoff),
     )
     comp_mind = cursor.fetchone()[0] or 0
-    mind_base = round((comp_mind / tot_mind) * 100) if tot_mind > 0 else 0
+    if tot_mind > 0:
+        mind_base = round((comp_mind / tot_mind) * 100)
+    else:
+        # Fallback to general mission completion percentage if no specific mindset category missions
+        mind_base = m_pct
 
     # Journal reflections logged on or before cutoff date
     cursor.execute(
@@ -117,8 +121,8 @@ def _compute_daily_snapshot(cursor: Any, user_id: int, date_cutoff: str) -> Dict
 
     # 4. Streak Days up to cutoff
     cursor.execute(
-        "SELECT DISTINCT DATE(completed_at) FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL AND completed_at <= ?",
-        (user_id, date_cutoff),
+        "SELECT DISTINCT DATE(COALESCE(completed_at, created_at, CURRENT_TIMESTAMP)) FROM missions WHERE user_id = ? AND completed = 1 AND (completed_at <= ? OR (completed_at IS NULL AND (created_at <= ? OR created_at IS NULL)))",
+        (user_id, date_cutoff, date_cutoff),
     )
     m_dates = [str(r[0])[:10] for r in cursor.fetchall() if r[0]]
 

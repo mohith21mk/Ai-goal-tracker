@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.database import get_connection
@@ -130,3 +130,48 @@ def test_mission_and_habit_xp_synchronization(sync_user):
     prog_zero = client.get("/api/progression", cookies=cookies).json()
     assert prog_zero["total_xp"] == 0
     assert prog_zero["mission_xp"] == 0
+
+
+def test_completed_3_missions_telemetry_live_update(sync_user):
+    cookies = sync_user["cookies"]
+
+    # Create 3 missions (Productivity, Wellness, Learning)
+    m1 = client.post(
+        "/api/missions",
+        json={"title": "morning habit", "category": "productivity", "xp_reward": 50},
+        cookies=cookies,
+    ).json()["id"]
+
+    m2 = client.post(
+        "/api/missions",
+        json={"title": "workout", "category": "wellness", "xp_reward": 50},
+        cookies=cookies,
+    ).json()["id"]
+
+    m3 = client.post(
+        "/api/missions",
+        json={"title": "learning", "category": "learning", "xp_reward": 50},
+        cookies=cookies,
+    ).json()["id"]
+
+    # Toggle all 3 missions to completed
+    client.patch(f"/api/missions/{m1}/toggle", cookies=cookies)
+    client.patch(f"/api/missions/{m2}/toggle", cookies=cookies)
+    client.patch(f"/api/missions/{m3}/toggle", cookies=cookies)
+
+    # Fetch live telemetry
+    telem = client.get("/api/telemetry", cookies=cookies).json()
+
+    # Verify metrics are not 0
+    assert telem["mission_completion"]["completed"] == 3
+    assert telem["mission_completion"]["total"] == 3
+    assert telem["mission_completion"]["percentage"] == 100
+    assert telem["xp_earned"] == 150
+    assert telem["discipline_score"] > 0
+    assert telem["mindset_strength"] > 0
+    assert telem["consistency"] > 0
+    assert telem["growth_index"] > 0
+    assert telem["streak_days"] >= 1
+    assert telem["progression"]["total_xp"] == 150
+    assert telem["progression"]["level"] >= 1
+
