@@ -1,4 +1,4 @@
-﻿import datetime
+import datetime
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -200,27 +200,40 @@ async def get_admin_users(
         rnk = calculate_rank(lvl)
         streak = get_user_max_habit_streak(uid)
 
-        # Count completed missions & habits
+        # Count completed missions, active goals, habits, and credentials
         cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ? AND completed = 1", (uid,))
         comp_m = cursor.fetchone()[0] or 0
 
+        cursor.execute("SELECT COUNT(*) FROM goals WHERE user_id = ? AND status = 'active'", (uid,))
+        act_g = cursor.fetchone()[0] or 0
+
         cursor.execute("SELECT COUNT(*) FROM habits WHERE user_id = ? AND status = 'active'", (uid,))
         act_h = cursor.fetchone()[0] or 0
+
+        cursor.execute("SELECT COUNT(*) FROM user_credentials WHERE user_id = ?", (uid,))
+        cred_c = cursor.fetchone()[0] or 0
 
         # Latest session last_seen_at
         cursor.execute("SELECT MAX(last_seen_at) FROM app_sessions WHERE user_id = ?", (uid,))
         last_seen = cursor.fetchone()[0]
 
         u_dict.update({
+            "user_id": uid,
             "total_xp": tot_xp,
+            "xp": tot_xp,
             "mission_xp": xp_data["mission_xp"],
             "habit_xp": xp_data["habit_xp"],
             "level": lvl,
             "rank": rnk,
             "streak_days": streak,
+            "discipline_streak": streak,
             "completed_missions": comp_m,
+            "active_goals": act_g,
             "active_habits": act_h,
+            "earned_credentials_count": cred_c,
+            "credentials_count": cred_c,
             "last_seen_at": last_seen,
+            "last_activity": last_seen or (str(u_dict.get("created_at")) if u_dict.get("created_at") else None),
         })
         users_list.append(u_dict)
 

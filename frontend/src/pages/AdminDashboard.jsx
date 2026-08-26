@@ -519,8 +519,13 @@ const AdminDashboard = () => {
                           </td>
 
                           <td>
-                            <div style={{ fontSize: '12px' }}>
-                              <span>🔥 {u.streak_days || 0}d streak</span> • <span>🎯 {u.completed_missions || 0} missions</span>
+                            <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <div>
+                                <span>🔥 {u.streak_days || 0}d streak</span> • <span>🎯 {u.completed_missions || 0} missions</span>
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                <span>🏆 {u.earned_credentials_count || 0} certs</span> • <span>📍 {u.active_goals || 0} goals</span>
+                              </div>
                             </div>
                           </td>
 

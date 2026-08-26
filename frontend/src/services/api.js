@@ -24,6 +24,7 @@ const ENDPOINT_TTLS = [
   { pattern: /^\/api\/habits/, ttl: 30 * 1000 },                         // 30 seconds
   { pattern: /^\/api\/reflection/, ttl: 45 * 1000 },                     // 45 seconds
   { pattern: /^\/api\/journal/, ttl: 30 * 1000 },                        // 30 seconds
+  { pattern: /^\/api\/admin/, ttl: 15 * 1000 },                          // 15 seconds
   { pattern: /^\/api\/notifications/, ttl: 10 * 1000 },                  // 10 seconds
 ];
 
@@ -164,6 +165,8 @@ async function apiFetch(endpoint, options = {}) {
     clearApiCache(/^\/api\/(journal|reflection|progress)/);
   } else if (endpoint.startsWith('/api/settings')) {
     clearApiCache(/^\/api\/settings/);
+  } else if (endpoint.startsWith('/api/admin')) {
+    clearApiCache(/^\/api\/admin/);
   } else if (endpoint.startsWith('/api/auth/logout') || endpoint.startsWith('/api/auth/login')) {
     clearApiCache(); // clear everything on login/logout
   } else if (endpoint.startsWith('/api/users')) {

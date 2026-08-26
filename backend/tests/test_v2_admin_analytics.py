@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.database import get_connection
@@ -118,10 +118,23 @@ def test_admin_users_directory_and_actions(admin_and_user):
     assert search_res.status_code == 200
     found = search_res.json()["items"]
     assert len(found) == 1
-    assert found[0]["email"] == USER_EMAIL
-    assert "total_xp" in found[0]
-    assert "level" in found[0]
-    assert "rank" in found[0]
+    u = found[0]
+    assert u["email"] == USER_EMAIL
+    assert u["username"] == "reg_user"
+    assert "user_id" in u
+    assert "total_xp" in u
+    assert "level" in u
+    assert "rank" in u
+    assert "streak_days" in u
+    assert "completed_missions" in u
+    assert "active_goals" in u
+    assert "earned_credentials_count" in u
+    assert "last_activity" in u
+    assert "mkc_id" in u
+    # Security: Ensure sensitive data is never exposed
+    assert "password_hash" not in u
+    assert "password" not in u
+    assert "token" not in u
 
     # Promote regular user to admin
     role_res = client.patch(
