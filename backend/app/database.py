@@ -28,7 +28,10 @@ class _PgCompatCursor:
         self._cursor = real_cursor
 
     def execute(self, sql, params=None):
-        sql = sql.replace('?', '%s')
+        if params:
+            sql = sql.replace('%', '%%').replace('?', '%s')
+        else:
+            sql = sql.replace('?', '%s')
         stripped = sql.strip()
         upper_stripped = stripped.upper()
         self._last_insert_id = None
@@ -54,7 +57,10 @@ class _PgCompatCursor:
         return self._cursor.execute(sql, params)
 
     def executemany(self, sql, params_list):
-        sql = sql.replace('?', '%s')
+        if params_list:
+            sql = sql.replace('%', '%%').replace('?', '%s')
+        else:
+            sql = sql.replace('?', '%s')
         return self._cursor.executemany(sql, params_list)
 
     def fetchone(self):
