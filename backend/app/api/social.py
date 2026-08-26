@@ -288,3 +288,184 @@ async def reject_connection(payload: ConnectionAction, current_user: Dict[str, A
     conn.commit()
     conn.close()
     return {"status": "success", "message": "Connection request rejected", "request_id": req["id"]}
+
+
+# ============================================================================
+# SOCIAL FOLLOW / UNFOLLOW SYSTEM
+# ============================================================================
+
+@router.post("/follow/{user_id}", response_model=Dict[str, Any])
+async def follow_user(user_id: int, current_user: Dict[str, Any] = Depends(get_current_user)):
+    target_id = user_id
+    if target_id == current_user["id"]:
+        raise HTTPException(status_code=400, detail="You cannot follow yourself.")
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id, username, full_name FROM users WHERE id = ? AND deactivated_at IS NULL", (target_id,))
+    target = cursor.fetchone()
+    if not target:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    cursor.execute(
+        "SELECT id FROM user_follows WHERE follower_id = ? AND following_id = ?",
+        (current_user["id"], target_id)
+    )
+    existing = cursor.fetchone()
+    if existing:
+        conn.close()
+        return {
+            "status": "success",
+            "message": f"You are already following @{target['username']}",
+            "following_id": target_id,
+            "is_following": True
+        }
+
+    cursor.execute(
+        "INSERT INTO user_follows (follower_id, following_id) VALUES (?, ?)",
+        (current_user["id"], target_id)
+    )
+    conn.commit()
+    conn.close()
+
+    # Send real-time notification to the followed user
+    await create_notification(
+        user_id=target_id,
+        type="user_followed",
+        title="New Follower",
+        message=f"@{current_user['username']} started following you.",
+        reference_type="user",
+        reference_id=current_user["id"],
+        data={
+            "type": "user_followed",
+            "follower_id": current_user["id"],
+            "follower_username": current_user.get("username", ""),
+            "follower_name": current_user.get("full_name") or current_user.get("username", ""),
+            "action": "open_profile"
+        }
+    )
+
+    return {
+        "status": "success",
+        "message": f"You are now following @{target['username']}",
+        "following_id": target_id,
+        "is_following": True
+    }
+
+
+@router.post("/unfollow/{user_id}", response_model=Dict[str, Any])
+async def unfollow_user(user_id: int, current_user: Dict[str, Any] = Depends(get_current_user)):
+    target_id = user_id
+    if target_id == current_user["id"]:
+        raise HTTPException(status_code=400, detail="You cannot unfollow yourself.")
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "DELETE FROM user_follows WHERE follower_id = ? AND following_id = ?",
+        (current_user["id"], target_id)
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "status": "success",
+        "message": "User unfollowed successfully.",
+        "following_id": target_id,
+        "is_following": False
+    }
+
+
+@router.get("/follow-stats/{user_id}", response_model=Dict[str, Any])
+async def get_follow_stats(user_id: int, current_user: Dict[str, Any] = Depends(get_current_user)):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id FROM users WHERE id = ? AND deactivated_at IS NULL", (user_id,))
+    user = cursor.fetchone()
+    if not user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    cursor.execute("SELECT COUNT(*) AS count FROM user_follows WHERE following_id = ?", (user_id,))
+    row_followers = cursor.fetchone()
+    followers_count = row_followers["count"] if row_followers else 0
+
+    cursor.execute("SELECT COUNT(*) AS count FROM user_follows WHERE follower_id = ?", (user_id,))
+    row_following = cursor.fetchone()
+    following_count = row_following["count"] if row_following else 0
+
+    cursor.execute(
+        "SELECT id FROM user_follows WHERE follower_id = ? AND following_id = ?",
+        (current_user["id"], user_id)
+    )
+    is_following = bool(cursor.fetchone())
+
+    conn.close()
+    return {
+        "user_id": user_id,
+        "followers_count": followers_count,
+        "following_count": following_count,
+        "is_following": is_following
+    }
+
+
+@router.get("/followers/{user_id}", response_model=List[Dict[str, Any]])
+async def get_followers(user_id: int, current_user: Dict[str, Any] = Depends(get_current_user)):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT u.id, u.username, u.full_name, u.avatar_initials, u.bio, u.mkc_id,
+               uf.created_at AS followed_at,
+               EXISTS(
+                   SELECT 1 FROM user_follows uf2 
+                   WHERE uf2.follower_id = ? AND uf2.following_id = u.id
+               ) AS is_following
+        FROM user_follows uf
+        JOIN users u ON uf.follower_id = u.id
+        WHERE uf.following_id = ? AND u.deactivated_at IS NULL
+        ORDER BY uf.created_at DESC
+    """, (current_user["id"], user_id))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["is_following"] = bool(d.get("is_following", False))
+        result.append(d)
+    return result
+
+
+@router.get("/following/{user_id}", response_model=List[Dict[str, Any]])
+async def get_following(user_id: int, current_user: Dict[str, Any] = Depends(get_current_user)):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT u.id, u.username, u.full_name, u.avatar_initials, u.bio, u.mkc_id,
+               uf.created_at AS followed_at,
+               EXISTS(
+                   SELECT 1 FROM user_follows uf2 
+                   WHERE uf2.follower_id = ? AND uf2.following_id = u.id
+               ) AS is_following
+        FROM user_follows uf
+        JOIN users u ON uf.following_id = u.id
+        WHERE uf.follower_id = ? AND u.deactivated_at IS NULL
+        ORDER BY uf.created_at DESC
+    """, (current_user["id"], user_id))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["is_following"] = bool(d.get("is_following", False))
+        result.append(d)
+    return result

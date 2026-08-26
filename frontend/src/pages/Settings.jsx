@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Bell, Zap, Shield, TriangleAlert, CheckCircle2, LogOut, MessageSquare } from 'lucide-react';
+import { 
+  Bot, Bell, Zap, Shield, TriangleAlert, CheckCircle2, LogOut, 
+  MessageSquare, Trash2, AlertTriangle, X 
+} from 'lucide-react';
 import FeedbackModal from '../components/FeedbackModal';
-import { getSettings, updateSettings, logoutUser } from '../services/api';
+import { getSettings, updateSettings, logoutUser, deleteAccount } from '../services/api';
 import './Settings.css';
 
 const Settings = () => {
@@ -11,6 +14,13 @@ const Settings = () => {
   const [dailyReminderTime, setDailyReminderTime] = useState('08:00');
   const [profileVisibility, setProfileVisibility] = useState('public');
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+
+  // Danger Zone Deletion Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirmPhrase, setDeleteConfirmPhrase] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -91,234 +101,353 @@ const Settings = () => {
     }
   };
 
+  const handleExecuteDeleteAccount = async (e) => {
+    if (e) e.preventDefault();
+    if (deleteConfirmPhrase.trim() !== 'DELETE MY ACCOUNT' || !deletePassword) return;
+
+    setDeletingAccount(true);
+    setDeleteError(null);
+
+    try {
+      await deleteAccount(deletePassword, deleteConfirmPhrase.trim());
+      setIsDeleteModalOpen(false);
+      navigate('/login');
+    } catch (err) {
+      setDeleteError(err.message || 'Failed to delete account.');
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
   return (
     <div className="settings-container">
-          {/* Header */}
-          <div className="settings-header">
-            <h1 className="font-serif">System Preferences</h1>
-            <p>Customize your AI Coach persona, notification protocols, and privacy parameters.</p>
-          </div>
+      {/* Header */}
+      <div className="settings-header">
+        <h1 className="font-serif">System Preferences</h1>
+        <p>Customize your AI Coach persona, notification protocols, privacy parameters, and account lifecycle.</p>
+      </div>
 
-          {statusMessage && (
-            <div style={{
-              padding: '12px 16px',
-              background: statusMessage.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(56, 189, 248, 0.1)',
-              border: `1px solid ${statusMessage.type === 'error' ? '#EF4444' : 'var(--cyan)'}`,
-              borderRadius: '12px',
-              color: statusMessage.type === 'error' ? '#EF4444' : 'var(--cyan)',
-              marginBottom: '24px',
-              fontSize: '13px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              {statusMessage.type === 'error' ? <TriangleAlert size={16} /> : <CheckCircle2 size={16} />} {statusMessage.text}
+      {statusMessage && (
+        <div style={{
+          padding: '12px 16px',
+          background: statusMessage.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(56, 189, 248, 0.1)',
+          border: `1px solid ${statusMessage.type === 'error' ? '#EF4444' : 'var(--cyan)'}`,
+          borderRadius: '12px',
+          color: statusMessage.type === 'error' ? '#EF4444' : 'var(--cyan)',
+          marginBottom: '24px',
+          fontSize: '13px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          {statusMessage.type === 'error' ? <TriangleAlert size={16} /> : <CheckCircle2 size={16} />} {statusMessage.text}
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-tertiary)' }}>Loading System Preferences...</div>
+      ) : (
+        <form onSubmit={handleSaveSettings}>
+          <div className="settings-grid">
+            {/* 1. AI Coach Persona */}
+            <div className="settings-card glass-panel">
+              <div className="settings-card-header">
+                <span className="settings-card-icon"><Bot size={20} /></span>
+                <h3>AI Coach Persona</h3>
+              </div>
+              <p className="settings-card-desc">Configure the tone and advice style of your AI mentor.</p>
+
+              <div className="settings-field-group">
+                <label className="settings-label">Coaching Philosophy</label>
+                <select
+                  value={coachStyle}
+                  onChange={(e) => setCoachStyle(e.target.value)}
+                  className="settings-select"
+                >
+                  <option value="strategic">Strategic (Direct, analytical, data-driven)</option>
+                  <option value="empathetic">Empathetic (Supportive, encouraging, balanced)</option>
+                  <option value="relentless">Relentless (High-intensity, non-negotiable execution)</option>
+                </select>
+              </div>
             </div>
-          )}
 
-          {loading ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-tertiary)' }}>Loading System Preferences...</div>
-          ) : (
-            <form onSubmit={handleSaveSettings}>
-              <div className="settings-grid">
-                {/* 1. AI Coach Persona */}
-                <div className="settings-card glass-panel">
-                  <div className="settings-card-header">
-                    <span className="settings-card-icon"><Bot size={20} /></span>
-                    <h3>AI Coach Persona</h3>
-                  </div>
-                  <p className="settings-card-desc">Configure the tone and advice style of your AI mentor.</p>
+            {/* 2. Notifications & Reminders */}
+            <div className="settings-card glass-panel">
+              <div className="settings-card-header">
+                <span className="settings-card-icon"><Bell size={20} /></span>
+                <h3>Notifications & Protocols</h3>
+              </div>
+              <p className="settings-card-desc">Manage system alerts and daily discipline reminders.</p>
 
-                  <div className="settings-field-group">
-                    <label className="settings-label">Coaching Philosophy</label>
-                    <select
-                      value={coachStyle}
-                      onChange={(e) => setCoachStyle(e.target.value)}
-                      className="settings-select"
-                    >
-                      <option value="strategic">Strategic (Direct, analytical, data-driven)</option>
-                      <option value="empathetic">Empathetic (Supportive, encouraging, balanced)</option>
-                      <option value="relentless">Relentless (High-intensity, non-negotiable execution)</option>
-                    </select>
-                  </div>
+              <div className="toggle-switch-wrapper">
+                <div>
+                  <div className="toggle-switch-label">Enable Daily Reminders</div>
+                  <div className="toggle-switch-sub">Receive daily protocol push prompts</div>
                 </div>
-
-                {/* 3. Notifications & Reminders */}
-                <div className="settings-card glass-panel">
-                  <div className="settings-card-header">
-                    <span className="settings-card-icon"><Bell size={20} /></span>
-                    <h3>Notifications & Protocols</h3>
-                  </div>
-                  <p className="settings-card-desc">Manage system alerts and daily discipline reminders.</p>
-
-                  <div className="toggle-switch-wrapper">
-                    <div>
-                      <div className="toggle-switch-label">Enable Daily Reminders</div>
-                      <div className="toggle-switch-sub">Receive daily protocol push prompts</div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notificationsEnabled}
-                      onChange={(e) => handleNotificationToggle(e.target.checked)}
-                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                    />
-                  </div>
-
-                  <div className="settings-field-group">
-                    <label className="settings-label">Daily Reminder Time</label>
-                    <input
-                      type="text"
-                      placeholder="08:00"
-                      value={dailyReminderTime}
-                      onChange={(e) => setDailyReminderTime(e.target.value)}
-                      className="settings-input"
-                    />
-                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {notificationsEnabled ? (
-                        <>
-                          <Zap size={12} style={{ flexShrink: 0 }} />
-                          <span>
-                            In-App Protocol Reminder set for {dailyReminderTime} {
-                              typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
-                                ? '(Browser Push Granted)'
-                                : '(In-App Protocol Active)'
-                            }
-                          </span>
-                        </>
-                      ) : (
-                        'Reminders currently disabled.'
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. Privacy & Visibility */}
-                <div className="settings-card glass-panel">
-                  <div className="settings-card-header">
-                    <span className="settings-card-icon"><Shield size={20} /></span>
-                    <h3>Profile & Privacy</h3>
-                  </div>
-                  <p className="settings-card-desc">Control whether your profile is visible in the community feed.</p>
-
-                  <div className="settings-field-group">
-                    <label className="settings-label">Profile Visibility</label>
-                    <select
-                      value={profileVisibility}
-                      onChange={(e) => setProfileVisibility(e.target.value)}
-                      className="settings-select"
-                    >
-                      <option value="public">Public (Visible in Community Feed)</option>
-                      <option value="private">Private (Masked as Anonymous Member)</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* 5. Feedback & Support */}
-                <div className="settings-card glass-panel" style={{ borderColor: 'rgba(56, 189, 248, 0.25)' }}>
-                  <div className="settings-card-header">
-                    <span className="settings-card-icon" style={{ color: '#38BDF8' }}><MessageSquare size={20} /></span>
-                    <h3>Feedback & Support</h3>
-                  </div>
-                  <p className="settings-card-desc">Have a suggestion, found a bug, or want an improvement? Let our team know privately.</p>
-
-                  <div className="settings-field-group">
-                    <button
-                      type="button"
-                      onClick={() => setIsFeedbackOpen(true)}
-                      style={{
-                        padding: '12px 24px',
-                        background: 'rgba(56, 189, 248, 0.12)',
-                        border: '1px solid rgba(56, 189, 248, 0.35)',
-                        borderRadius: '8px',
-                        color: '#38BDF8',
-                        fontWeight: '600',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        transition: 'all 0.2s',
-                        width: 'fit-content'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = 'rgba(56, 189, 248, 0.22)';
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = 'rgba(56, 189, 248, 0.12)';
-                        e.currentTarget.style.transform = 'none';
-                      }}
-                    >
-                      <MessageSquare size={18} />
-                      Submit Feedback
-                    </button>
-                  </div>
-                </div>
-
-                {/* 6. Account Actions */}
-                <div className="settings-card glass-panel" style={{ borderColor: 'rgba(239, 68, 68, 0.2)' }}>
-                  <div className="settings-card-header">
-                    <span className="settings-card-icon" style={{ color: 'var(--accent-red, #ef4444)' }}><LogOut size={20} /></span>
-                    <h3 style={{ color: 'var(--accent-red, #ef4444)' }}>Account Actions</h3>
-                  </div>
-                  <p className="settings-card-desc">Manage your active session and account status.</p>
-
-                  <div className="settings-field-group">
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      style={{
-                        padding: '12px 24px',
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        borderRadius: '8px',
-                        color: 'var(--accent-red, #ef4444)',
-                        fontWeight: '600',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        transition: 'all 0.2s',
-                        width: 'fit-content'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                        e.currentTarget.style.transform = 'none';
-                      }}
-                    >
-                      <LogOut size={18} />
-                      Sign Out
-                    </button>
-                  </div>
-                </div>
+                <input
+                  type="checkbox"
+                  checked={notificationsEnabled}
+                  onChange={(e) => handleNotificationToggle(e.target.checked)}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
               </div>
 
-              {/* Save Footer */}
-              <div className="settings-save-footer glass-panel">
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  All changes persist cleanly to your SQLite database and update live.
+              <div className="settings-field-group">
+                <label className="settings-label">Daily Reminder Time</label>
+                <input
+                  type="text"
+                  placeholder="08:00"
+                  value={dailyReminderTime}
+                  onChange={(e) => setDailyReminderTime(e.target.value)}
+                  className="settings-input"
+                />
+                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {notificationsEnabled ? (
+                    <>
+                      <Zap size={12} style={{ flexShrink: 0 }} />
+                      <span>
+                        In-App Protocol Reminder set for {dailyReminderTime} {
+                          typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
+                            ? '(Browser Push Granted)'
+                            : '(In-App Protocol Active)'
+                        }
+                      </span>
+                    </>
+                  ) : (
+                    'Reminders currently disabled.'
+                  )}
                 </div>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="btn-save-settings"
+              </div>
+            </div>
+
+            {/* 3. Privacy & Visibility */}
+            <div className="settings-card glass-panel">
+              <div className="settings-card-header">
+                <span className="settings-card-icon"><Shield size={20} /></span>
+                <h3>Profile & Privacy</h3>
+              </div>
+              <p className="settings-card-desc">Control whether your profile is visible in the community feed.</p>
+
+              <div className="settings-field-group">
+                <label className="settings-label">Profile Visibility</label>
+                <select
+                  value={profileVisibility}
+                  onChange={(e) => setProfileVisibility(e.target.value)}
+                  className="settings-select"
                 >
-                  {saving ? 'Saving Changes...' : 'Save Preferences'}
+                  <option value="public">Public (Visible in Community Feed)</option>
+                  <option value="private">Private (Masked as Anonymous Member)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 4. Feedback & Support */}
+            <div className="settings-card glass-panel" style={{ borderColor: 'rgba(56, 189, 248, 0.25)' }}>
+              <div className="settings-card-header">
+                <span className="settings-card-icon" style={{ color: '#38BDF8' }}><MessageSquare size={20} /></span>
+                <h3>Feedback & Support</h3>
+              </div>
+              <p className="settings-card-desc">Have a suggestion, found a bug, or want an improvement? Let our team know privately.</p>
+
+              <div className="settings-field-group">
+                <button
+                  type="button"
+                  onClick={() => setIsFeedbackOpen(true)}
+                  style={{
+                    padding: '12px 24px',
+                    background: 'rgba(56, 189, 248, 0.12)',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                    borderRadius: '8px',
+                    color: '#38BDF8',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s',
+                    width: 'fit-content'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(56, 189, 248, 0.22)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(56, 189, 248, 0.12)';
+                    e.currentTarget.style.transform = 'none';
+                  }}
+                >
+                  <MessageSquare size={18} />
+                  Submit Feedback
                 </button>
               </div>
-            </form>
-          )}
+            </div>
 
-          <FeedbackModal
-            isOpen={isFeedbackOpen}
-            onClose={() => setIsFeedbackOpen(false)}
-          />
+            {/* 5. Account Actions: Sign Out */}
+            <div className="settings-card glass-panel" style={{ borderColor: 'rgba(239, 68, 68, 0.2)' }}>
+              <div className="settings-card-header">
+                <span className="settings-card-icon" style={{ color: 'var(--accent-red, #ef4444)' }}><LogOut size={20} /></span>
+                <h3 style={{ color: 'var(--accent-red, #ef4444)' }}>Session Management</h3>
+              </div>
+              <p className="settings-card-desc">Manage your active authentication session.</p>
+
+              <div className="settings-field-group">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  style={{
+                    padding: '12px 24px',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: '8px',
+                    color: 'var(--accent-red, #ef4444)',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s',
+                    width: 'fit-content'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                    e.currentTarget.style.transform = 'none';
+                  }}
+                >
+                  <LogOut size={18} />
+                  Sign Out
+                </button>
+              </div>
+            </div>
+
+            {/* 6. Danger Zone: Account Deletion */}
+            <div className="settings-card glass-panel settings-danger-card">
+              <div className="settings-card-header">
+                <span className="settings-card-icon danger"><AlertTriangle size={20} /></span>
+                <h3 className="danger-text">Danger Zone</h3>
+              </div>
+              <p className="settings-card-desc">
+                Permanently delete your account and all associated goals, streaks, credentials, messages, and social graph.
+              </p>
+
+              <div className="settings-field-group">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeletePassword('');
+                    setDeleteConfirmPhrase('');
+                    setDeleteError(null);
+                    setIsDeleteModalOpen(true);
+                  }}
+                  className="btn-danger-action"
+                >
+                  <Trash2 size={16} />
+                  Delete Account Permanently
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Save Footer */}
+          <div className="settings-save-footer glass-panel">
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              All changes persist cleanly to your database and update live.
+            </div>
+            <button
+              type="submit"
+              disabled={saving}
+              className="btn-save-settings"
+            >
+              {saving ? 'Saving Changes...' : 'Save Preferences'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Account Deletion Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="modal-backdrop" onClick={() => setIsDeleteModalOpen(false)}>
+          <div className="modal-card danger-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-header danger">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={20} style={{ color: '#ef4444' }} />
+                <h2 style={{ color: '#ef4444' }}>Delete Account Permanently</h2>
+              </div>
+              <button onClick={() => setIsDeleteModalOpen(false)} className="modal-close-btn">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="danger-modal-body">
+              <div className="danger-warning-callout">
+                <strong>WARNING:</strong> This action cannot be undone. All your goals, missions, streak records, verified credentials, chat messages, and social connections will be permanently wiped.
+              </div>
+
+              {deleteError && (
+                <div className="danger-error-banner">
+                  <AlertTriangle size={15} /> {deleteError}
+                </div>
+              )}
+
+              <form onSubmit={handleExecuteDeleteAccount} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="modal-field">
+                  <label className="modal-label">Enter Your Password</label>
+                  <input
+                    type="password"
+                    className="modal-input"
+                    placeholder="Your account password"
+                    value={deletePassword}
+                    onChange={e => setDeletePassword(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="modal-field">
+                  <label className="modal-label">
+                    Type <strong style={{ color: '#ef4444' }}>DELETE MY ACCOUNT</strong> to confirm
+                  </label>
+                  <input
+                    type="text"
+                    className="modal-input"
+                    placeholder="DELETE MY ACCOUNT"
+                    value={deleteConfirmPhrase}
+                    onChange={e => setDeleteConfirmPhrase(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn-modal-cancel"
+                    onClick={() => setIsDeleteModalOpen(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-modal-danger-delete"
+                    disabled={deletingAccount || !deletePassword || deleteConfirmPhrase.trim() !== 'DELETE MY ACCOUNT'}
+                  >
+                    {deletingAccount ? 'Deleting Account...' : 'Permanently Delete'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
+      )}
+
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+      />
+    </div>
   );
 };
 

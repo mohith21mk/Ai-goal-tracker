@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   X, 
   UserPlus, 
+  UserCheck,
   Check, 
   MessageCircle, 
   Flame, 
@@ -16,6 +17,9 @@ import {
 import { 
   getPublicUserProfile,
   getPublicCredentials,
+  getFollowStats,
+  followUser,
+  unfollowUser,
   requestConnection, 
   acceptConnection, 
   rejectConnection 
@@ -32,8 +36,10 @@ export default function UserProfilePanel({
   const [profile, setProfile] = useState(null);
   const [credentials, setCredentials] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState('none');
+  const [followStats, setFollowStats] = useState({ followers_count: 0, following_count: 0, is_following: false });
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
   const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
   const isMountedRef = useRef(true);
@@ -53,14 +59,16 @@ export default function UserProfilePanel({
   const refreshProfile = useCallback(async () => {
     if (!userId) return;
     try {
-      const [data, creds] = await Promise.all([
+      const [data, creds, fStats] = await Promise.all([
         getPublicUserProfile(userId),
-        getPublicCredentials(userId).catch(() => [])
+        getPublicCredentials(userId).catch(() => []),
+        getFollowStats(userId).catch(() => ({ followers_count: 0, following_count: 0, is_following: false }))
       ]);
       if (isMountedRef.current) {
         setProfile(data);
         setCredentials(Array.isArray(creds) ? creds : []);
         setConnectionStatus(data.connection_status || 'none');
+        setFollowStats(fStats);
       }
     } catch (err) {
       console.error('Failed to refresh user profile:', err);
@@ -72,14 +80,16 @@ export default function UserProfilePanel({
     async function loadData() {
       setLoading(true);
       try {
-        const [data, creds] = await Promise.all([
+        const [data, creds, fStats] = await Promise.all([
           getPublicUserProfile(userId),
-          getPublicCredentials(userId).catch(() => [])
+          getPublicCredentials(userId).catch(() => []),
+          getFollowStats(userId).catch(() => ({ followers_count: 0, following_count: 0, is_following: false }))
         ]);
         if (isMountedRef.current) {
           setProfile(data);
           setCredentials(Array.isArray(creds) ? creds : []);
           setConnectionStatus(data.connection_status || 'none');
+          setFollowStats(fStats);
           setLoading(false);
         }
       } catch (err) {
@@ -101,6 +111,34 @@ export default function UserProfilePanel({
       }
     };
   }, [userId]);
+
+  const handleToggleFollow = async () => {
+    if (!userId || followLoading) return;
+    setFollowLoading(true);
+    try {
+      if (followStats.is_following) {
+        await unfollowUser(userId);
+        setFollowStats(prev => ({
+          ...prev,
+          is_following: false,
+          followers_count: Math.max(0, prev.followers_count - 1)
+        }));
+        showToast('success', `Unfollowed @${profile?.username || 'user'}`);
+      } else {
+        await followUser(userId);
+        setFollowStats(prev => ({
+          ...prev,
+          is_following: true,
+          followers_count: prev.followers_count + 1
+        }));
+        showToast('success', `Now following @${profile?.username || 'user'}`);
+      }
+    } catch (err) {
+      showToast('error', err.message || 'Failed to update follow status.');
+    } finally {
+      setFollowLoading(false);
+    }
+  };
 
   const handleConnect = async () => {
     setActionLoading(true);
@@ -287,6 +325,14 @@ export default function UserProfilePanel({
                     {profile.mkc_id || `MKC-${profile.id}`}
                   </span>
                 </div>
+                
+                {/* Followers / Following Stats Row */}
+                <div className="user-profile-social-row">
+                  <span><strong>{followStats.followers_count}</strong> Followers</span>
+                  <span className="dot">•</span>
+                  <span><strong>{followStats.following_count}</strong> Following</span>
+                </div>
+
                 {profile.member_since && (
                   <div className="user-profile-since">
                     Member Since {profile.member_since}
@@ -363,6 +409,23 @@ export default function UserProfilePanel({
               </div>
 
               <div className="action-button-container">
+                {/* Social Follow Toggle Button (if not viewing self) */}
+                {connectionStatus !== 'self' && (
+                  <button 
+                    type="button" 
+                    className={`user-profile-btn ${followStats.is_following ? 'btn-following' : 'btn-follow'}`}
+                    onClick={handleToggleFollow}
+                    disabled={followLoading}
+                    style={{ marginBottom: '8px' }}
+                  >
+                    {followStats.is_following ? (
+                      <><UserCheck size={16} strokeWidth={2} /> Following</>
+                    ) : (
+                      <><UserPlus size={16} strokeWidth={2} /> Follow @{profile.username}</>
+                    )}
+                  </button>
+                )}
+
                 {renderActionButton()}
               </div>
             </div>

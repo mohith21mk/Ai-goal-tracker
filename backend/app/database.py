@@ -255,6 +255,10 @@ def init_db() -> None:
             cursor = conn.cursor()
             cursor.execute("UPDATE missions SET completed_at = CURRENT_TIMESTAMP WHERE completed = 1 AND completed_at IS NULL")
             cursor.execute("UPDATE missions SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL")
+            cursor.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(50) DEFAULT 'text'")
+            cursor.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS attachment_url TEXT")
+            cursor.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS attachment_metadata TEXT")
+            cursor.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS attachment_duration INTEGER")
             conn.commit()
             conn.close()
         except Exception as e:
@@ -1022,6 +1026,10 @@ def init_db() -> None:
             conversation_id INTEGER NOT NULL,
             sender_id INTEGER NOT NULL,
             message TEXT NOT NULL,
+            message_type TEXT DEFAULT 'text',
+            attachment_url TEXT,
+            attachment_metadata TEXT,
+            attachment_duration INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             read_at TIMESTAMP,
             FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
@@ -1029,6 +1037,16 @@ def init_db() -> None:
         )
         """
     )
+    cursor.execute("PRAGMA table_info(chat_messages)")
+    cm_cols = [r["name"] for r in cursor.fetchall()]
+    if "message_type" not in cm_cols:
+        cursor.execute("ALTER TABLE chat_messages ADD COLUMN message_type TEXT DEFAULT 'text'")
+    if "attachment_url" not in cm_cols:
+        cursor.execute("ALTER TABLE chat_messages ADD COLUMN attachment_url TEXT")
+    if "attachment_metadata" not in cm_cols:
+        cursor.execute("ALTER TABLE chat_messages ADD COLUMN attachment_metadata TEXT")
+    if "attachment_duration" not in cm_cols:
+        cursor.execute("ALTER TABLE chat_messages ADD COLUMN attachment_duration INTEGER")
 
     # Chat & messaging performance indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_conv_members_user ON conversation_members(user_id)")
@@ -1110,6 +1128,23 @@ def init_db() -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_feedback_category ON feedback(category)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at)")
+
+    # 20. Create user_follows table
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_follows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            follower_id INTEGER NOT NULL,
+            following_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(follower_id, following_id),
+            FOREIGN KEY(follower_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(following_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_follows_follower ON user_follows(follower_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_follows_following ON user_follows(following_id)")
 
     conn.commit()
     conn.close()

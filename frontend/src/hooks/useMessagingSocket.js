@@ -134,7 +134,7 @@ export function useMessagingSocket(onMessageReceived) {
     };
   }, [connect]);
 
-  const sendMessage = useCallback((conversationId, content) => {
+  const sendMessage = useCallback((conversationId, content = '', options = {}) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       console.warn('WebSocket is not connected. Message send postponed.');
       return false;
@@ -143,8 +143,12 @@ export function useMessagingSocket(onMessageReceived) {
     const payload = {
       type: 'message.send',
       conversation_id: conversationId,
-      content: content.trim(),
-      message: content.trim(),
+      content: typeof content === 'string' ? content.trim() : '',
+      message: typeof content === 'string' ? content.trim() : '',
+      message_type: options.message_type || 'text',
+      attachment_url: options.attachment_url || null,
+      attachment_metadata: options.attachment_metadata || null,
+      attachment_duration: options.attachment_duration || null,
     };
 
     wsRef.current.send(JSON.stringify(payload));

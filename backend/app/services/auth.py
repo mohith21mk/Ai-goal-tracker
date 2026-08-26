@@ -444,32 +444,60 @@ def delete_user_account(user_id: int) -> None:
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Revoke sessions & tokens
+    # Safeguard: Check if user is the last active admin
+    cursor.execute("SELECT role FROM users WHERE id = ?", (user_id,))
+    u_row = cursor.fetchone()
+    if u_row and u_row["role"] == "admin":
+        cursor.execute(
+            "SELECT COUNT(*) AS admin_count FROM users WHERE role = 'admin' AND is_active = 1 AND deactivated_at IS NULL AND id != ?",
+            (user_id,)
+        )
+        row_admin = cursor.fetchone()
+        admin_count = row_admin["admin_count"] if row_admin else 0
+        if admin_count == 0:
+            conn.close()
+            raise ValueError("Cannot delete account: You are the sole active administrator. Please designate another administrator before deleting this account.")
+
+    # 1. Revoke sessions & tokens
     cursor.execute("DELETE FROM app_sessions WHERE user_id = ?", (user_id,))
     cursor.execute("DELETE FROM password_resets WHERE user_id = ?", (user_id,))
     cursor.execute("DELETE FROM email_verifications WHERE user_id = ?", (user_id,))
 
-    # Delete user content
+    # 2. Delete user settings & preferences
     cursor.execute("DELETE FROM user_settings WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM ai_activity_logs WHERE user_id = ?", (user_id,))
+
+    # 3. Delete AI coach messages
     cursor.execute("DELETE FROM messages WHERE user_id = ?", (user_id,))
+
+    # 4. Delete goals, missions, habits & journal
     cursor.execute("DELETE FROM habit_logs WHERE user_id = ?", (user_id,))
     cursor.execute("DELETE FROM habits WHERE user_id = ?", (user_id,))
     cursor.execute("DELETE FROM journal_entries WHERE user_id = ?", (user_id,))
     cursor.execute("DELETE FROM missions WHERE user_id = ?", (user_id,))
     cursor.execute("DELETE FROM goals WHERE user_id = ?", (user_id,))
 
-    # Delete life blueprint data
+    # 5. Delete life blueprint data
     cursor.execute("DELETE FROM blueprint_milestones WHERE blueprint_id IN (SELECT id FROM life_blueprints WHERE user_id = ?)", (user_id,))
     cursor.execute("DELETE FROM blueprint_phases WHERE blueprint_id IN (SELECT id FROM life_blueprints WHERE user_id = ?)", (user_id,))
     cursor.execute("DELETE FROM blueprint_areas WHERE user_id = ?", (user_id,))
     cursor.execute("DELETE FROM life_blueprints WHERE user_id = ?", (user_id,))
 
-    # Delete community interactions
+    # 6. Delete social follows, connections & conversations
+    cursor.execute("DELETE FROM user_follows WHERE follower_id = ? OR following_id = ?", (user_id, user_id))
+    cursor.execute("DELETE FROM user_connections WHERE requester_id = ? OR recipient_id = ?", (user_id, user_id))
+    cursor.execute("DELETE FROM chat_messages WHERE sender_id = ?", (user_id,))
+    cursor.execute("DELETE FROM conversation_members WHERE user_id = ?", (user_id,))
+
+    # 7. Delete community interactions & credentials
     cursor.execute("DELETE FROM community_comments WHERE user_id = ?", (user_id,))
     cursor.execute("DELETE FROM community_likes WHERE user_id = ?", (user_id,))
     cursor.execute("DELETE FROM community_posts WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM user_credentials WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM notifications WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM feedback WHERE user_id = ?", (user_id,))
 
-    # Delete user record
+    # 8. Delete user record
     cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
     conn.commit()
     conn.close()

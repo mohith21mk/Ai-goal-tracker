@@ -14,3 +14,8 @@ dist/
 .env
 .vscode/
 .idea/
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+

@@ -1,7 +1,10 @@
 import json
+import os
+import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
 from pydantic import BaseModel
 
 from ..database import get_connection
@@ -32,6 +35,27 @@ async def get_current_user_ws(websocket: WebSocket) -> Optional[Dict[str, Any]]:
         await websocket.close(code=1008)
         return None
     return user
+
+
+from ..services.storage import save_media_file
+
+
+@router.post("/upload", response_model=Dict[str, Any])
+async def upload_chat_attachment(
+    file: UploadFile = File(...),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Uploads an image or voice audio attachment for chat messaging with security validation and cloud persistence."""
+    contents = await file.read()
+    try:
+        result = await save_media_file(
+            contents=contents,
+            orig_filename=file.filename or "attachment",
+            content_type=file.content_type or ""
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/conversations", response_model=Dict[str, Any])
@@ -136,7 +160,12 @@ async def get_conversations(current_user: Dict[str, Any] = Depends(get_current_u
     cursor.execute("""
         SELECT c.id, c.updated_at, 
                u.id as other_user_id, u.username as other_username, u.avatar_initials as other_avatar, u.full_name as other_full_name,
-               (SELECT message FROM chat_messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message,
+               (SELECT CASE 
+                  WHEN m.message_type = 'image' AND (m.message IS NULL OR m.message = '') THEN '📷 Photo'
+                  WHEN m.message_type = 'voice' THEN '🎤 Voice message'
+                  WHEN m.message_type = 'sticker' THEN '✨ Sticker'
+                  ELSE m.message 
+                END FROM chat_messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message,
                (SELECT created_at FROM chat_messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message_time,
                (SELECT COUNT(*) FROM chat_messages m WHERE m.conversation_id = c.id AND m.sender_id != ? AND m.read_at IS NULL) as unread_count
         FROM conversations c
@@ -170,9 +199,12 @@ async def get_conversation_messages(
         conn.close()
         raise HTTPException(status_code=403, detail="Not authorized to access this conversation")
         
-    # Fetch messages
+    # Fetch messages including rich fields
     cursor.execute("""
-        SELECT m.id, m.conversation_id, m.sender_id, m.message as content, m.message, m.created_at, m.read_at, u.username as sender_username
+        SELECT m.id, m.conversation_id, m.sender_id, m.message as content, m.message, 
+               COALESCE(m.message_type, 'text') as message_type,
+               m.attachment_url, m.attachment_metadata, m.attachment_duration,
+               m.created_at, m.read_at, u.username as sender_username
         FROM chat_messages m
         JOIN users u ON m.sender_id = u.id
         WHERE m.conversation_id = ?
@@ -238,9 +270,18 @@ async def websocket_endpoint(websocket: WebSocket, target_conv_id: Optional[int]
                 payload = json.loads(data)
                 event_type = payload.get("type", "message.send")
                 conversation_id = payload.get("conversation_id") or target_conv_id
-                message_text = payload.get("content") or payload.get("message")
+                message_text = payload.get("content") or payload.get("message") or ""
+                message_type = payload.get("message_type") or "text"
+                attachment_url = payload.get("attachment_url")
+                attachment_metadata = payload.get("attachment_metadata")
+                if isinstance(attachment_metadata, dict):
+                    attachment_metadata = json.dumps(attachment_metadata)
+                attachment_duration = payload.get("attachment_duration")
                 
-                if conversation_id and message_text:
+                # Allow message if text is present OR if there is an attachment/rich type
+                has_content = bool(message_text.strip()) or bool(attachment_url) or message_type in ("image", "voice", "sticker")
+
+                if conversation_id and has_content:
                     conn = get_connection()
                     cursor = conn.cursor()
                     
@@ -250,10 +291,15 @@ async def websocket_endpoint(websocket: WebSocket, target_conv_id: Optional[int]
                         (conversation_id, user_id)
                     )
                     if cursor.fetchone():
-                        # Save message
+                        # Save message with rich media columns
                         cursor.execute(
-                            "INSERT INTO chat_messages (conversation_id, sender_id, message) VALUES (?, ?, ?)",
-                            (conversation_id, user_id, message_text)
+                            """
+                            INSERT INTO chat_messages (
+                                conversation_id, sender_id, message, message_type, 
+                                attachment_url, attachment_metadata, attachment_duration
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (conversation_id, user_id, message_text, message_type, attachment_url, attachment_metadata, attachment_duration)
                         )
                         msg_id = cursor.lastrowid
                         cursor.execute("UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", (conversation_id,))
@@ -274,13 +320,22 @@ async def websocket_endpoint(websocket: WebSocket, target_conv_id: Optional[int]
                         conn.commit()
                         conn.close()
                         
-                        # Create notification for recipient
+                        # Create tailored notification for recipient
                         if recipient_id:
+                            if message_type == "image":
+                                notif_msg = f"@{sender_username} sent a photo"
+                            elif message_type == "voice":
+                                notif_msg = f"@{sender_username} sent a voice message"
+                            elif message_type == "sticker":
+                                notif_msg = f"@{sender_username} sent a sticker"
+                            else:
+                                notif_msg = f"New message from @{sender_username}"
+
                             await create_notification(
                                 user_id=recipient_id,
                                 type="chat_message",
                                 title="New Message",
-                                message=f"New message from @{sender_username}",
+                                message=notif_msg,
                                 reference_type="conversation",
                                 reference_id=conversation_id
                             )
@@ -295,6 +350,10 @@ async def websocket_endpoint(websocket: WebSocket, target_conv_id: Optional[int]
                                 "sender_username": sender_username,
                                 "content": message_text,
                                 "message": message_text,
+                                "message_type": message_type,
+                                "attachment_url": attachment_url,
+                                "attachment_metadata": attachment_metadata,
+                                "attachment_duration": attachment_duration,
                                 "created_at": datetime.now(timezone.utc).isoformat(),
                                 "read_at": None
                             },

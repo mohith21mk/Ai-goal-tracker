@@ -7,6 +7,17 @@ if (import.meta.env.PROD && (rawApiUrl.includes('your-backend-service') || rawAp
 }
 const API_BASE_URL = rawApiUrl.replace(/\/+$/, '');
 
+export { API_BASE_URL };
+
+export function getMediaUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+    return url;
+  }
+  const cleanPath = url.startsWith('/') ? url : `/${url}`;
+  return `${API_BASE_URL}${cleanPath}`;
+}
+
 // -------------------------------------------------------------------
 // CLIENT-SIDE IN-MEMORY SWR CACHE & REQUEST DEDUPLICATION
 // -------------------------------------------------------------------
@@ -58,7 +69,9 @@ if (typeof window !== 'undefined') {
 
 async function apiFetch(endpoint, options = {}) {
   const method = (options.method || 'GET').toUpperCase();
-  const defaultHeaders = options.body ? { 'Content-Type': 'application/json' } : {};
+  const defaultHeaders = (options.body && !(options.body instanceof FormData))
+    ? { 'Content-Type': 'application/json' }
+    : {};
   const config = {
     credentials: 'include',
     ...options,
@@ -1026,6 +1039,75 @@ export async function deleteMessage(messageId) {
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
     throw new Error(errBody.detail || `Failed to delete message: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function uploadChatAttachment(file) {
+  const formData = file instanceof FormData ? file : new FormData();
+  if (!(file instanceof FormData)) {
+    formData.append('file', file);
+  }
+  const response = await apiFetch('/api/chat/upload', {
+    method: 'POST',
+    body: formData,
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to upload attachment: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+// -------------------------------------------------------------------
+// SOCIAL FOLLOWS APIs
+// -------------------------------------------------------------------
+
+export async function followUser(userId) {
+  const response = await apiFetch(`/api/social/follow/${userId}`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to follow user: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function unfollowUser(userId) {
+  const response = await apiFetch(`/api/social/unfollow/${userId}`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to unfollow user: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getFollowStats(userId) {
+  const response = await apiFetch(`/api/social/follow-stats/${userId}`);
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to get follow stats: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getFollowers(userId) {
+  const response = await apiFetch(`/api/social/followers/${userId}`);
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to get followers: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getFollowing(userId) {
+  const response = await apiFetch(`/api/social/following/${userId}`);
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to get following: ${response.statusText}`);
   }
   return response.json();
 }

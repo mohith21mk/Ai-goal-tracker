@@ -424,8 +424,11 @@ async def delete_account_endpoint(
     if not row or not row["password_hash"] or not verify_password(payload.current_password, row["password_hash"]):
         raise HTTPException(status_code=400, detail="Incorrect password. Account deletion denied.")
 
-    # Perform safe cascade deletion
-    delete_user_account(user_id)
+    # Perform safe cascade deletion with validation
+    try:
+        delete_user_account(user_id)
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err))
 
     # Clear auth cookie
     response.delete_cookie(

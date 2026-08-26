@@ -93,6 +93,19 @@ class Message(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), server_default=func.now())
 
 
+class UserFollow(Base):
+    __tablename__ = "user_follows"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    follower_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    following_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("follower_id", "following_id", name="uq_user_follow"),
+    )
+
+
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
@@ -100,6 +113,10 @@ class ChatMessage(Base):
     conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
     sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     message = Column(Text, nullable=False)
+    message_type = Column(String(50), default="text")
+    attachment_url = Column(Text, nullable=True)
+    attachment_metadata = Column(Text, nullable=True)
+    attachment_duration = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), server_default=func.now())
     read_at = Column(DateTime, nullable=True)
 

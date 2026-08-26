@@ -180,3 +180,102 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Danger Zone Card */
+.settings-danger-card {
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.04), rgba(15, 23, 42, 0.6)) !important;
+}
+
+.settings-card-icon.danger {
+  color: #ef4444 !important;
+}
+
+.danger-text {
+  color: #ef4444 !important;
+}
+
+.btn-danger-action {
+  padding: 12px 24px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 8px;
+  color: #f87171;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+  width: fit-content;
+}
+
+.btn-danger-action:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #fff;
+  border-color: #ef4444;
+  transform: translateY(-1px);
+}
+
+/* Danger Deletion Modal */
+.danger-modal-card {
+  max-width: 480px !important;
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(239, 68, 68, 0.15) !important;
+}
+
+.modal-header.danger {
+  border-bottom: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.danger-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
+}
+
+.danger-warning-callout {
+  padding: 12px 14px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 10px;
+  color: #fca5a5;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.danger-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  color: #fca5a5;
+  font-size: 13px;
+}
+
+.btn-modal-danger-delete {
+  padding: 10px 22px;
+  background: #ef4444;
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-modal-danger-delete:hover:not(:disabled) {
+  background: #dc2626;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+}
+
+.btn-modal-danger-delete:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

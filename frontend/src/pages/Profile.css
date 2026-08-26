@@ -455,3 +455,133 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Profile Social Follows */
+.profile-social-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+}
+
+.profile-social-chip-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.profile-social-chip-btn strong {
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.profile-social-chip-btn:hover {
+  background: rgba(56, 189, 248, 0.1);
+  color: var(--text-primary);
+}
+
+.profile-social-dot {
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+/* Follow List Modal */
+.follow-list-modal {
+  max-width: 440px !important;
+  width: 100%;
+}
+
+.follow-modal-body {
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.follow-user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.follow-user-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  transition: border-color 0.2s;
+}
+
+.follow-user-card .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid var(--cyan);
+  color: var(--cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.follow-user-card .user-details {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  margin: 0 12px;
+}
+
+.follow-user-card .fullname {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.follow-user-card .username {
+  font-size: 11.5px;
+  color: var(--cyan);
+}
+
+.btn-follow-toggle {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--cyan);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.btn-follow-toggle:hover {
+  background: var(--cyan);
+  color: #000;
+}
+
+.btn-follow-toggle.following {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.btn-follow-toggle.following:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}

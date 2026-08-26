@@ -61,6 +61,14 @@ def create_app() -> FastAPI:
     app.include_router(feedback.router, tags=["feedback"])
     app.include_router(admin.router)
 
+    # Mount static uploads directory for chat media and attachments
+    from pathlib import Path
+    from fastapi.staticfiles import StaticFiles
+    uploads_dir = Path(__file__).resolve().parent.parent / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    (uploads_dir / "chat").mkdir(parents=True, exist_ok=True)
+    app.mount("/api/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
+
     @app.get("/api/telemetry", response_model=Dict[str, Any], tags=["telemetry"])
     async def get_telemetry_endpoint(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
         return await compute_telemetry(current_user["id"])
