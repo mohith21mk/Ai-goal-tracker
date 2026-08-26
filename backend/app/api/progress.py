@@ -341,7 +341,6 @@ async def compute_telemetry(user_id: int) -> Dict[str, Any]:
         from ..services.logger import logger
         logger.exception(f"Error computing telemetry for user {user_id}: {e}\n{tb}")
         prog = get_user_progression(user_id)
-        last_tb_line = tb.strip().splitlines()[-2] if len(tb.strip().splitlines()) >= 2 else str(e)
         return {
             "discipline_score": 0,
             "discipline_score_change": 0,
@@ -374,7 +373,6 @@ async def compute_telemetry(user_id: int) -> Dict[str, Any]:
             "habits": {"active_habits_count": 0, "habits": []},
             "journal": {"total_entries": 0, "journal_streak": 0, "avg_energy_7d": 0.0, "latest_mood": None},
             "blueprint": {"active_blueprint": None, "completion_percentage": 0},
-            "debug_error": " || ".join(tb.strip().splitlines()[-6:]),
         }
 
 
