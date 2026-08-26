@@ -960,6 +960,14 @@ def init_db() -> None:
 
     # Auto-heal NULL likes_count in community_posts
     cursor.execute("UPDATE community_posts SET likes_count = 0 WHERE likes_count IS NULL")
+    cursor.execute(
+        """
+        DELETE FROM community_posts 
+        WHERE LOWER(author_name) LIKE '%manbun%' 
+           OR LOWER(content) LIKE '%shit%' 
+           OR LOWER(content) LIKE '%fuck%'
+        """
+    )
     conn.commit()
 
     # Seed default starter community posts if none exist

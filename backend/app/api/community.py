@@ -21,6 +21,17 @@ from .auth import get_current_user
 router = APIRouter()
 
 
+INAPPROPRIATE_WORDS = {"shit", "fuck", "bitch", "asshole", "crap", "bastard", "damn", "dick", "piss", "cunt"}
+
+
+def check_positive_language(text: str) -> None:
+    words = text.lower().split()
+    for w in words:
+        cleaned = "".join(ch for ch in w if ch.isalnum())
+        if cleaned in INAPPROPRIATE_WORDS:
+            raise ValueError("Please keep community interactions positive, respectful, and constructive.")
+
+
 class PostCreateRequest(BaseModel):
     content: str
     category: Optional[str] = "general"
@@ -34,6 +45,7 @@ class PostCreateRequest(BaseModel):
             raise ValueError("Post content cannot be empty")
         if len(s) > 1000:
             raise ValueError("Post content cannot exceed 1000 characters")
+        check_positive_language(s)
         return s
 
     @field_validator("category")
@@ -56,6 +68,7 @@ class PostUpdateRequest(BaseModel):
             raise ValueError("Post content cannot be empty")
         if len(s) > 1000:
             raise ValueError("Post content cannot exceed 1000 characters")
+        check_positive_language(s)
         return s
 
 
@@ -70,6 +83,7 @@ class CommentCreateRequest(BaseModel):
             raise ValueError("Comment content cannot be empty")
         if len(s) > 500:
             raise ValueError("Comment content cannot exceed 500 characters")
+        check_positive_language(s)
         return s
 
 
@@ -84,6 +98,7 @@ class CommentUpdateRequest(BaseModel):
             raise ValueError("Comment content cannot be empty")
         if len(s) > 500:
             raise ValueError("Comment content cannot exceed 500 characters")
+        check_positive_language(s)
         return s
 
 
@@ -160,8 +175,9 @@ async def delete_post(
     current_user: Dict[str, Any] = Depends(get_current_user),
 ) -> Dict[str, Any]:
     user_id = current_user["id"]
+    is_admin = current_user.get("role") == "admin"
     try:
-        success = delete_community_post(user_id=user_id, post_id=post_id)
+        success = delete_community_post(user_id=user_id, post_id=post_id, is_admin=is_admin)
         if not success:
             raise HTTPException(status_code=404, detail="Post not found")
         return {"message": "Post deleted successfully", "id": post_id}

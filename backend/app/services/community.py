@@ -186,7 +186,7 @@ def update_community_post(user_id: int, post_id: int, content: str) -> Dict[str,
     return get_post_by_id(post_id)
 
 
-def delete_community_post(user_id: int, post_id: int) -> bool:
+def delete_community_post(user_id: int, post_id: int, is_admin: bool = False) -> bool:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT user_id FROM community_posts WHERE id = ?", (post_id,))
@@ -196,7 +196,7 @@ def delete_community_post(user_id: int, post_id: int) -> bool:
         conn.close()
         return False
 
-    if row["user_id"] != user_id:
+    if row["user_id"] != user_id and not is_admin:
         conn.close()
         raise PermissionError("User does not own this post")
 

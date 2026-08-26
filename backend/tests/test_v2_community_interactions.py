@@ -59,6 +59,19 @@ def test_create_post_empty_content_rejected():
         cleanup_test_user(uid)
 
 
+def test_create_post_inappropriate_language_rejected():
+    uid, token = setup_test_user("v2comm_pos")
+    try:
+        res = client.post(
+            "/api/community/posts",
+            json={"content": "This is bad shit!", "category": "general"},
+            cookies={"mkc_session": token},
+        )
+        assert res.status_code == 422, f"Expected 422 for inappropriate language, got {res.status_code}"
+    finally:
+        cleanup_test_user(uid)
+
+
 def test_create_post_invalid_category_rejected():
     uid, token = setup_test_user("v2comm_cat")
     try:
