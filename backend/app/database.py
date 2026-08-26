@@ -798,20 +798,23 @@ def init_db() -> None:
             (bp_id, demo_user_id, "Mindset & Leadership", "Cognitive clarity & resilience", "🧠", 2),
             (bp_id, demo_user_id, "Health & Fitness", "Physical energy & stamina", "⚡", 3),
         ]
-        cursor.executemany(
-            """
-            INSERT INTO blueprint_areas (blueprint_id, user_id, name, description, icon, position)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            areas,
-        )
-        conn.commit()
+        area_ids = []
+        for a in areas:
+            cursor.execute(
+                """
+                INSERT INTO blueprint_areas (blueprint_id, user_id, name, description, icon, position)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                a,
+            )
+            conn.commit()
+            area_ids.append(cursor.lastrowid)
 
         # Seed Phases
         phases = [
-            (bp_id, 1, "Phase 1: Foundation & Core CS", "Master Python, DSA, git, and backend fundamentals", 1, "completed", 1),
-            (bp_id, 2, "Phase 2: AI & Machine Learning", "Deep dive into ML models, neural networks, and LLM orchestration", 2, "active", 2),
-            (bp_id, 3, "Phase 3: Portfolio & Placement Mastery", "Build flagship AI applications, system design, and mock interviews", 3, "pending", 3),
+            (bp_id, area_ids[0] if area_ids else None, "Phase 1: Foundation & Core CS", "Master Python, DSA, git, and backend fundamentals", 1, "completed", 1),
+            (bp_id, area_ids[1] if len(area_ids) > 1 else None, "Phase 2: AI & Machine Learning", "Deep dive into ML models, neural networks, and LLM orchestration", 2, "active", 2),
+            (bp_id, area_ids[2] if len(area_ids) > 2 else None, "Phase 3: Portfolio & Placement Mastery", "Build flagship AI applications, system design, and mock interviews", 3, "pending", 3),
         ]
         phase_ids = []
         for p in phases:
