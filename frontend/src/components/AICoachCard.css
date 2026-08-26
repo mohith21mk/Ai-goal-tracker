@@ -7,7 +7,7 @@
   min-height: 0;
   overflow: hidden;
   border-radius: 16px;
-  background: rgba(10, 22, 40, 0.7);
+  background: var(--bg-card-elevated);
   border: 1px solid var(--border-subtle);
   margin-bottom: 20px;
   box-sizing: border-box;
@@ -97,7 +97,7 @@
   width: 4px;
 }
 .coach-message-box::-webkit-scrollbar-track {
-  background: rgba(5, 11, 22, 0.4);
+  background: var(--bg-chip);
   border-radius: 4px;
 }
 .coach-message-box::-webkit-scrollbar-thumb {
@@ -118,7 +118,7 @@
 }
 
 .message-bubble.coach {
-  background: rgba(7, 20, 38, 0.7);
+  background: var(--bg-card-elevated);
   border: 1px solid rgba(56, 189, 248, 0.15);
   color: var(--text-primary);
   border-left: 3px solid var(--cyan);
@@ -141,7 +141,7 @@
 .coach-input {
   width: 100%;
   padding: 8px 12px;
-  background: rgba(5, 11, 22, 0.6);
+  background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   color: var(--text-primary);

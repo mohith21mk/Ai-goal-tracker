@@ -5,7 +5,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  background: rgba(5, 11, 22, 0.4);
+  background: var(--bg-surface);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-subtle);
   position: sticky;
@@ -19,7 +19,7 @@
   gap: 10px;
   padding: 8px 16px;
   width: 340px;
-  background: rgba(10, 22, 40, 0.6);
+  background: var(--bg-input);
   border-radius: 9999px;
   border: 1px solid var(--border-subtle);
   transition: all 0.2s ease;
@@ -88,7 +88,7 @@
   gap: 12px;
   padding: 4px 6px 4px 14px;
   border-radius: 9999px;
-  background: rgba(10, 22, 40, 0.7);
+  background: var(--bg-card-elevated);
   border: 1px solid var(--border-subtle);
 }
 

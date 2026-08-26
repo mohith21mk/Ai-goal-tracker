@@ -22,7 +22,7 @@
   font-weight: 700;
   margin-bottom: 6px;
   letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #FFFFFF 0%, #38BDF8 100%);
+  background: var(--heading-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -43,7 +43,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: rgba(10, 22, 40, 0.6);
+  background: var(--bg-chip);
   border: 1px solid var(--border-subtle);
   border-radius: 9999px;
 }
@@ -102,7 +102,7 @@
   flex-direction: column;
   gap: 16px;
   padding: 24px;
-  background: rgba(5, 11, 22, 0.5);
+  background: var(--bg-chip);
   border: 1px solid var(--border-subtle);
   border-radius: 16px 16px 0 0;
   scroll-behavior: smooth;
@@ -170,7 +170,7 @@
 }
 
 .coach-msg.from-coach .coach-msg-bubble {
-  background: rgba(7, 20, 38, 0.8);
+  background: var(--bg-card-elevated);
   border: 1px solid rgba(56, 189, 248, 0.15);
   border-left: 3px solid var(--cyan);
   color: var(--text-primary);
@@ -202,7 +202,7 @@
   display: flex;
   gap: 5px;
   padding: 14px 18px;
-  background: rgba(7, 20, 38, 0.8);
+  background: var(--bg-card-elevated);
   border: 1px solid rgba(56, 189, 248, 0.15);
   border-left: 3px solid var(--cyan);
   border-radius: 14px;
@@ -239,7 +239,7 @@
   display: flex;
   gap: 12px;
   padding: 20px 24px;
-  background: rgba(10, 22, 40, 0.85);
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-top: none;
   border-radius: 0 0 16px 16px;
@@ -249,7 +249,7 @@
 .coach-page-input {
   flex: 1;
   padding: 14px 18px;
-  background: rgba(5, 11, 22, 0.7);
+  background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
   color: var(--text-primary);
@@ -268,7 +268,7 @@
   background: linear-gradient(135deg, var(--cyan) 0%, var(--primary-blue) 100%);
   border: none;
   border-radius: 12px;
-  color: #050B16;
+  color: var(--text-on-accent);
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
@@ -299,7 +299,7 @@
 
 .coach-suggestion-chip {
   padding: 8px 16px;
-  background: rgba(10, 22, 40, 0.6);
+  background: var(--bg-chip);
   border: 1px solid var(--border-subtle);
   border-radius: 9999px;
   color: var(--text-secondary);

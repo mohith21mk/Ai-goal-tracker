@@ -13,7 +13,7 @@
   justify-content: space-between;
   gap: 20px;
   padding: 24px 28px;
-  background: radial-gradient(circle at 10% 50%, rgba(56, 189, 248, 0.1) 0%, rgba(7, 20, 38, 0.8) 100%);
+  background: var(--bg-hero);
   border: 1px solid rgba(56, 189, 248, 0.2);
   border-radius: 20px;
 }
@@ -113,7 +113,7 @@
 
 .goal-card.selected {
   border-color: var(--cyan);
-  background: rgba(10, 22, 40, 0.9);
+  background: var(--bg-card-elevated);
   box-shadow: 0 0 25px rgba(56, 189, 248, 0.25);
 }
 
@@ -287,7 +287,7 @@
 .no-linked-missions-box {
   padding: 24px;
   text-align: center;
-  background: rgba(7, 20, 38, 0.4);
+  background: var(--bg-chip);
   border: 1px dashed rgba(148, 163, 184, 0.15);
   border-radius: 12px;
   color: var(--text-tertiary);
@@ -318,7 +318,7 @@
   max-width: 520px;
   padding: 24px;
   border-radius: 20px;
-  background: rgba(10, 22, 40, 0.95);
+  background: var(--bg-modal);
   border: 1px solid rgba(56, 189, 248, 0.3);
   box-shadow: 0 20px 50px rgba(5, 11, 22, 0.9);
 
@@ -371,7 +371,7 @@
 .form-select {
   width: 100%;
   padding: 10px 14px;
-  background: rgba(5, 11, 22, 0.8);
+  background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   color: var(--text-primary);

@@ -14,7 +14,7 @@
   align-items: flex-start;
   gap: 12px;
   border-radius: 14px;
-  background: rgba(10, 22, 40, 0.7);
+  background: var(--bg-card-elevated);
   border: 1px solid var(--border-subtle);
   transition: all 0.25s ease;
   min-height: 100px;

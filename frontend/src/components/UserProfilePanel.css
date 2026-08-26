@@ -15,7 +15,7 @@
 .user-profile-modal-card {
   width: 100%;
   max-width: 420px;
-  background: var(--card-bg, #0c1425);
+  background: var(--bg-modal);
   border: 1px solid var(--border-subtle, rgba(56, 189, 248, 0.15));
   border-radius: 20px;
   box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 30px rgba(56, 189, 248, 0.08);
@@ -151,7 +151,7 @@
 
 .user-profile-bio {
   padding: 12px 14px;
-  background: rgba(5, 11, 22, 0.4);
+  background: var(--bg-chip);
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
   border-radius: 12px;
   font-size: 13px;
@@ -174,7 +174,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px;
-  background: rgba(5, 11, 22, 0.5);
+  background: var(--bg-chip);
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
   border-radius: 12px;
 }
@@ -207,7 +207,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  background: rgba(5, 11, 22, 0.4);
+  background: var(--bg-chip);
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
   border-radius: 12px;
 }
@@ -280,7 +280,7 @@
 
 .user-profile-btn.btn-primary {
   background: var(--cyan, #38bdf8);
-  color: #050b16;
+  color: var(--text-on-accent);
   box-shadow: 0 4px 15px rgba(56, 189, 248, 0.25);
 }
 
@@ -297,7 +297,7 @@
 
 .user-profile-btn.btn-success {
   background: #10b981;
-  color: #050b16;
+  color: var(--text-on-accent);
 }
 
 .user-profile-btn.btn-success:hover {

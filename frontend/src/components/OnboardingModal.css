@@ -13,7 +13,7 @@
 .onboarding-modal {
   width: 100%;
   max-width: 520px;
-  background: var(--dark-panel);
+  background: var(--bg-modal);
   border: 1px solid var(--border-subtle);
   border-radius: 20px;
   padding: 32px;
@@ -133,7 +133,7 @@
 .onboarding-btn-primary {
   padding: 12px 24px;
   background: linear-gradient(135deg, var(--cyan) 0%, var(--primary-blue) 100%);
-  color: #050b16;
+  color: var(--text-on-accent);
   font-size: 14px;
   font-weight: 700;
   border: none;

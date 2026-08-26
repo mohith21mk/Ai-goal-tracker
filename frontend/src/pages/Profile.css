@@ -220,7 +220,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--bg-chip);
   border-radius: 14px;
   border: 1px dashed rgba(255, 255, 255, 0.1);
 }
@@ -355,7 +355,7 @@
 .modal-input {
   width: 100%;
   padding: 10px 14px;
-  background: rgba(5, 11, 22, 0.6);
+  background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   color: var(--text-primary);
@@ -371,7 +371,7 @@
 .modal-textarea {
   width: 100%;
   padding: 10px 14px;
-  background: rgba(5, 11, 22, 0.6);
+  background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   color: var(--text-primary);

@@ -99,7 +99,7 @@
   flex-direction: column;
   gap: 12px;
   border-radius: 16px;
-  background: rgba(10, 22, 40, 0.7);
+  background: var(--bg-card-elevated);
   border: 1px solid var(--border-subtle);
 }
 

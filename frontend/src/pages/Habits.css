@@ -308,7 +308,7 @@
   gap: 4px;
   padding: 6px;
   border-radius: 8px;
-  background: rgba(10, 22, 40, 0.5);
+  background: var(--bg-chip);
   border: 1px solid var(--border-subtle);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -390,7 +390,7 @@
   width: 100%;
   max-width: 500px;
   padding: 28px;
-  background: #071426;
+  background: var(--bg-modal);
   border: 1px solid rgba(56, 189, 248, 0.3);
   border-radius: 20px;
   box-shadow: 0 20px 50px rgba(5, 11, 22, 0.9);
@@ -438,7 +438,7 @@
 .form-textarea {
   width: 100%;
   padding: 10px 14px;
-  background: rgba(10, 22, 40, 0.8);
+  background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   color: var(--text-primary);
@@ -552,7 +552,7 @@
 .level-up-modal-card {
   width: 100%;
   max-width: 480px;
-  background: linear-gradient(180deg, #0C1A30 0%, #060D1A 100%);
+  background: var(--bg-modal);
   border: 2px solid var(--cyan);
   border-radius: 24px;
   padding: 36px 28px;
@@ -610,7 +610,7 @@
   gap: 10px;
   width: 100%;
   padding: 16px 12px;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--bg-card-elevated);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
   margin-bottom: 18px;
