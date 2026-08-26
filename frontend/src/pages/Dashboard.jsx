@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Flame, Brain, Zap, TrendingUp, CheckCircle2, DollarSign, Rocket, ArrowRight } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
@@ -10,12 +10,13 @@ import AICoachCard from '../components/AICoachCard';
 import MasteryPlanCard from '../components/MasteryPlanCard';
 import MissionCard from '../components/MissionCard';
 import MotivationBar from '../components/MotivationBar';
-import { getMissions, toggleMission, getProgress, getTelemetry, getUser, getGoals, getDailyReflection } from '../services/api';
+import { getMissions, toggleMission, getProgress, getTelemetry, getUser, getGoals, getDailyReflection, getProgression } from '../services/api';
 import './Dashboard.css';
 
 const Dashboard = () => {
   const [missions, setMissions] = useState([]);
   const [progressData, setProgressData] = useState({ completed: 0, total: 0, percentage: 0 });
+  const [progression, setProgression] = useState({ total_xp: 0, level: 1, rank: 'INITIATE', level_progress_percent: 0 });
   const [telemetry, setTelemetry] = useState({
     discipline_score: 0,
     mindset_strength: 0,
@@ -48,46 +49,69 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [backendConnected, setBackendConnected] = useState(false);
 
+  const loadBackendData = useCallback(async () => {
+    try {
+      const [missionsData, telemetryRes, userRes, goalsRes, reflectionRes, progRes] = await Promise.all([
+        getMissions().catch(() => null),
+        getTelemetry().catch(() => null),
+        getUser().catch(() => null),
+        getGoals().catch(() => null),
+        getDailyReflection().catch(() => null),
+        getProgression().catch(() => null),
+      ]);
+
+      if (Array.isArray(missionsData) && missionsData.length > 0) {
+        setMissions(missionsData);
+      }
+
+      if (telemetryRes) {
+        setTelemetry(telemetryRes);
+        if (telemetryRes.mission_completion) {
+          setProgressData(telemetryRes.mission_completion);
+        }
+        if (telemetryRes.progression) {
+          setProgression(telemetryRes.progression);
+        }
+      } else {
+        const fallbackProg = await getProgress().catch(() => null);
+        if (fallbackProg) setProgressData(fallbackProg);
+      }
+
+      if (progRes) setProgression(progRes);
+      if (userRes) setUser(userRes);
+      if (Array.isArray(goalsRes)) setGoals(goalsRes);
+      if (reflectionRes) setReflectionData(reflectionRes);
+
+      setBackendConnected(true);
+    } catch (err) {
+      console.warn('Backend API connection warning, operating with fallback local state:', err.message);
+      setBackendConnected(false);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    async function loadBackendData() {
-      try {
-        const [missionsData, telemetryRes, userRes, goalsRes, reflectionRes] = await Promise.all([
-          getMissions().catch(() => null),
-          getTelemetry().catch(() => null),
-          getUser().catch(() => null),
-          getGoals().catch(() => null),
-          getDailyReflection().catch(() => null),
-        ]);
-
-        if (Array.isArray(missionsData) && missionsData.length > 0) {
-          setMissions(missionsData);
-        }
-
-        if (telemetryRes) {
-          setTelemetry(telemetryRes);
-          if (telemetryRes.mission_completion) {
-            setProgressData(telemetryRes.mission_completion);
-          }
-        } else {
-          const fallbackProg = await getProgress().catch(() => null);
-          if (fallbackProg) setProgressData(fallbackProg);
-        }
-
-        if (userRes) setUser(userRes);
-        if (Array.isArray(goalsRes)) setGoals(goalsRes);
-        if (reflectionRes) setReflectionData(reflectionRes);
-
-        setBackendConnected(true);
-      } catch (err) {
-        console.warn('Backend API connection warning, operating with fallback local state:', err.message);
-        setBackendConnected(false);
-      } finally {
-        setLoading(false);
+    let isMounted = true;
+    async function init() {
+      if (isMounted) {
+        await loadBackendData();
       }
     }
+    init();
 
-    loadBackendData();
-  }, []);
+    const handleGlobalProgressUpdate = () => {
+      if (isMounted) {
+        loadBackendData();
+      }
+    };
+    window.addEventListener('mkc:progress-updated', handleGlobalProgressUpdate);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('mkc:progress-updated', handleGlobalProgressUpdate);
+    };
+  }, [loadBackendData]);
 
   const handleToggleMission = async (id) => {
     // Optimistic local UI toggle
@@ -102,13 +126,18 @@ const Dashboard = () => {
           m.id === id ? { ...m, ...updatedMission } : m
         ));
 
-        const [freshTelemetry, freshProgress] = await Promise.all([
+        const [freshTelemetry, freshProgress, freshProgression] = await Promise.all([
           getTelemetry().catch(() => null),
-          getProgress().catch(() => null)
+          getProgress().catch(() => null),
+          getProgression().catch(() => null),
         ]);
 
         if (freshTelemetry) setTelemetry(freshTelemetry);
         if (freshProgress) setProgressData(freshProgress);
+        if (freshProgression) setProgression(freshProgression);
+
+        // Dispatch global progress update event
+        window.dispatchEvent(new CustomEvent('mkc:progress-updated'));
       } catch (err) {
         console.error('Error toggling mission on server:', err.message);
       }
@@ -224,8 +253,8 @@ const Dashboard = () => {
                 />
                 <StatCard
                   title="Future You"
-                  value={`Level ${Math.floor((telemetry.xp_earned || 0) / 50) + 1}`}
-                  subtitle={`${telemetry.xp_earned || 0} Total XP`}
+                  value={`Level ${progression.level || Math.floor((telemetry.xp_earned || 0) / 500) + 1}`}
+                  subtitle={`${progression.total_xp ?? telemetry.xp_earned ?? 0} Total XP • ${progression.rank || 'INITIATE'}`}
                   change={`${telemetry.xp_earned_change >= 0 ? '+' : ''}${telemetry.xp_earned_change || 0} XP`}
                   trend={telemetry.xp_earned_change >= 0 ? "up" : "down"}
                   icon={<Rocket size={22} strokeWidth={1.8} />}

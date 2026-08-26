@@ -113,8 +113,15 @@ const Sidebar = () => {
       }
     }
     loadProgress();
+
+    const handleProgressUpdate = () => {
+      loadProgress();
+    };
+    window.addEventListener('mkc:progress-updated', handleProgressUpdate);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('mkc:progress-updated', handleProgressUpdate);
     };
   }, []);
 

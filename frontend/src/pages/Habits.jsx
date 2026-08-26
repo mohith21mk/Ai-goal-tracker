@@ -131,8 +131,15 @@ const Habits = () => {
     }
     const currentTimers = animTimersRef.current;
     initHabits();
+
+    const handleGlobalProgressUpdate = () => {
+      refreshHabits();
+    };
+    window.addEventListener('mkc:progress-updated', handleGlobalProgressUpdate);
+
     return () => {
       isMountedRef.current = false;
+      window.removeEventListener('mkc:progress-updated', handleGlobalProgressUpdate);
       currentTimers.forEach(t => clearTimeout(t));
       currentTimers.clear();
     };
@@ -159,6 +166,7 @@ const Habits = () => {
         triggerXpAnimation(habitId, '+15 XP');
       }
       await refreshHabits();
+      window.dispatchEvent(new CustomEvent('mkc:progress-updated'));
     } catch (err) {
       alert(err.message || 'Could not toggle habit completion.');
     }
@@ -179,6 +187,7 @@ const Habits = () => {
         target_days_per_week: 7
       });
       await refreshHabits();
+      window.dispatchEvent(new CustomEvent('mkc:progress-updated'));
     } catch (err) {
       alert(err.message || 'Failed to create habit.');
     }
@@ -190,6 +199,7 @@ const Habits = () => {
     try {
       await deleteHabit(habitId);
       await refreshHabits();
+      window.dispatchEvent(new CustomEvent('mkc:progress-updated'));
     } catch (err) {
       alert(err.message || 'Failed to delete habit.');
     }

@@ -6,6 +6,7 @@ from ..database import get_connection
 from ..services.blueprints import get_blueprint_telemetry
 from ..services.habits import get_aggregate_habit_stats
 from ..services.journal import compute_journal_stats
+from ..services.progression import calculate_user_xp, get_user_progression
 from .auth import get_current_user
 
 router = APIRouter()
@@ -112,6 +113,7 @@ def _compute_daily_snapshot(cursor: Any, user_id: int, date_cutoff: str) -> Dict
         (user_id, cutoff_date),
     )
     tot_h_logs = cursor.fetchone()[0] or 0
+    total_xp_cutoff = xp_m + (tot_h_logs * 15)
 
     # 4. Streak Days up to cutoff
     cursor.execute(
@@ -209,7 +211,7 @@ def _compute_daily_snapshot(cursor: Any, user_id: int, date_cutoff: str) -> Dict
         "financial_goal": fin_pct,
         "completed_missions": comp_m,
         "streak_days": streak,
-        "xp_earned": xp_m,
+        "xp_earned": total_xp_cutoff,
     }
 
 
@@ -226,7 +228,8 @@ def compute_telemetry_sync(user_id: int) -> Dict[str, Any]:
     # 1. Missions Telemetry
     cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ?", (user_id,))
     total_missions = cursor.fetchone()[0] or 0
-    completed_missions = current_snap["completed_missions"]
+    cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ? AND completed = 1", (user_id,))
+    completed_missions = cursor.fetchone()[0] or 0
     mission_percentage = round((completed_missions / total_missions) * 100) if total_missions > 0 else 0
 
     # 2. Goals Telemetry
@@ -243,6 +246,9 @@ def compute_telemetry_sync(user_id: int) -> Dict[str, Any]:
     # 4. Journal & Blueprint Telemetry
     journal_stats = compute_journal_stats(user_id)
     blueprint_telemetry = get_blueprint_telemetry(user_id)
+
+    # 5. Authoritative Progression (XP, Level, Rank)
+    progression = get_user_progression(user_id)
 
     # 5. Compute Historical 7-Day Sparkline Arrays
     sparklines = {
@@ -295,8 +301,9 @@ def compute_telemetry_sync(user_id: int) -> Dict[str, Any]:
         "missions_completed_change": current_snap["completed_missions"] - prev_missions,
         "streak_days": current_snap["streak_days"],
         "streak_days_change": current_snap["streak_days"] - prev_streak,
-        "xp_earned": current_snap["xp_earned"],
-        "xp_earned_change": current_snap["xp_earned"] - prev_xp,
+        "xp_earned": progression["total_xp"],
+        "xp_earned_change": progression["total_xp"] - prev_xp,
+        "progression": progression,
         "sparklines": sparklines,
         "mission_completion": {
             "completed": completed_missions,

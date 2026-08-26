@@ -103,7 +103,16 @@ const Goals = () => {
       await fetchGoalsData();
     }
     init();
-    return () => { isMounted = false; };
+
+    const handleGlobalProgressUpdate = () => {
+      fetchGoalsData();
+    };
+    window.addEventListener('mkc:progress-updated', handleGlobalProgressUpdate);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('mkc:progress-updated', handleGlobalProgressUpdate);
+    };
   }, [fetchGoalsData]);
 
   // Escape key handler for dialogs
@@ -185,6 +194,7 @@ const Goals = () => {
         setGoals(prev => [...prev, created]);
         setSelectedGoalId(created.id);
       }
+      window.dispatchEvent(new CustomEvent('mkc:progress-updated'));
       closeModal();
     } catch (err) {
       console.error('Goal submission error:', err.message);
@@ -210,6 +220,7 @@ const Goals = () => {
     try {
       await deleteGoal(targetId);
       setGoals(prev => prev.filter(g => g.id !== targetId));
+      window.dispatchEvent(new CustomEvent('mkc:progress-updated'));
     } catch (err) {
       console.warn('API delete goal failed, removing locally:', err.message);
       setGoals(prev => prev.filter(g => g.id !== targetId));
@@ -232,6 +243,7 @@ const Goals = () => {
       setMissions(prev => prev.map(m =>
         m.id === missionId ? { ...m, ...updated } : m
       ));
+      window.dispatchEvent(new CustomEvent('mkc:progress-updated'));
     } catch (err) {
       console.error('Failed to sync mission toggle:', err.message);
     }

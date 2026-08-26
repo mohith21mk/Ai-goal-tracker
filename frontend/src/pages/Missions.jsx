@@ -77,8 +77,15 @@ const Missions = () => {
       }
     }
     init();
+
+    const handleGlobalProgressUpdate = () => {
+      loadMissionsData();
+    };
+    window.addEventListener('mkc:progress-updated', handleGlobalProgressUpdate);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('mkc:progress-updated', handleGlobalProgressUpdate);
     };
   }, []);
 
@@ -91,6 +98,7 @@ const Missions = () => {
     try {
       await toggleMission(id);
       await loadMissionsData();
+      window.dispatchEvent(new CustomEvent('mkc:progress-updated'));
     } catch (err) {
       console.error('Failed to toggle mission:', err);
       // Revert if error
@@ -118,6 +126,7 @@ const Missions = () => {
       setTitle('');
       setDescription('');
       await loadMissionsData();
+      window.dispatchEvent(new CustomEvent('mkc:progress-updated'));
     } catch (err) {
       alert(err.message || 'Failed to create custom mission.');
     }

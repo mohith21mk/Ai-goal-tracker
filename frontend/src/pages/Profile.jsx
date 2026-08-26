@@ -70,8 +70,15 @@ const Profile = () => {
       }
     }
     loadProfileData();
+
+    const handleGlobalProgressUpdate = () => {
+      loadProfileData();
+    };
+    window.addEventListener('mkc:progress-updated', handleGlobalProgressUpdate);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('mkc:progress-updated', handleGlobalProgressUpdate);
     };
   }, [searchParams]);
 

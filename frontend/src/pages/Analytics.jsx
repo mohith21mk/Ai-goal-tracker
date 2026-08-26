@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Flame,
   Brain,
@@ -16,7 +16,7 @@ import Sidebar from '../components/Sidebar';
 import TopBar from '../components/TopBar';
 import StatCard from '../components/StatCard';
 import MKCLogo from '../components/MKCLogo';
-import { getTelemetry, getProgress, getMissions, getUser } from '../services/api';
+import { getTelemetry, getProgress, getMissions, getUser, getProgression } from '../services/api';
 import './Analytics.css';
 
 const getStatusLabel = (score) => {
@@ -50,41 +50,62 @@ const Analytics = () => {
       financial_goal: [0, 0, 0, 0, 0, 0, 0],
     }
   });
+  const [progression, setProgression] = useState({ total_xp: 0, level: 1, rank: 'INITIATE', level_progress_percent: 0 });
   const [progress, setProgress] = useState({ completed: 0, total: 0, percentage: 0 });
   const [missions, setMissions] = useState([]);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadAnalyticsData() {
-      try {
-        const [telemetryRes, progressRes, missionsRes, userRes] = await Promise.all([
-          getTelemetry().catch(() => null),
-          getProgress().catch(() => null),
-          getMissions().catch(() => null),
-          getUser().catch(() => null)
-        ]);
+  const loadAnalyticsData = useCallback(async () => {
+    try {
+      const [telemetryRes, progressRes, missionsRes, userRes, progRes] = await Promise.all([
+        getTelemetry().catch(() => null),
+        getProgress().catch(() => null),
+        getMissions().catch(() => null),
+        getUser().catch(() => null),
+        getProgression().catch(() => null),
+      ]);
 
-        if (isMounted) {
-          if (telemetryRes) setTelemetry(telemetryRes);
-          if (progressRes) setProgress(progressRes);
-          if (Array.isArray(missionsRes)) setMissions(missionsRes);
-          if (userRes) setUser(userRes);
-        }
-      } catch (err) {
-        console.warn('Failed to load real analytics telemetry:', err);
-      } finally {
-        if (isMounted) setLoading(false);
+      if (telemetryRes) {
+        setTelemetry(telemetryRes);
+        if (telemetryRes.progression) setProgression(telemetryRes.progression);
       }
+      if (progressRes) setProgress(progressRes);
+      if (Array.isArray(missionsRes)) setMissions(missionsRes);
+      if (userRes) setUser(userRes);
+      if (progRes) setProgression(progRes);
+    } catch (err) {
+      console.warn('Failed to load real analytics telemetry:', err);
+    } finally {
+      setLoading(false);
     }
-
-    loadAnalyticsData();
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    async function init() {
+      if (isMounted) {
+        await loadAnalyticsData();
+      }
+    }
+    init();
+
+    const handleGlobalProgressUpdate = () => {
+      if (isMounted) {
+        loadAnalyticsData();
+      }
+    };
+    window.addEventListener('mkc:progress-updated', handleGlobalProgressUpdate);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('mkc:progress-updated', handleGlobalProgressUpdate);
+    };
+  }, [loadAnalyticsData]);
+
   const completedMissionsCount = missions.filter(m => m.completed).length;
-  const userLevel = Math.floor((telemetry.xp_earned || 0) / 50) + 1;
-  const hasActivity = (telemetry.discipline_score > 0) || (telemetry.xp_earned > 0) || (progress.completed > 0) || (telemetry.streak_days > 0);
+  const userLevel = progression.level || Math.floor((telemetry.xp_earned || 0) / 500) + 1;
+  const hasActivity = (telemetry.discipline_score > 0) || ((progression.total_xp || telemetry.xp_earned || 0) > 0) || (progress.completed > 0) || (telemetry.streak_days > 0);
 
   return (
     <div className="app-shell">
@@ -212,7 +233,7 @@ const Analytics = () => {
               <StatCard
                 title="Identity Level"
                 value={`Level ${userLevel}`}
-                subtitle={`${telemetry.xp_earned || 0} Total XP`}
+                subtitle={`${progression.total_xp ?? telemetry.xp_earned ?? 0} Total XP • ${progression.rank || 'INITIATE'}`}
                 change={`${telemetry.xp_earned_change >= 0 ? '+' : ''}${telemetry.xp_earned_change || 0} XP`}
                 trend={telemetry.xp_earned_change >= 0 ? 'up' : 'down'}
                 icon={<Rocket size={20} strokeWidth={1.8} />}

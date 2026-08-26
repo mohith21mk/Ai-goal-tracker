@@ -150,7 +150,16 @@ const TopBar = ({ user }) => {
       }
     }
     loadTopBarData();
-    return () => { isMounted = false; };
+
+    const handleProgressUpdate = () => {
+      loadTopBarData();
+    };
+    window.addEventListener('mkc:progress-updated', handleProgressUpdate);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('mkc:progress-updated', handleProgressUpdate);
+    };
   }, []);
 
   const displayName = userProfile?.full_name || user?.full_name || 'Mohith K';
