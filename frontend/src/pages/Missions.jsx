@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Zap, Laptop, HeartPulse, Dumbbell, BookOpen, Brain, CheckCircle2, Target, Flame, TriangleAlert, X } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import MissionCard from '../components/MissionCard';
 import { getMissions, toggleMission, createMission, getTelemetry } from '../services/api';
 import './Missions.css';
@@ -141,11 +139,7 @@ const Missions = () => {
   const completionPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
-    <div className="app-shell">
-      <Sidebar />
-      <div className="main-viewport">
-        <TopBar />
-        <div className="missions-container">
+    <div className="missions-container">
           {/* Header */}
           <div className="missions-header-section">
             <div className="missions-header-left">
@@ -343,8 +337,6 @@ const Missions = () => {
             </div>
           )}
         </div>
-      </div>
-    </div>
   );
 };
 

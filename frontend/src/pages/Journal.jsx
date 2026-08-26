@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Zap, Target, Scale, Shield, BatteryCharging, Calendar, Flame, BookOpen, Bot, RefreshCw, TriangleAlert, Trash2 } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import {
   getTodayJournal,
   saveJournalEntry,
@@ -201,11 +199,7 @@ const Journal = () => {
   };
 
   return (
-    <div className="app-shell">
-      <Sidebar />
-      <div className="main-viewport">
-        <TopBar />
-        <div className="journal-container">
+    <div className="journal-container">
           {/* Header */}
           <div className="journal-header-section">
             <div className="journal-header-left">
@@ -461,8 +455,6 @@ const Journal = () => {
             )}
           </div>
         </div>
-      </div>
-    </div>
   );
 };
 

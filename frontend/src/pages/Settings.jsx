@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Palette, Moon, Sun, Bot, Bell, Zap, Shield, TriangleAlert, CheckCircle2, LogOut, MessageSquare } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import FeedbackModal from '../components/FeedbackModal';
 import { getSettings, updateSettings, logoutUser } from '../services/api';
 import './Settings.css';
@@ -111,11 +109,7 @@ const Settings = () => {
   };
 
   return (
-    <div className="app-shell">
-      <Sidebar />
-      <div className="main-viewport">
-        <TopBar />
-        <div className="settings-container">
+    <div className="settings-container">
           {/* Header */}
           <div className="settings-header">
             <h1 className="font-serif">System Preferences</h1>
@@ -367,14 +361,12 @@ const Settings = () => {
               </div>
             </form>
           )}
-        </div>
-      </div>
 
-      <FeedbackModal
-        isOpen={isFeedbackOpen}
-        onClose={() => setIsFeedbackOpen(false)}
-      />
-    </div>
+          <FeedbackModal
+            isOpen={isFeedbackOpen}
+            onClose={() => setIsFeedbackOpen(false)}
+          />
+        </div>
   );
 };
 

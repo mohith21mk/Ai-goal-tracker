@@ -13,8 +13,6 @@ import {
   Lock,
   RefreshCw
 } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import { 
   getUser, 
   getAdminOverview, 
@@ -178,26 +176,20 @@ const AdminDashboard = () => {
 
   if (!loading && (!currentUser || currentUser.role !== 'admin')) {
     return (
-      <div className="app-shell">
-        <Sidebar />
-        <div className="main-viewport">
-          <TopBar user={currentUser} />
-          <div className="admin-page-layout">
-            <div className="admin-forbidden-card glass-panel">
-              <div className="forbidden-icon">
-                <Lock size={32} />
-              </div>
-              <h2 style={{ fontSize: '20px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
-                Administrator Privileges Required
-              </h2>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
-                This workspace is protected. You must be authenticated as an authorized system administrator to view executive analytics and directory telemetry.
-              </p>
-              <Link to={ROUTES.DASHBOARD} className="feedback-btn" style={{ textDecoration: 'none', padding: '10px 20px', marginTop: '12px' }}>
-                Return to Dashboard
-              </Link>
-            </div>
+      <div className="admin-page-layout">
+        <div className="admin-forbidden-card glass-panel">
+          <div className="forbidden-icon">
+            <Lock size={32} />
           </div>
+          <h2 style={{ fontSize: '20px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
+            Administrator Privileges Required
+          </h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+            This workspace is protected. You must be authenticated as an authorized system administrator to view executive analytics and directory telemetry.
+          </p>
+          <Link to={ROUTES.DASHBOARD} className="feedback-btn" style={{ textDecoration: 'none', padding: '10px 20px', marginTop: '12px' }}>
+            Return to Dashboard
+          </Link>
         </div>
       </div>
     );
@@ -206,13 +198,7 @@ const AdminDashboard = () => {
   const maxGrowth = overview?.user_growth_timeline ? Math.max(...overview.user_growth_timeline.map(t => t.count), 1) : 1;
 
   return (
-    <div className="app-shell">
-      <Sidebar />
-
-      <div className="main-viewport">
-        <TopBar user={currentUser} />
-
-        <div className="admin-page-layout">
+    <div className="admin-page-layout">
           {/* Header Banner */}
           <header className="admin-header-card glass-panel">
             <div className="admin-header-title-group">
@@ -729,8 +715,6 @@ const AdminDashboard = () => {
             </div>
           )}
         </div>
-      </div>
-    </div>
   );
 };
 

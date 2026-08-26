@@ -12,11 +12,9 @@ import {
   Calendar,
   Activity
 } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import StatCard from '../components/StatCard';
 import MKCLogo from '../components/MKCLogo';
-import { getTelemetry, getProgress, getMissions, getUser, getProgression } from '../services/api';
+import { getTelemetry, getProgress, getMissions, getProgression } from '../services/api';
 import './Analytics.css';
 
 const getStatusLabel = (score) => {
@@ -53,16 +51,14 @@ const Analytics = () => {
   const [progression, setProgression] = useState({ total_xp: 0, level: 1, rank: 'INITIATE', level_progress_percent: 0 });
   const [progress, setProgress] = useState({ completed: 0, total: 0, percentage: 0 });
   const [missions, setMissions] = useState([]);
-  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const loadAnalyticsData = useCallback(async () => {
     try {
-      const [telemetryRes, progressRes, missionsRes, userRes, progRes] = await Promise.all([
+      const [telemetryRes, progressRes, missionsRes, progRes] = await Promise.all([
         getTelemetry().catch(() => null),
         getProgress().catch(() => null),
         getMissions().catch(() => null),
-        getUser().catch(() => null),
         getProgression().catch(() => null),
       ]);
 
@@ -72,7 +68,6 @@ const Analytics = () => {
       }
       if (progressRes) setProgress(progressRes);
       if (Array.isArray(missionsRes)) setMissions(missionsRes);
-      if (userRes) setUser(userRes);
       if (progRes) setProgression(progRes);
     } catch (err) {
       console.warn('Failed to load real analytics telemetry:', err);
@@ -108,13 +103,7 @@ const Analytics = () => {
   const hasActivity = (telemetry.discipline_score > 0) || ((progression.total_xp || telemetry.xp_earned || 0) > 0) || (progress.completed > 0) || (telemetry.streak_days > 0);
 
   return (
-    <div className="app-shell">
-      <Sidebar />
-
-      <div className="main-viewport">
-        <TopBar user={user} />
-
-        <div className="analytics-page-layout">
+    <div className="analytics-page-layout">
           {/* Header Banner */}
           <div className="analytics-header glass-panel">
             <div className="analytics-header-content">
@@ -301,8 +290,6 @@ const Analytics = () => {
             </div>
           </div>
         </div>
-      </div>
-    </div>
   );
 };
 

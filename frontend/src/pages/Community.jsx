@@ -12,8 +12,6 @@ import {
   Trash2,
   Award
 } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import VictoryCredentialCard from '../components/VictoryCredentialCard';
 import CertificateModal from '../components/CertificateModal';
 import {
@@ -267,11 +265,7 @@ const Community = () => {
   };
 
   return (
-    <div className="app-shell">
-      <Sidebar />
-      <div className="main-viewport">
-        <TopBar />
-        <div className="community-container">
+    <div className="community-container">
           {/* Header */}
           <div className="community-header">
             <div className="community-header-left">
@@ -591,17 +585,15 @@ const Community = () => {
               })}
             </div>
           )}
-        </div>
-      </div>
 
-      {certModalData && (
-        <CertificateModal
-          credential={certModalData.credential}
-          user={certModalData.user}
-          onClose={() => setCertModalData(null)}
-        />
-      )}
-    </div>
+        {certModalData && (
+          <CertificateModal
+            credential={certModalData.credential}
+            user={certModalData.user}
+            onClose={() => setCertModalData(null)}
+          />
+        )}
+      </div>
   );
 };
 

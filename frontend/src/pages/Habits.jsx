@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import { 
   Zap, 
   Trophy, 
@@ -214,11 +212,8 @@ const Habits = () => {
   };
 
   return (
-    <div className="app-shell">
-      <Sidebar />
-      <div className="main-viewport">
-        <TopBar />
-        <div className="habits-container">
+    <>
+      <div className="habits-container">
           {/* 1. SOUL-LEVELING CHARACTER PROGRESSION HUD */}
           <div className="habits-hud-card glass-panel">
             <div className="hud-top-row">
@@ -390,7 +385,6 @@ const Habits = () => {
             </div>
           )}
         </div>
-      </div>
 
       {/* Level Up & Rank Up Celebration Modal */}
       {levelUpEvent && (
@@ -502,7 +496,7 @@ const Habits = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

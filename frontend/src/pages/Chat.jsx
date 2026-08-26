@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { Search, UserPlus, Check, X, Send, MessageSquare, MessageCircle, Trash2 } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import { useMessagingSocket } from '../hooks/useMessagingSocket';
 import { useNotificationsSocket } from '../hooks/useNotificationsSocket';
 import UserProfilePanel from '../components/UserProfilePanel';
@@ -323,11 +321,8 @@ const Chat = () => {
   };
 
   return (
-    <div className="app-shell">
-      <Sidebar />
-      <div className="main-viewport">
-        <TopBar />
-        <div className="chat-layout">
+    <>
+      <div className="chat-layout">
           
           {/* LEFT PANEL */}
           <div className="chat-sidebar glass-panel">
@@ -600,7 +595,6 @@ const Chat = () => {
           </div>
           
         </div>
-      </div>
 
       {/* User Profile Panel Modal */}
       {selectedProfileUserId && (
@@ -620,7 +614,7 @@ const Chat = () => {
           }}
         />
       )}
-    </div>
+    </>
   );
 };
 

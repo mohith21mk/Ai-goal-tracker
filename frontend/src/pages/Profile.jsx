@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { TriangleAlert, CheckCircle2, Pencil, Flame, Zap, Target, Shield, Globe, X, Award, Sparkles } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import VictoryCredentialCard from '../components/VictoryCredentialCard';
 import CertificateModal from '../components/CertificateModal';
 import { getUser, updateUser, getProgression, getCredentials, getVerifiedCredential } from '../services/api';
@@ -122,11 +120,7 @@ const Profile = () => {
   };
 
   return (
-    <div className="app-shell">
-      <Sidebar />
-      <div className="main-viewport">
-        <TopBar user={user} />
-        <div className="profile-container">
+    <div className="profile-container">
           {/* Header & Feedback */}
           {feedbackMessage && (
             <div style={{
@@ -373,8 +367,6 @@ const Profile = () => {
             </>
           )}
         </div>
-      </div>
-    </div>
   );
 };
 

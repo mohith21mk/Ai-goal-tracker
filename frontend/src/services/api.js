@@ -7,7 +7,56 @@ if (import.meta.env.PROD && (rawApiUrl.includes('your-backend-service') || rawAp
 }
 const API_BASE_URL = rawApiUrl.replace(/\/+$/, '');
 
+// -------------------------------------------------------------------
+// CLIENT-SIDE IN-MEMORY SWR CACHE & REQUEST DEDUPLICATION
+// -------------------------------------------------------------------
+const apiCache = new Map(); // endpoint -> { data, timestamp, ttl }
+const inFlightRequests = new Map(); // endpoint -> Promise<any>
+
+const DEFAULT_TTL = 30 * 1000; // 30s default
+const ENDPOINT_TTLS = [
+  { pattern: /^\/api\/(auth\/me|users\/me)/, ttl: 5 * 60 * 1000 },      // 5 minutes
+  { pattern: /^\/api\/credentials/, ttl: 5 * 60 * 1000 },                // 5 minutes
+  { pattern: /^\/api\/settings/, ttl: 5 * 60 * 1000 },                   // 5 minutes
+  { pattern: /^\/api\/(goals|blueprints)/, ttl: 45 * 1000 },             // 45 seconds
+  { pattern: /^\/api\/(progression|progress(\/telemetry)?)/, ttl: 30 * 1000 }, // 30 seconds
+  { pattern: /^\/api\/community\/posts/, ttl: 30 * 1000 },               // 30 seconds
+  { pattern: /^\/api\/habits/, ttl: 30 * 1000 },                         // 30 seconds
+  { pattern: /^\/api\/reflection/, ttl: 45 * 1000 },                     // 45 seconds
+  { pattern: /^\/api\/journal/, ttl: 30 * 1000 },                        // 30 seconds
+  { pattern: /^\/api\/notifications/, ttl: 10 * 1000 },                  // 10 seconds
+];
+
+function getTtlForEndpoint(endpoint) {
+  for (const { pattern, ttl } of ENDPOINT_TTLS) {
+    if (pattern.test(endpoint)) return ttl;
+  }
+  return DEFAULT_TTL;
+}
+
+export function clearApiCache(endpointPattern = null) {
+  if (!endpointPattern) {
+    apiCache.clear();
+    inFlightRequests.clear();
+    return;
+  }
+  const regex = typeof endpointPattern === 'string' ? new RegExp(endpointPattern) : endpointPattern;
+  for (const key of apiCache.keys()) {
+    if (regex.test(key)) {
+      apiCache.delete(key);
+    }
+  }
+}
+
+// Global listener to clear progress-related caches on progress events
+if (typeof window !== 'undefined') {
+  window.addEventListener('mkc:progress-updated', () => {
+    clearApiCache(/^\/api\/(progress|progression|missions|habits|goals|blueprints)/);
+  });
+}
+
 async function apiFetch(endpoint, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
   const defaultHeaders = options.body ? { 'Content-Type': 'application/json' } : {};
   const config = {
     credentials: 'include',
@@ -17,6 +66,110 @@ async function apiFetch(endpoint, options = {}) {
       ...options.headers,
     },
   };
+
+  // 1. GET requests: SWR caching + concurrent request deduplication
+  if (method === 'GET') {
+    const cacheKey = endpoint;
+    const now = Date.now();
+    const ttl = getTtlForEndpoint(endpoint);
+
+    // Cache HIT (fresh within TTL)
+    const cached = apiCache.get(cacheKey);
+    if (cached && (now - cached.timestamp) < cached.ttl) {
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK (from cache)',
+        json: async () => JSON.parse(JSON.stringify(cached.data)),
+        text: async () => JSON.stringify(cached.data),
+        headers: new Headers({ 'Content-Type': 'application/json', 'X-MKC-Cache': 'HIT' }),
+      };
+    }
+
+    // In-Flight Request Deduplication
+    if (inFlightRequests.has(cacheKey)) {
+      const data = await inFlightRequests.get(cacheKey);
+      if (data !== null) {
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK (deduplicated)',
+          json: async () => JSON.parse(JSON.stringify(data)),
+          text: async () => JSON.stringify(data),
+          headers: new Headers({ 'Content-Type': 'application/json', 'X-MKC-Cache': 'DEDUP' }),
+        };
+      }
+    }
+
+    // Launch single background/foreground network request
+    const fetchPromise = (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}${endpoint}`, config);
+        if (res.ok) {
+          const data = await res.json();
+          apiCache.set(cacheKey, { data, timestamp: Date.now(), ttl });
+          return data;
+        }
+        return null;
+      } catch {
+        return null;
+      } finally {
+        inFlightRequests.delete(cacheKey);
+      }
+    })();
+
+    inFlightRequests.set(cacheKey, fetchPromise);
+
+    // Stale-While-Revalidate: Return stale cached data immediately while refreshing in background
+    if (cached) {
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK (stale cache)',
+        json: async () => JSON.parse(JSON.stringify(cached.data)),
+        text: async () => JSON.stringify(cached.data),
+        headers: new Headers({ 'Content-Type': 'application/json', 'X-MKC-Cache': 'STALE' }),
+      };
+    }
+
+    // First-time fetch: await response
+    const data = await fetchPromise;
+    if (data !== null) {
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => JSON.parse(JSON.stringify(data)),
+        text: async () => JSON.stringify(data),
+        headers: new Headers({ 'Content-Type': 'application/json', 'X-MKC-Cache': 'MISS' }),
+      };
+    }
+
+    // Fallback if initial fetch failed
+    return fetch(`${API_BASE_URL}${endpoint}`, config);
+  }
+
+  // 2. Mutations (POST, PUT, PATCH, DELETE): Invalidate relevant cache branches
+  if (endpoint.startsWith('/api/missions')) {
+    clearApiCache(/^\/api\/(missions|progress|progression)/);
+  } else if (endpoint.startsWith('/api/goals')) {
+    clearApiCache(/^\/api\/(goals|progress|progression)/);
+  } else if (endpoint.startsWith('/api/habits')) {
+    clearApiCache(/^\/api\/(habits|progress|progression|reflection)/);
+  } else if (endpoint.startsWith('/api/blueprints')) {
+    clearApiCache(/^\/api\/(blueprints|goals|progress|progression|credentials)/);
+  } else if (endpoint.startsWith('/api/community')) {
+    clearApiCache(/^\/api\/community/);
+  } else if (endpoint.startsWith('/api/journal') || endpoint.startsWith('/api/reflection')) {
+    clearApiCache(/^\/api\/(journal|reflection|progress)/);
+  } else if (endpoint.startsWith('/api/settings')) {
+    clearApiCache(/^\/api\/settings/);
+  } else if (endpoint.startsWith('/api/auth/logout') || endpoint.startsWith('/api/auth/login')) {
+    clearApiCache(); // clear everything on login/logout
+  } else if (endpoint.startsWith('/api/users')) {
+    clearApiCache(/^\/api\/(users|auth)/);
+  }
+
   return fetch(`${API_BASE_URL}${endpoint}`, config);
 }
 

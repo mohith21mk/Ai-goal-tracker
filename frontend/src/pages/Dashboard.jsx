@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Flame, Brain, Zap, TrendingUp, CheckCircle2, DollarSign, Rocket, ArrowRight } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import HeroSection from '../components/HeroSection';
 import StatCard from '../components/StatCard';
 import ProgressCircle from '../components/ProgressCircle';
@@ -10,7 +8,7 @@ import AICoachCard from '../components/AICoachCard';
 import MasteryPlanCard from '../components/MasteryPlanCard';
 import MissionCard from '../components/MissionCard';
 import MotivationBar from '../components/MotivationBar';
-import { getMissions, toggleMission, getProgress, getTelemetry, getUser, getGoals, getDailyReflection, getProgression } from '../services/api';
+import { getMissions, toggleMission, getProgress, getTelemetry, getGoals, getDailyReflection, getProgression } from '../services/api';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -38,7 +36,6 @@ const Dashboard = () => {
       financial_goal: [0, 0, 0, 0, 0, 0, 0],
     }
   });
-  const [user, setUser] = useState(null);
   const [goals, setGoals] = useState([]);
   const [reflectionData, setReflectionData] = useState({
     reflection: '"Small choices today create extraordinary tomorrows."',
@@ -51,10 +48,9 @@ const Dashboard = () => {
 
   const loadBackendData = useCallback(async () => {
     try {
-      const [missionsData, telemetryRes, userRes, goalsRes, reflectionRes, progRes] = await Promise.all([
+      const [missionsData, telemetryRes, goalsRes, reflectionRes, progRes] = await Promise.all([
         getMissions().catch(() => null),
         getTelemetry().catch(() => null),
-        getUser().catch(() => null),
         getGoals().catch(() => null),
         getDailyReflection().catch(() => null),
         getProgression().catch(() => null),
@@ -78,7 +74,6 @@ const Dashboard = () => {
       }
 
       if (progRes) setProgression(progRes);
-      if (userRes) setUser(userRes);
       if (Array.isArray(goalsRes)) setGoals(goalsRes);
       if (reflectionRes) setReflectionData(reflectionRes);
 
@@ -149,17 +144,7 @@ const Dashboard = () => {
   const activeGoalMissions = activeGoal ? missions.filter(m => Number(m.goal_id) === Number(activeGoal.id)) : missions;
 
   return (
-    <div className="app-shell">
-      {/* 1. Fixed Left Sidebar (~220px) */}
-      <Sidebar />
-
-      {/* 2. Main Scrollable Container */}
-      <div className="main-viewport">
-        {/* Sticky TopBar */}
-        <TopBar user={user} />
-
-        {/* Dashboard View Content */}
-        <div className="dashboard-content-layout">
+    <div className="dashboard-content-layout">
           {/* CENTER COLUMN (Flexible Width) */}
           <main className="center-content">
             {/* Cinematic Hero Section */}
@@ -370,8 +355,6 @@ const Dashboard = () => {
             </div>
           </aside>
         </div>
-      </div>
-    </div>
   );
 };
 

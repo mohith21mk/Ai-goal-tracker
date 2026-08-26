@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import { Sparkles, TriangleAlert, Rocket, Target, Trash2, Calendar, Check, X } from 'lucide-react';
 import {
   getActiveBlueprint,
@@ -179,11 +177,7 @@ const Blueprint = () => {
   };
 
   return (
-    <div className="app-shell">
-      <Sidebar />
-      <div className="main-viewport">
-        <TopBar />
-        <div className="blueprint-container">
+    <div className="blueprint-container">
           {/* Header */}
           <div className="blueprint-header-section">
             <div className="blueprint-header-left">
@@ -515,8 +509,6 @@ const Blueprint = () => {
             </div>
           )}
         </div>
-      </div>
-    </div>
   );
 };
 

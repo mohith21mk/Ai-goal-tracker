@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bot, User, Trash2, TriangleAlert } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import { sendCoachMessage, getCoachHistory, clearCoachHistory } from '../services/api';
 import './AICoach.css';
 
@@ -107,11 +105,7 @@ const AICoach = () => {
   };
 
   return (
-    <div className="app-shell">
-      <Sidebar />
-      <div className="main-viewport">
-        <TopBar />
-        <div className="coach-page-container">
+    <div className="coach-page-container">
           {/* Header */}
           <div className="coach-page-header">
             <div className="coach-page-header-left">
@@ -226,8 +220,6 @@ const AICoach = () => {
             ))}
           </div>
         </div>
-      </div>
-    </div>
   );
 };
 

@@ -25,6 +25,7 @@ const Profile = lazy(() => import('./pages/Profile'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 import ErrorBoundary from './components/ErrorBoundary';
+import AppLayout from './components/AppLayout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { getSettings } from './services/api';
 import { ROUTES } from './constants/routes';
@@ -129,26 +130,28 @@ function AppContent() {
           <Route path={ROUTES.VERIFY_EMAIL} element={<VerifyEmail />} />
           <Route path={ROUTES.LANDING} element={<Landing />} />
 
-          {/* Protected Application Routes */}
-          <Route path={ROUTES.ROOT} element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path={ROUTES.DASHBOARD} element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path={ROUTES.ANALYTICS} element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
-          <Route path={ROUTES.MISSIONS} element={<ProtectedRoute><Missions /></ProtectedRoute>} />
-          <Route path={ROUTES.GOALS} element={<ProtectedRoute><Goals /></ProtectedRoute>} />
-          <Route path={ROUTES.COACH} element={<ProtectedRoute><AICoach /></ProtectedRoute>} />
-          <Route path={ROUTES.AI_COACH_ALIAS} element={<ProtectedRoute><AICoach /></ProtectedRoute>} />
-          <Route path={ROUTES.HABITS} element={<ProtectedRoute><Habits /></ProtectedRoute>} />
-          <Route path={ROUTES.STREAKS_ALIAS} element={<ProtectedRoute><Habits /></ProtectedRoute>} />
-          <Route path={ROUTES.JOURNAL} element={<ProtectedRoute><Journal /></ProtectedRoute>} />
-          <Route path={ROUTES.BLUEPRINT} element={<ProtectedRoute><Blueprint /></ProtectedRoute>} />
-          <Route path={ROUTES.LIFE_BLUEPRINT_ALIAS} element={<ProtectedRoute><Blueprint /></ProtectedRoute>} />
-          <Route path={ROUTES.SETTINGS} element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path={ROUTES.COMMUNITY} element={<ProtectedRoute><Community /></ProtectedRoute>} />
-          <Route path={ROUTES.MESSAGES} element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-          <Route path={ROUTES.CHAT_ALIAS} element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-          <Route path={ROUTES.PROFILE} element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path={ROUTES.MY_IDENTITY_ALIAS} element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path={ROUTES.ADMIN} element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+          {/* Protected Application Routes with Persistent AppLayout */}
+          <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+            <Route path={ROUTES.ROOT} element={<Dashboard />} />
+            <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
+            <Route path={ROUTES.ANALYTICS} element={<Analytics />} />
+            <Route path={ROUTES.MISSIONS} element={<Missions />} />
+            <Route path={ROUTES.GOALS} element={<Goals />} />
+            <Route path={ROUTES.COACH} element={<AICoach />} />
+            <Route path={ROUTES.AI_COACH_ALIAS} element={<AICoach />} />
+            <Route path={ROUTES.HABITS} element={<Habits />} />
+            <Route path={ROUTES.STREAKS_ALIAS} element={<Habits />} />
+            <Route path={ROUTES.JOURNAL} element={<Journal />} />
+            <Route path={ROUTES.BLUEPRINT} element={<Blueprint />} />
+            <Route path={ROUTES.LIFE_BLUEPRINT_ALIAS} element={<Blueprint />} />
+            <Route path={ROUTES.SETTINGS} element={<Settings />} />
+            <Route path={ROUTES.COMMUNITY} element={<Community />} />
+            <Route path={ROUTES.MESSAGES} element={<Chat />} />
+            <Route path={ROUTES.CHAT_ALIAS} element={<Chat />} />
+            <Route path={ROUTES.PROFILE} element={<Profile />} />
+            <Route path={ROUTES.MY_IDENTITY_ALIAS} element={<Profile />} />
+            <Route path={ROUTES.ADMIN} element={<AdminDashboard />} />
+          </Route>
 
           {/* Catch-all fallback */}
           <Route path="*" element={<Navigate to={ROUTES.DASHBOARD} replace />} />

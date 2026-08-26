@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { TriangleAlert, Target, Calendar, Pencil, Trash2, X } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import TopBar from '../components/TopBar';
 import MissionCard from '../components/MissionCard';
 import { getGoals, createGoal, updateGoal, deleteGoal, getMissions, toggleMission } from '../services/api';
 import './Goals.css';
@@ -277,15 +275,8 @@ const Goals = () => {
   const selectedProgress = selectedGoal ? calculateProgress(selectedGoal.id) : null;
 
   return (
-    <div className="app-shell">
-      {/* 1. App Shell Sidebar */}
-      <Sidebar />
-
-      {/* 2. Main Viewport */}
-      <div className="main-viewport">
-        <TopBar />
-
-        <div className="goals-container-layout">
+    <>
+      <div className="goals-container-layout">
           {/* Header Banner */}
           <div className="goals-page-header">
             <div className="header-text-area">
@@ -486,7 +477,6 @@ const Goals = () => {
             </div>
           )}
         </div>
-      </div>
 
       {/* CREATE / EDIT MODAL DIALOG */}
       {isModalOpen && (
@@ -609,7 +599,7 @@ const Goals = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
