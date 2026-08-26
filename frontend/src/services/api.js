@@ -639,7 +639,9 @@ export async function updateSettings(data) {
 }
 
 export async function getCommunityPosts(category = 'all') {
-  const response = await apiFetch(`/api/community/posts?category=${category}`);
+  const cleanCat = category && category !== 'all' && category !== 'null' && category !== 'undefined' ? category : '';
+  const qs = cleanCat ? `?category=${encodeURIComponent(cleanCat)}` : '';
+  const response = await apiFetch(`/api/community/posts${qs}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch community posts: ${response.statusText}`);
   }

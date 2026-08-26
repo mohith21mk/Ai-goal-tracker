@@ -945,6 +945,29 @@ def init_db() -> None:
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_conn_requester ON user_connections(requester_id, status)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_conn_recipient ON user_connections(recipient_id, status)")
 
+    # Auto-heal NULL likes_count in community_posts
+    cursor.execute("UPDATE community_posts SET likes_count = 0 WHERE likes_count IS NULL")
+    conn.commit()
+
+    # Seed default starter community posts if none exist
+    cursor.execute("SELECT COUNT(*) FROM community_posts")
+    cp_count = cursor.fetchone()[0] or 0
+    if cp_count == 0:
+        default_posts = [
+            (demo_user_id, "Mastery Key Coach Demo", "Welcome to the Mastery Key Network! Execute your daily protocols, track momentum, and compound 1% improvements daily.", "general", 0),
+            (demo_user_id, "Mastery Key Coach Demo", "Milestone breakthrough: Completed 14-day consecutive deep work protocol and deployed system architecture.", "wins", 0),
+            (demo_user_id, "Mastery Key Coach Demo", "Discipline principle: Motivation is an emotional impulse; discipline is an automated engineering system.", "mindset", 0),
+        ]
+        for p in default_posts:
+            cursor.execute(
+                """
+                INSERT INTO community_posts (user_id, author_name, content, category, likes_count, created_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                p,
+            )
+        conn.commit()
+
     # 13. Create conversations table
     cursor.execute(
         """

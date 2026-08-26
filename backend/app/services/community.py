@@ -46,7 +46,7 @@ def list_community_posts(user_id: int, category: Optional[str] = None) -> List[D
     """
     params = [user_id]
 
-    if category and category.lower() != "all":
+    if category and category.lower() not in ("all", "null", "none", "undefined", ""):
         sql += " WHERE LOWER(p.category) = ?"
         params.append(category.lower())
 
@@ -152,8 +152,8 @@ def create_community_post(
 
     cursor.execute(
         """
-        INSERT INTO community_posts (user_id, author_name, content, category, credential_id)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO community_posts (user_id, author_name, content, category, credential_id, likes_count)
+        VALUES (?, ?, ?, ?, ?, 0)
         """,
         (user_id, display_author, content, category, credential_id),
     )
@@ -223,13 +223,13 @@ async def toggle_community_like(user_id: int, post_id: int) -> Dict[str, Any]:
     if like_row:
         # Unlike
         cursor.execute("DELETE FROM community_likes WHERE post_id = ? AND user_id = ?", (post_id, user_id))
-        cursor.execute("UPDATE community_posts SET likes_count = CASE WHEN likes_count > 0 THEN likes_count - 1 ELSE 0 END WHERE id = ?", (post_id,))
+        cursor.execute("UPDATE community_posts SET likes_count = CASE WHEN COALESCE(likes_count, 0) > 0 THEN likes_count - 1 ELSE 0 END WHERE id = ?", (post_id,))
         user_has_liked = False
         conn.commit()
     else:
         # Like
         cursor.execute("INSERT INTO community_likes (post_id, user_id) VALUES (?, ?)", (post_id, user_id))
-        cursor.execute("UPDATE community_posts SET likes_count = likes_count + 1 WHERE id = ?", (post_id,))
+        cursor.execute("UPDATE community_posts SET likes_count = COALESCE(likes_count, 0) + 1 WHERE id = ?", (post_id,))
         user_has_liked = True
         conn.commit()
 
@@ -248,7 +248,8 @@ async def toggle_community_like(user_id: int, post_id: int) -> Dict[str, Any]:
             )
 
     cursor.execute("SELECT likes_count FROM community_posts WHERE id = ?", (post_id,))
-    likes_count = cursor.fetchone()["likes_count"]
+    post_data = cursor.fetchone()
+    likes_count = int(post_data["likes_count"] or 0) if post_data else 0
     conn.close()
 
     return {
@@ -268,11 +269,12 @@ def delete_community_like(user_id: int, post_id: int) -> Dict[str, Any]:
         raise ValueError("Post not found")
 
     cursor.execute("DELETE FROM community_likes WHERE post_id = ? AND user_id = ?", (post_id, user_id))
-    cursor.execute("UPDATE community_posts SET likes_count = CASE WHEN likes_count > 0 THEN likes_count - 1 ELSE 0 END WHERE id = ?", (post_id,))
+    cursor.execute("UPDATE community_posts SET likes_count = CASE WHEN COALESCE(likes_count, 0) > 0 THEN likes_count - 1 ELSE 0 END WHERE id = ?", (post_id,))
     conn.commit()
 
     cursor.execute("SELECT likes_count FROM community_posts WHERE id = ?", (post_id,))
-    likes_count = cursor.fetchone()["likes_count"]
+    post_data = cursor.fetchone()
+    likes_count = int(post_data["likes_count"] or 0) if post_data else 0
     conn.close()
 
     return {

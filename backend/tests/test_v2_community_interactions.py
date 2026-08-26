@@ -233,3 +233,50 @@ def test_community_unauthenticated_guards():
 
     res_post = client.post("/api/community/posts", json={"content": "No auth"})
     assert res_post.status_code == 401
+
+
+def test_community_category_filtering_and_likes_resilience():
+    uid, token = setup_test_user("v2comm_filt")
+    try:
+        # Create general post
+        res_p1 = client.post(
+            "/api/community/posts",
+            json={"content": "General Discipline Protocol", "category": "general"},
+            cookies={"mkc_session": token},
+        )
+        assert res_p1.status_code == 200
+        p1_id = res_p1.json()["id"]
+
+        # Create wins post
+        res_p2 = client.post(
+            "/api/community/posts",
+            json={"content": "Major Victory Won", "category": "wins"},
+            cookies={"mkc_session": token},
+        )
+        assert res_p2.status_code == 200
+
+        # Query all feeds (no param, category=all, category=null, category=none)
+        feed_no_param = client.get("/api/community/posts", cookies={"mkc_session": token}).json()
+        assert len(feed_no_param) >= 2
+
+        feed_all = client.get("/api/community/posts?category=all", cookies={"mkc_session": token}).json()
+        assert len(feed_all) >= 2
+
+        feed_null = client.get("/api/community/posts?category=null", cookies={"mkc_session": token}).json()
+        assert len(feed_null) >= 2
+
+        feed_general = client.get("/api/community/posts?category=general", cookies={"mkc_session": token}).json()
+        assert all(p["category"] == "general" for p in feed_general)
+
+        # Test Likes Count lifecycle (should never be null/None)
+        like_res = client.post(f"/api/community/posts/{p1_id}/like", cookies={"mkc_session": token})
+        assert like_res.status_code == 200
+        assert like_res.json()["user_has_liked"] is True
+        assert like_res.json()["likes_count"] == 1
+
+        unlike_res = client.post(f"/api/community/posts/{p1_id}/like", cookies={"mkc_session": token})
+        assert unlike_res.status_code == 200
+        assert unlike_res.json()["user_has_liked"] is False
+        assert unlike_res.json()["likes_count"] == 0
+    finally:
+        cleanup_test_user(uid)
