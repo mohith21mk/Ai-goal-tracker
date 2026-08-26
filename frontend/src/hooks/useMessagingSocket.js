@@ -79,6 +79,10 @@ export function useMessagingSocket(onMessageReceived) {
             if (onMessageReceived && isMountedRef.current) {
               onMessageReceived(data);
             }
+          } else if (data.type === 'typing.start' || data.type === 'typing.stop') {
+            if (onMessageReceived && isMountedRef.current) {
+              onMessageReceived(data);
+            }
           }
         } catch (err) {
           console.error('Failed to parse WebSocket message:', err);
@@ -147,9 +151,24 @@ export function useMessagingSocket(onMessageReceived) {
     return true;
   }, []);
 
+  const sendTyping = useCallback((conversationId, isTyping) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    const payload = {
+      type: isTyping ? 'typing.start' : 'typing.stop',
+      conversation_id: conversationId,
+    };
+
+    wsRef.current.send(JSON.stringify(payload));
+    return true;
+  }, []);
+
   return {
     status,
     sendMessage,
+    sendTyping,
     isConnected: status === ConnectionStatus.CONNECTED,
   };
 }

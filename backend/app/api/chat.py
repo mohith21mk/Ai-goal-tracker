@@ -306,6 +306,31 @@ async def websocket_endpoint(websocket: WebSocket, target_conv_id: Optional[int]
                         
                         # Send ack to sender
                         await websocket.send_json({"type": "message.ack", "message_id": msg_id, "conversation_id": conversation_id})
+                elif event_type in ("typing.start", "typing.stop") and conversation_id:
+                    conn = get_connection()
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT user_id FROM conversation_members WHERE conversation_id = ? AND user_id != ?",
+                        (conversation_id, user_id)
+                    )
+                    other_member = cursor.fetchone()
+                    recipient_id = other_member["user_id"] if other_member else None
+                    
+                    cursor.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+                    sender_row = cursor.fetchone()
+                    sender_username = sender_row["username"] if sender_row else "Someone"
+                    conn.close()
+
+                    if recipient_id:
+                        event_data = {
+                            "type": event_type,
+                            "conversation_id": conversation_id,
+                            "user_id": user_id,
+                            "sender_id": user_id,
+                            "username": sender_username,
+                            "recipient_id": recipient_id
+                        }
+                        await publish_chat_event(conversation_id, event_data)
 
             except json.JSONDecodeError:
                 await websocket.send_json({"type": "error", "message": "Invalid JSON format"})

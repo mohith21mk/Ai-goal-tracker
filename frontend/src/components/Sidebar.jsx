@@ -17,7 +17,8 @@ import {
   ArrowRight
 } from 'lucide-react';
 import MKCLogo from './MKCLogo';
-import { getProgress } from '../services/api';
+import { getProgress, getConversations } from '../services/api';
+import { useNotificationsSocket } from '../hooks/useNotificationsSocket';
 import { ROUTES } from '../constants/routes';
 import './Sidebar.css';
 
@@ -99,23 +100,50 @@ const rawNavItems = [
 const Sidebar = () => {
   const location = useLocation();
   const [progress, setProgress] = useState({ completed: 0, total: 0, percentage: 0 });
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+
+  const loadUnreadChat = async () => {
+    try {
+      const convs = await getConversations();
+      if (Array.isArray(convs)) {
+        const total = convs.reduce((acc, c) => acc + (c.unread_count || 0), 0);
+        setUnreadChatCount(total);
+      }
+    } catch {
+      // Ignore background unread fetch failure
+    }
+  };
+
+  useNotificationsSocket((notif) => {
+    const nType = notif?.type || notif?.data?.type || notif?.reference_type;
+    if (nType === 'chat_message' || nType === 'new_message') {
+      loadUnreadChat();
+    }
+  });
 
   useEffect(() => {
     let isMounted = true;
-    async function loadProgress() {
+    async function loadData() {
       try {
-        const data = await getProgress();
-        if (isMounted && data) {
-          setProgress(data);
+        const [prog, convs] = await Promise.all([
+          getProgress().catch(() => null),
+          getConversations().catch(() => [])
+        ]);
+        if (isMounted) {
+          if (prog) setProgress(prog);
+          if (Array.isArray(convs)) {
+            const total = convs.reduce((acc, c) => acc + (c.unread_count || 0), 0);
+            setUnreadChatCount(total);
+          }
         }
       } catch (err) {
-        console.warn('Sidebar progress fetch error:', err);
+        console.warn('Sidebar data fetch error:', err);
       }
     }
-    loadProgress();
+    loadData();
 
     const handleProgressUpdate = () => {
-      loadProgress();
+      loadData();
     };
     window.addEventListener('mkc:progress-updated', handleProgressUpdate);
 
@@ -123,7 +151,7 @@ const Sidebar = () => {
       isMounted = false;
       window.removeEventListener('mkc:progress-updated', handleProgressUpdate);
     };
-  }, []);
+  }, [location.pathname]);
 
   return (
     <aside className="sidebar-container">
@@ -176,6 +204,9 @@ const Sidebar = () => {
                 <div className="nav-item-content">
                   <span className="nav-icon">{item.icon}</span>
                   <span className="nav-label">{item.label}</span>
+                  {item.id === 'chat' && unreadChatCount > 0 && (
+                    <span className="sidebar-unread-pill">{unreadChatCount}</span>
+                  )}
                 </div>
                 {isActive && <div className="active-indicator" />}
               </Link>
@@ -191,6 +222,9 @@ const Sidebar = () => {
               <div className="nav-item-content">
                 <span className="nav-icon">{item.icon}</span>
                 <span className="nav-label">{item.label}</span>
+                {item.id === 'chat' && unreadChatCount > 0 && (
+                  <span className="sidebar-unread-pill">{unreadChatCount}</span>
+                )}
               </div>
               {isActive && <div className="active-indicator" />}
             </a>

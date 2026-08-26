@@ -33,6 +33,7 @@ const Chat = () => {
       : 'conversations'
   );
   const [conversations, setConversations] = useState([]);
+  const [convFilterQuery, setConvFilterQuery] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -43,8 +44,12 @@ const Chat = () => {
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState('');
+  const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
+  const [otherUserTypingUsername, setOtherUserTypingUsername] = useState('');
   const messagesEndRef = useRef(null);
   const scrollTimerRef = useRef(null);
+  const otherTypingTimerRef = useRef(null);
+  const myTypingDebounceRef = useRef(null);
 
   const scrollToBottom = useCallback(() => {
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
@@ -58,6 +63,8 @@ const Chat = () => {
   useEffect(() => {
     return () => {
       if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+      if (otherTypingTimerRef.current) clearTimeout(otherTypingTimerRef.current);
+      if (myTypingDebounceRef.current) clearTimeout(myTypingDebounceRef.current);
     };
   }, []);
 
@@ -81,6 +88,7 @@ const Chat = () => {
 
   const openConversation = useCallback(async (conv) => {
     setActiveConversation(conv);
+    setIsOtherUserTyping(false);
     try {
       const history = await getConversationMessages(conv.id);
       setMessages(history);
@@ -125,12 +133,36 @@ const Chat = () => {
 
   // Real-time WebSocket event handler with local state updates (NO HTTP spam)
   const handleIncomingMessage = useCallback((eventData) => {
+    if (eventData.type === 'typing.start') {
+      const targetConvId = eventData.conversation_id;
+      const currentActiveConv = activeConvRef.current;
+      if (currentActiveConv && currentActiveConv.id === targetConvId) {
+        setIsOtherUserTyping(true);
+        setOtherUserTypingUsername(eventData.username || currentActiveConv.other_username || 'Member');
+        if (otherTypingTimerRef.current) clearTimeout(otherTypingTimerRef.current);
+        otherTypingTimerRef.current = setTimeout(() => {
+          setIsOtherUserTyping(false);
+        }, 3000);
+      }
+      return;
+    }
+
+    if (eventData.type === 'typing.stop') {
+      const targetConvId = eventData.conversation_id;
+      const currentActiveConv = activeConvRef.current;
+      if (currentActiveConv && currentActiveConv.id === targetConvId) {
+        setIsOtherUserTyping(false);
+      }
+      return;
+    }
+
     const msgObj = eventData.message || eventData;
     const targetConvId = eventData.conversation_id || msgObj.conversation_id;
     const currentActiveConv = activeConvRef.current;
     const content = msgObj.content || msgObj.message || '';
 
     if (currentActiveConv && currentActiveConv.id === targetConvId) {
+      setIsOtherUserTyping(false);
       setMessages(prev => {
         if (prev.some(m => m.id === msgObj.id)) return prev;
         return [...prev, {
@@ -168,7 +200,7 @@ const Chat = () => {
     });
   }, [loadConversations, scrollToBottom]);
 
-  const { status: socketStatus, sendMessage: sendWsMessage } = useMessagingSocket(
+  const { status: socketStatus, sendMessage: sendWsMessage, sendTyping } = useMessagingSocket(
     handleIncomingMessage
   );
 
@@ -289,9 +321,26 @@ const Chat = () => {
     }
   };
 
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setMessageInput(val);
+    if (activeConversation) {
+      sendTyping(activeConversation.id, true);
+      if (myTypingDebounceRef.current) clearTimeout(myTypingDebounceRef.current);
+      myTypingDebounceRef.current = setTimeout(() => {
+        if (activeConversation) {
+          sendTyping(activeConversation.id, false);
+        }
+      }, 2500);
+    }
+  };
+
   const sendMessage = (e) => {
     e.preventDefault();
     if (!messageInput.trim() || !activeConversation) return;
+
+    if (myTypingDebounceRef.current) clearTimeout(myTypingDebounceRef.current);
+    sendTyping(activeConversation.id, false);
 
     const content = messageInput.trim();
     const sent = sendWsMessage(activeConversation.id, content);
@@ -319,6 +368,15 @@ const Chat = () => {
       alert(err.message || 'Failed to delete message.');
     }
   };
+
+  const filteredConversations = conversations.filter(c => {
+    if (!convFilterQuery.trim()) return true;
+    const q = convFilterQuery.toLowerCase();
+    const username = (c.other_username || '').toLowerCase();
+    const fullName = (c.other_full_name || '').toLowerCase();
+    const lastMsg = (c.last_message || '').toLowerCase();
+    return username.includes(q) || fullName.includes(q) || lastMsg.includes(q);
+  });
 
   return (
     <>
@@ -350,10 +408,25 @@ const Chat = () => {
             <div className="chat-sidebar-content">
               {activeTab === 'conversations' && (
                 <div className="conversation-list">
-                  {conversations.length === 0 ? (
-                    <div className="empty-state">No conversations yet. Connect with someone in Discover!</div>
+                  {conversations.length > 0 && (
+                    <div className="chat-filter-box">
+                      <input
+                        type="text"
+                        className="chat-filter-input"
+                        placeholder="Filter chats..."
+                        value={convFilterQuery}
+                        onChange={(e) => setConvFilterQuery(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {filteredConversations.length === 0 ? (
+                    <div className="empty-state">
+                      {conversations.length === 0
+                        ? "No conversations yet. Connect with someone in Discover!"
+                        : `No chats matching "${convFilterQuery}"`}
+                    </div>
                   ) : (
-                    conversations.map(conv => (
+                    filteredConversations.map(conv => (
                       <div 
                         key={conv.id} 
                         className={`conversation-item ${activeConversation?.id === conv.id ? 'active' : ''}`}
@@ -576,6 +649,16 @@ const Chat = () => {
                       </div>
                     );
                   })}
+                  {isOtherUserTyping && (
+                    <div className="typing-indicator-wrapper">
+                      <div className="typing-dots">
+                        <div className="typing-dot" />
+                        <div className="typing-dot" />
+                        <div className="typing-dot" />
+                      </div>
+                      <span className="typing-text">@{otherUserTypingUsername} is typing...</span>
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
                 
@@ -584,7 +667,7 @@ const Chat = () => {
                     type="text" 
                     placeholder="Type a message..." 
                     value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
+                    onChange={handleInputChange}
                   />
                   <button type="submit" disabled={!messageInput.trim()}>
                     <Send size={18} strokeWidth={1.8} />
