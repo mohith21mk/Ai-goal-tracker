@@ -6,7 +6,6 @@ import {
   Target, 
   ClipboardList, 
   MapPin, 
-  Moon, 
   Bell,
   LogOut,
   CheckCheck,
@@ -222,13 +221,6 @@ const TopBar = ({ user }) => {
     navigate(route);
   };
 
-  const handleThemeToggleQuick = () => {
-    const current = document.documentElement.getAttribute('data-theme') || 'dark';
-    const next = current === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
-  };
-
   return (
     <header className="topbar-container" style={{ position: 'relative' }}>
       {/* Search Input Field */}
@@ -395,28 +387,6 @@ const TopBar = ({ user }) => {
 
       {/* Right User & AI Status Area */}
       <div className="topbar-actions">
-        {/* Quick Theme Switch Button */}
-        <button
-          onClick={handleThemeToggleQuick}
-          title="Toggle Theme"
-          aria-label="Toggle theme"
-          style={{
-            padding: '6px 10px',
-            background: 'var(--bg-chip, rgba(10, 22, 40, 0.6))',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: '9999px',
-            color: 'var(--text-primary)',
-            fontSize: '12px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          <Moon size={18} strokeWidth={1.8} aria-hidden="true" />
-          <span>Theme</span>
-        </button>
-
         {/* Notification Bell with Badge & Dropdown */}
         <div style={{ position: 'relative' }}>
           <button

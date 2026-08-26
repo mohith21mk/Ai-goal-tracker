@@ -32,10 +32,6 @@ import { ROUTES } from './constants/routes';
 
 import './styles/globals.css';
 
-// Immediate theme bootstrap from localStorage to prevent render flicker
-const savedTheme = localStorage.getItem('theme') || 'dark';
-document.documentElement.setAttribute('data-theme', savedTheme);
-
 const PageLoader = () => (
   <div style={{
     minHeight: '80vh',

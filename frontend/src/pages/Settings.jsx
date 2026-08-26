@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Palette, Moon, Sun, Bot, Bell, Zap, Shield, TriangleAlert, CheckCircle2, LogOut, MessageSquare } from 'lucide-react';
+import { Bot, Bell, Zap, Shield, TriangleAlert, CheckCircle2, LogOut, MessageSquare } from 'lucide-react';
 import FeedbackModal from '../components/FeedbackModal';
 import { getSettings, updateSettings, logoutUser } from '../services/api';
 import './Settings.css';
 
 const Settings = () => {
-  const [theme, setTheme] = useState('dark');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [coachStyle, setCoachStyle] = useState('strategic');
   const [dailyReminderTime, setDailyReminderTime] = useState('08:00');
@@ -35,11 +34,6 @@ const Settings = () => {
       try {
         const s = await getSettings();
         if (isMounted && s) {
-          const loadedTheme = s.theme || 'dark';
-          setTheme(loadedTheme);
-          document.documentElement.setAttribute('data-theme', loadedTheme);
-          localStorage.setItem('theme', loadedTheme);
-
           setNotificationsEnabled(Boolean(s.notifications_enabled));
           setCoachStyle(s.coach_style || 'strategic');
           setDailyReminderTime(s.daily_reminder_time || '08:00');
@@ -60,12 +54,6 @@ const Settings = () => {
     };
   }, []);
 
-  const handleThemeChange = (newTheme) => {
-    setTheme(newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-  };
-
   const handleNotificationToggle = (checked) => {
     setNotificationsEnabled(checked);
     if (checked && 'Notification' in window && Notification.permission === 'default') {
@@ -80,7 +68,7 @@ const Settings = () => {
 
     try {
       const updated = await updateSettings({
-        theme,
+        theme: 'dark',
         notifications_enabled: notificationsEnabled,
         coach_style: coachStyle,
         daily_reminder_time: dailyReminderTime,
@@ -88,11 +76,6 @@ const Settings = () => {
       });
 
       if (updated) {
-        const nextTheme = updated.theme || theme;
-        setTheme(nextTheme);
-        document.documentElement.setAttribute('data-theme', nextTheme);
-        localStorage.setItem('theme', nextTheme);
-
         setNotificationsEnabled(Boolean(updated.notifications_enabled));
         setCoachStyle(updated.coach_style);
         setDailyReminderTime(updated.daily_reminder_time);
@@ -138,38 +121,7 @@ const Settings = () => {
           ) : (
             <form onSubmit={handleSaveSettings}>
               <div className="settings-grid">
-                {/* 1. Appearance */}
-                <div className="settings-card glass-panel">
-                  <div className="settings-card-header">
-                    <span className="settings-card-icon"><Palette size={20} /></span>
-                    <h3>Appearance & Interface</h3>
-                  </div>
-                  <p className="settings-card-desc">Choose the visual theme for your mastery operating system.</p>
-
-                  <div className="settings-field-group">
-                    <label className="settings-label">Theme Mode</label>
-                    <div className="segmented-control">
-                      <button
-                        type="button"
-                        onClick={() => handleThemeChange('dark')}
-                        className={`segmented-btn ${theme === 'dark' ? 'active' : ''}`}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        <Moon size={14} /> Dark Cyberpunk
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleThemeChange('light')}
-                        className={`segmented-btn ${theme === 'light' ? 'active' : ''}`}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        <Sun size={14} /> Light Mode
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. AI Coach Persona */}
+                {/* 1. AI Coach Persona */}
                 <div className="settings-card glass-panel">
                   <div className="settings-card-header">
                     <span className="settings-card-icon"><Bot size={20} /></span>
