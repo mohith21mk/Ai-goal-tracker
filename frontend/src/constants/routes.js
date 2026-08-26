@@ -32,6 +32,7 @@ export const ROUTES = {
   CHAT_ALIAS: '/chat',
   PROFILE: '/profile',
   MY_IDENTITY_ALIAS: '/my-identity',
+  ADMIN: '/admin',
 };
 
 export default ROUTES;

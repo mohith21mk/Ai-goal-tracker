@@ -6,7 +6,7 @@ from .config import settings as app_settings
 from .services.logger import logger
 from .services.realtime import start_redis_listener, stop_redis_listener
 
-from .api import auth, blueprints, coach, community, goals, habits, health, journal, missions, progress, reflection, search, settings as api_settings, users, social, chat, notifications, progression, credentials, feedback
+from .api import auth, blueprints, coach, community, goals, habits, health, journal, missions, progress, reflection, search, settings as api_settings, users, social, chat, notifications, progression, credentials, feedback, admin
 from .api.auth import get_current_user
 from .api.progress import compute_telemetry
 from .database import init_db
@@ -59,6 +59,7 @@ def create_app() -> FastAPI:
     app.include_router(progression.router, prefix="/api/progression", tags=["progression"])
     app.include_router(credentials.router, prefix="/api/credentials", tags=["credentials"])
     app.include_router(feedback.router, tags=["feedback"])
+    app.include_router(admin.router)
 
     @app.get("/api/telemetry", response_model=Dict[str, Any], tags=["telemetry"])
     async def get_telemetry_endpoint(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:

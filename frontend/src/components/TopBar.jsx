@@ -11,7 +11,8 @@ import {
   LogOut,
   CheckCheck,
   Trash2,
-  MessageSquare
+  MessageSquare,
+  ShieldCheck
 } from 'lucide-react';
 import {
   searchApplication,
@@ -614,6 +615,31 @@ const TopBar = ({ user }) => {
               >
                 My Identity Profile
               </div>
+              {userProfile?.role === 'admin' && (
+                <div
+                  onClick={() => {
+                    setIsProfileDropdownOpen(false);
+                    navigate(ROUTES.ADMIN);
+                  }}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#EC4899',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = 'rgba(236, 72, 153, 0.15)'}
+                  onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <ShieldCheck size={16} strokeWidth={1.8} />
+                  Admin Dashboard
+                </div>
+              )}
               <div
                 onClick={() => {
                   setIsProfileDropdownOpen(false);

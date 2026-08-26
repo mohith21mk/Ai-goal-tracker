@@ -22,6 +22,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const Community = lazy(() => import('./pages/Community'));
 const Chat = lazy(() => import('./pages/Chat'));
 const Profile = lazy(() => import('./pages/Profile'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -147,6 +148,7 @@ function AppContent() {
           <Route path={ROUTES.CHAT_ALIAS} element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path={ROUTES.PROFILE} element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path={ROUTES.MY_IDENTITY_ALIAS} element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path={ROUTES.ADMIN} element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
 
           {/* Catch-all fallback */}
           <Route path="*" element={<Navigate to={ROUTES.DASHBOARD} replace />} />

@@ -1031,5 +1031,52 @@ export async function deleteAdminFeedback(id) {
   return response.json();
 }
 
+export async function getAdminOverview() {
+  const response = await apiFetch('/api/admin/overview');
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to fetch admin overview: ${response.statusText}`);
+  }
+  return response.json();
+}
 
+export async function getAdminUsers(params = {}) {
+  const query = new URLSearchParams();
+  if (params.q) query.append('q', params.q);
+  if (params.role) query.append('role', params.role);
+  if (params.is_active !== undefined && params.is_active !== '') query.append('is_active', params.is_active);
+  if (params.limit) query.append('limit', params.limit);
+  if (params.offset) query.append('offset', params.offset);
 
+  const qs = query.toString() ? `?${query.toString()}` : '';
+  const response = await apiFetch(`/api/admin/users${qs}`);
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to fetch admin users: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function updateUserRole(userId, role) {
+  const response = await apiFetch(`/api/admin/users/${userId}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to update user role: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function updateUserStatus(userId, isActive) {
+  const response = await apiFetch(`/api/admin/users/${userId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_active: isActive }),
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.detail || `Failed to update user status: ${response.statusText}`);
+  }
+  return response.json();
+}

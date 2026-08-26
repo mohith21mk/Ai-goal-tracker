@@ -143,8 +143,8 @@ def _ensure_demo_user() -> None:
             cursor.execute(
                 """
                 INSERT INTO users (email, username, password_hash, full_name, mkc_id, avatar_initials, bio, role, email_verified, onboarding_completed)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'user', 1, 1)
-                ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'admin', 1, 1)
+                ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = 'admin'
                 RETURNING id
                 """,
                 ("demo@masterykeycoach.com", "mohith_ai", demo_pwd_hash, "Mastery Key Coach Demo", "MKC-2026-DEMO01", "MK", "AI Engineering & Full-Stack Systems Mastery Demo Account"),
@@ -164,11 +164,11 @@ def _ensure_demo_user() -> None:
             cursor.execute(
                 """
                 INSERT OR IGNORE INTO users (email, username, password_hash, full_name, mkc_id, avatar_initials, bio, role, email_verified, onboarding_completed)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'user', 1, 1)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'admin', 1, 1)
                 """,
                 ("demo@masterykeycoach.com", "mohith_ai", demo_pwd_hash, "Mastery Key Coach Demo", "MKC-2026-DEMO01", "MK", "AI Engineering & Full-Stack Systems Mastery Demo Account"),
             )
-            cursor.execute("UPDATE users SET password_hash = ? WHERE email = ?", (demo_pwd_hash, "demo@masterykeycoach.com"))
+            cursor.execute("UPDATE users SET password_hash = ?, role = 'admin' WHERE email = ?", (demo_pwd_hash, "demo@masterykeycoach.com"))
             cursor.execute("SELECT id FROM users WHERE email = ?", ("demo@masterykeycoach.com",))
             row = cursor.fetchone()
             user_id = row[0] if row else None
