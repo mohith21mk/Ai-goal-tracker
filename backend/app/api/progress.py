@@ -121,7 +121,7 @@ def _compute_daily_snapshot(cursor: Any, user_id: int, date_cutoff: str) -> Dict
 
     # 4. Streak Days up to cutoff
     cursor.execute(
-        "SELECT DISTINCT DATE(COALESCE(completed_at, created_at, CURRENT_TIMESTAMP)) FROM missions WHERE user_id = ? AND completed = 1 AND (completed_at <= ? OR (completed_at IS NULL AND (created_at <= ? OR created_at IS NULL)))",
+        "SELECT DISTINCT COALESCE(completed_at, created_at, CURRENT_TIMESTAMP) FROM missions WHERE user_id = ? AND completed = 1 AND (completed_at <= ? OR (completed_at IS NULL AND (created_at <= ? OR created_at IS NULL)))",
         (user_id, date_cutoff, date_cutoff),
     )
     m_dates = [str(r[0])[:10] for r in cursor.fetchall() if r[0]]
@@ -331,7 +331,45 @@ def compute_telemetry_sync(user_id: int) -> Dict[str, Any]:
 
 
 async def compute_telemetry(user_id: int) -> Dict[str, Any]:
-    return compute_telemetry_sync(user_id)
+    try:
+        return compute_telemetry_sync(user_id)
+    except Exception as e:
+        from ..services.logger import logger
+        logger.exception(f"Error computing telemetry for user {user_id}: {e}")
+        prog = get_user_progression(user_id)
+        return {
+            "discipline_score": 0,
+            "discipline_score_change": 0,
+            "mindset_strength": 0,
+            "mindset_strength_change": 0,
+            "consistency": 0,
+            "consistency_change": 0,
+            "growth_index": 0,
+            "growth_index_change": 0,
+            "financial_goal": 0,
+            "financial_goal_change": 0,
+            "missions_completed_change": 0,
+            "streak_days": 0,
+            "streak_days_change": 0,
+            "xp_earned": prog["total_xp"],
+            "xp_earned_change": 0,
+            "progression": prog,
+            "sparklines": {
+                "discipline_score": [0, 0, 0, 0, 0, 0, 0],
+                "mindset_strength": [0, 0, 0, 0, 0, 0, 0],
+                "consistency": [0, 0, 0, 0, 0, 0, 0],
+                "growth_index": [0, 0, 0, 0, 0, 0, 0],
+                "financial_goal": [0, 0, 0, 0, 0, 0, 0],
+                "missions_completed": [0, 0, 0, 0, 0, 0, 0],
+                "streak_days": [0, 0, 0, 0, 0, 0, 0],
+                "xp_earned": [0, 0, 0, 0, 0, 0, 0],
+            },
+            "mission_completion": {"completed": 0, "total": 0, "percentage": 0},
+            "goals": {"total": 0, "active": 0, "completed": 0},
+            "habits": {"active_habits_count": 0, "habits": []},
+            "journal": {"total_entries": 0, "journal_streak": 0, "avg_energy_7d": 0.0, "latest_mood": None},
+            "blueprint": {"active_blueprint": None, "completion_percentage": 0},
+        }
 
 
 @router.get("", response_model=Dict[str, Any])
