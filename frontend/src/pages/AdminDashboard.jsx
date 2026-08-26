@@ -761,7 +761,7 @@ const AdminDashboard = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'rgba(5, 10, 20, 0.85)',
+              background: 'rgba(5, 10, 20, 0.75)',
               backdropFilter: 'blur(8px)',
               display: 'flex',
               alignItems: 'center',
@@ -770,15 +770,15 @@ const AdminDashboard = () => {
               padding: '20px'
             }}>
               <div style={{
-                background: 'var(--bg-card, #0f172a)',
-                border: '1px solid rgba(56, 189, 248, 0.3)',
+                background: 'var(--bg-modal, #0f172a)',
+                border: '1px solid var(--border-subtle)',
                 borderRadius: '16px',
                 width: '100%',
                 maxWidth: '750px',
                 maxHeight: '90vh',
                 overflowY: 'auto',
                 padding: '24px',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(56, 189, 248, 0.15)',
+                boxShadow: '0 25px 50px -12px var(--mkc-shadow, rgba(0, 0, 0, 0.7)), 0 0 30px var(--mkc-glow-subtle, rgba(56, 189, 248, 0.15))',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '20px'
