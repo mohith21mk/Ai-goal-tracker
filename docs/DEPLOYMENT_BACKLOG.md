@@ -20,6 +20,7 @@
    - Continue development locally (`http://localhost:5173`).
    - Continue running full backend and frontend test suites (`pytest`, `npm run lint`, `npm run build`).
    - Keep the Render backend synchronized with current database schemas.
+5. **Evaluation Rule**: Do not judge new frontend features against the currently published Netlify UI until the next deployment. GitHub `main` holds the true source code.
 
 ---
 
@@ -34,6 +35,7 @@ The following table records every commit pushed to `main` that was skipped by Ne
 | `b9cfc74` | `feat(v2): release MKC Messages, Social Follows & Account Management Full Upgrade` | Added Followers/Following social system, Rich Chat (Emojis popover, MKC vector stickers, image upload + lightbox, voice memos with waveform player), Danger Zone account deletion with last-admin guard, and storage adapter. | Verified & Passing (15/15 tests) | **Skipped** (*Credit usage exceeded*) | **YES** (Included in latest batch) |
 | `3a53101` | `fix(deploy): add root package.json and harmonize Netlify monorepo build configs` | Added root `package.json` monorepo configuration, Node 20 build environment in `netlify.toml` and `frontend/netlify.toml`. | Verified & Passing | **Skipped** (*Credit usage exceeded*) | **YES** (Included in latest batch) |
 | `1c11608` | `feat(telemetry): separate overall performance metrics from daily progress with normalized formulas` | Architectural refactor separating Overall Performance Metrics (lifetime, Bayesian normalized, stable) from Daily Progress (current day only, auto-reset). Added `GET /api/progress/daily` and `progress_engine.py`. | Verified & Passing (20/20 tests) | **Skipped** (*Credit usage exceeded*) | **YES** (Included in latest batch) |
+| `dd75209` | `fix(telemetry): implement multi-horizon historical models and volume confidence scaling` | Implemented multi-horizon time modeling (Lifetime 50%, 90d 25%, 30d 15%, 7d 10%), account baseline normalization, and asymptotic volume-confidence scaling $C_v(N) = 1 - e^{-N/k}$. Today's activity is intentionally a small component of the overall score, while historical data carries the majority of the weighting. | Verified & Passing (20/20 tests) | **Skipped** (*Credit usage exceeded*) | **YES** (Included in latest batch) |
 
 ---
 
@@ -44,14 +46,36 @@ The following table records every commit pushed to `main` that was skipped by Ne
 At or after this review date, check whether Netlify production deployment credits have been restored for the billing cycle.
 
 ### Deployment Workflow (When Credits Return):
-1. **Verify Canonical Head**: Review all commits on `main` up to the newest verified commit (currently `1c11608`).
-2. **Single Atomic Deployment**: Trigger a single production deployment of the latest verified `main` commit. All accumulated changes (`9d000f2` through `1c11608`+) will be bundled together in one build. Do **not** deploy intermediate commits one by one.
+1. **Verify Canonical Head**: Review all commits on `main` up to the newest verified commit (currently `dd75209`).
+2. **Single Atomic Deployment**: Trigger a single production deployment of the latest verified `main` commit. All accumulated changes (`9d000f2` through `dd75209`+) will be bundled together in one build. Do **not** deploy intermediate commits one by one.
 3. **Backend Compatibility**: Confirm Render backend (`https://mkc-backend-iguj.onrender.com`) is running and compatible with the latest frontend contracts.
 4. **Execute Production Smoke Test**: Run the complete checklist below.
 
 ---
 
-## 4. Production Smoke-Test Checklist
+## 4. Final Acceptance Test Scenario (When Credits Return)
+
+When the new frontend is deployed, verify this exact progression scenario:
+
+- [ ] **Day 1**:
+  - Complete 1 mission.
+  - **Daily Progress**: Displays $100\%$ ($1/1$ actions done, XP earned today).
+  - **Overall Discipline**: Remains low/modest ($\le 15.0$, confidence-damped).
+- [ ] **Day 2**:
+  - Complete zero actions.
+  - **Daily Progress**: Resets to $0\%$ ($0$ completed actions today).
+  - **Overall Discipline**: Does NOT reset to $0$; historical score persists.
+- [ ] **Day 3**:
+  - Complete several missions and habits.
+  - **Daily Progress**: Reflects today's activity accurately.
+  - **Overall Performance**: Rises gradually (e.g. $+0.5$ to $+1.5$), never jumping wildly to $100$.
+- [ ] **Long-Term Evolution**:
+  - Historical behavior dominates all calculations.
+  - Overall score becomes increasingly stable and reflective of true cumulative mastery.
+
+---
+
+## 5. Production Smoke-Test Checklist
 
 Once the production deployment is completed on Netlify, execute the following end-to-end audit:
 
@@ -108,7 +132,7 @@ Once the production deployment is completed on Netlify, execute the following en
 
 ---
 
-## 5. Deployment Safety & Pre-Deploy Validation
+## 6. Deployment Safety & Pre-Deploy Validation
 
 Before triggering the deferred deployment on Netlify, run:
 
