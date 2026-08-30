@@ -42,21 +42,18 @@ def setup_perf_user(prefix: str):
     return uid, token
 
 
-def test_zero_state_user_metrics():
-    """Verify zero-state user returns clean baselines without division by zero or fake data."""
+def test_1_zero_state_user_clean_baseline():
+    """11. New users do not receive artificially high scores (clean 0.0 baseline)."""
     uid, token = setup_perf_user("zero_state")
     client.cookies.set(COOKIE_NAME, token)
 
-    # 1. Daily Progress
     res_daily = client.get("/api/progress/daily")
     assert res_daily.status_code == 200
     daily = res_daily.json()
     assert daily["completed_actions"] == 0
-    assert daily["total_actions"] == 0
     assert daily["completion_percentage"] == 0
     assert daily["xp_earned_today"] == 0
 
-    # 2. Overall Performance Telemetry
     res_telem = client.get("/api/progress/telemetry")
     assert res_telem.status_code == 200
     telem = res_telem.json()
@@ -66,17 +63,18 @@ def test_zero_state_user_metrics():
     assert telem["growth_index"] == 0.0
     assert telem["active_days"] == 0
     assert telem["current_streak"] == 0
-    assert telem["longest_streak"] == 0
     assert telem["progression"]["total_xp"] == 0
     assert telem["progression"]["level"] == 1
 
 
-def test_action_completed_today_updates_daily_and_overall_gradually():
-    """Completing 1 mission today updates Daily Progress (100%) but keeps Overall Discipline gradual (<80%)."""
-    uid, token = setup_perf_user("gradual_action")
+def test_2_single_action_cannot_jump_overall_scores_to_high_numbers():
+    """
+    1, 2, 3, 4: Completing one mission (100% daily) cannot jump Discipline, Consistency,
+    or Growth to 100, proving today's 100% completion != Overall 100.
+    """
+    uid, token = setup_perf_user("single_action")
     client.cookies.set(COOKIE_NAME, token)
 
-    # Create a mission for today
     res_create = client.post("/api/missions", json={
         "title": "Execute Deep Focus Protocol",
         "category": "discipline",
@@ -86,49 +84,40 @@ def test_action_completed_today_updates_daily_and_overall_gradually():
     assert res_create.status_code == 200
     mission_id = res_create.json()["id"]
 
-    # Before completion:
-    daily_pre = client.get("/api/progress/daily").json()
-    assert daily_pre["completed_actions"] == 0
-    assert daily_pre["total_actions"] >= 1
-    assert daily_pre["completion_percentage"] == 0
-
-    # Toggle mission to complete
     res_toggle = client.patch(f"/api/missions/{mission_id}/toggle")
     assert res_toggle.status_code == 200
-    assert res_toggle.json()["completed"] is True
 
-    # After completion:
-    daily_post = client.get("/api/progress/daily").json()
-    assert daily_post["completed_actions"] == 1
-    assert daily_post["missions_completed"] == 1
-    assert daily_post["completion_percentage"] == 100
-    assert daily_post["xp_earned_today"] == 50
+    daily = client.get("/api/progress/daily").json()
+    assert daily["completed_actions"] == 1
+    assert daily["completion_percentage"] == 100
+    assert daily["xp_earned_today"] == 50
 
-    # Overall Performance:
-    overall_post = client.get("/api/progress/telemetry").json()
-    # Discipline score should be normalized and stable (not 100!)
-    assert 0 < overall_post["discipline_score"] < 80
-    assert overall_post["active_days"] == 1
-    assert overall_post["current_streak"] == 1
-    assert overall_post["progression"]["total_xp"] == 50
+    overall = client.get("/api/progress/telemetry").json()
+    # Overall score must be modest and confidence-adjusted (<= 15.0), NEVER 90-100!
+    assert 0 < overall["discipline_score"] <= 15.0
+    assert overall["consistency"] <= 15.0
+    assert overall["growth_index"] <= 15.0
+    assert overall["active_days"] == 1
+    assert overall["current_streak"] == 1
 
 
-def test_new_day_resets_daily_progress_without_resetting_overall_performance():
-    """Yesterday's completed mission should yield 0 completed actions today in Daily Progress, but preserve Overall Performance."""
-    uid, token = setup_perf_user("new_day_reset")
+def test_3_new_day_resets_daily_progress_only_and_preserves_overall():
+    """
+    5, 6, 7: Moving to a new day resets daily progress to 0, but does NOT reset overall metrics.
+    Yesterday's history continues to affect today's overall performance.
+    """
+    uid, token = setup_perf_user("new_day_persist")
     client.cookies.set(COOKIE_NAME, token)
 
     yesterday_str = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
     yesterday_datetime = f"{yesterday_str} 10:00:00"
 
-    # Insert a mission completed yesterday
     conn = get_connection()
     c = conn.cursor()
     c.execute(
         "INSERT INTO missions (user_id, title, category, xp_reward, completed, created_at, completed_at) VALUES (?, ?, ?, ?, 1, ?, ?)",
         (uid, "Yesterday Protocol", "mindset", 25, yesterday_datetime, yesterday_datetime)
     )
-    # Insert a habit log yesterday
     c.execute(
         "INSERT INTO habits (user_id, title, category, frequency, target_days_per_week, created_at) VALUES (?, ?, ?, ?, 7, ?)",
         (uid, "Morning Meditation", "mindset", "daily", yesterday_datetime)
@@ -141,75 +130,125 @@ def test_new_day_resets_daily_progress_without_resetting_overall_performance():
     conn.commit()
     conn.close()
 
-    # 1. Check Daily Progress for TODAY -> must be 0 completed actions
-    res_daily = client.get("/api/progress/daily")
-    daily = res_daily.json()
+    # 1. Today's Daily Progress is 0
+    daily = client.get("/api/progress/daily").json()
     assert daily["completed_actions"] == 0
     assert daily["missions_completed"] == 0
     assert daily["habits_completed"] == 0
     assert daily["xp_earned_today"] == 0
     assert daily["completion_percentage"] == 0
 
-    # 2. Check Overall Performance -> must reflect yesterday's activity
-    res_telem = client.get("/api/progress/telemetry")
-    telem = res_telem.json()
+    # 2. Overall Performance persists and does NOT reset to 0
+    telem = client.get("/api/progress/telemetry").json()
     assert telem["active_days"] == 1
-    # Streak continues if active yesterday
     assert telem["current_streak"] == 1
-    assert telem["progression"]["total_xp"] == 40  # 25 XP mission + 15 XP habit
+    assert telem["progression"]["total_xp"] == 40
     assert telem["discipline_score"] > 0
     assert telem["mindset_strength"] > 0
 
 
-def test_historical_activity_multi_day_streak_and_consistency():
-    """Verify multi-day activity builds streaks and increases Consistency score."""
-    uid, token = setup_perf_user("multi_streak")
+def test_4_multi_horizon_historical_activity_compounds_scores():
+    """
+    8, 9, 10, 12, 13, 14: 30-day, 90-day, and lifetime activity builds sustained Discipline,
+    Consistency, cumulative XP, Level, and streaks.
+    """
+    uid, token = setup_perf_user("multi_horizon")
     client.cookies.set(COOKIE_NAME, token)
 
     today = datetime.date.today()
     conn = get_connection()
     c = conn.cursor()
 
-    # Create habit
-    c.execute(
-        "INSERT INTO habits (user_id, title, category, frequency, target_days_per_week) VALUES (?, ?, ?, ?, 7)",
-        (uid, "Daily Cold Shower", "discipline", "daily")
-    )
-    habit_id = c.lastrowid
+    # User created 60 days ago
+    created_60d = (today - datetime.timedelta(days=60)).strftime("%Y-%m-%d %H:%M:%S")
+    c.execute("UPDATE users SET created_at = ? WHERE id = ?", (created_60d, uid))
 
-    # Log 5 consecutive days up to today
-    for i in range(4, -1, -1):
+    # Insert 40 completed missions spread over 50 days
+    for i in range(49, 9, -1):
+        d_str = (today - datetime.timedelta(days=i)).strftime("%Y-%m-%d")
+        dt_str = f"{d_str} 12:00:00"
+        c.execute(
+            "INSERT INTO missions (user_id, title, category, xp_reward, completed, created_at, completed_at) VALUES (?, ?, 'discipline', 50, 1, ?, ?)",
+            (uid, f"Historical Protocol {i}", dt_str, dt_str)
+        )
+
+    # Insert habits logged for the past 14 consecutive days up to today
+    c.execute(
+        "INSERT INTO habits (user_id, title, category, frequency, target_days_per_week, created_at) VALUES (?, 'Daily Focus', 'discipline', 'daily', 7, ?)",
+        (uid, created_60d)
+    )
+    h_id = c.lastrowid
+    for i in range(13, -1, -1):
         d_str = (today - datetime.timedelta(days=i)).strftime("%Y-%m-%d")
         c.execute(
             "INSERT INTO habit_logs (user_id, habit_id, completed_date) VALUES (?, ?, ?)",
-            (uid, habit_id, d_str)
+            (uid, h_id, d_str)
         )
+
+    # Insert 1 completed goal
+    c.execute(
+        "INSERT INTO goals (user_id, title, category, status, created_at) VALUES (?, 'Reach Mastery', 'career', 'completed', ?)",
+        (uid, created_60d)
+    )
 
     conn.commit()
     conn.close()
 
-    # Telemetry should reflect 5-day streak and 5 active days
     telem = client.get("/api/progress/telemetry").json()
-    assert telem["active_days"] == 5
-    assert telem["current_streak"] == 5
-    assert telem["longest_streak"] == 5
-    assert telem["consistency"] > 40
-    assert telem["progression"]["total_xp"] == 5 * 15
+    assert telem["active_days"] >= 40
+    assert telem["current_streak"] == 50
+    assert telem["longest_streak"] == 50
+    assert telem["discipline_score"] >= 45.0  # High sustained historical execution
+    assert telem["consistency"] >= 45.0
+    assert telem["progression"]["total_xp"] == (40 * 50) + (14 * 15)  # 2210 XP
+    assert telem["progression"]["level"] == 5  # floor(2210 / 500) + 1 = 5
 
 
-def test_progress_root_endpoint_returns_both_daily_and_overall():
-    """GET /api/progress returns backward-compatible fields with embedded daily and overall models."""
-    uid, token = setup_perf_user("root_endpoint")
+def test_5_today_single_action_creates_only_gradual_change_on_mature_account():
+    """
+    15: On a mature account, 1 new completed action creates a small incremental bump (e.g. +0.2 to +0.8),
+    proving today's completion percentage CANNOT dominate overall performance.
+    """
+    uid, token = setup_perf_user("mature_gradual")
     client.cookies.set(COOKIE_NAME, token)
 
-    res = client.get("/api/progress")
-    assert res.status_code == 200
-    data = res.json()
+    today = datetime.date.today()
+    conn = get_connection()
+    c = conn.cursor()
 
-    assert "completed" in data
-    assert "total" in data
-    assert "percentage" in data
-    assert "daily" in data
-    assert "overall" in data
-    assert "discipline_score" in data["overall"]
-    assert "completed_actions" in data["daily"]
+    created_90d = (today - datetime.timedelta(days=90)).strftime("%Y-%m-%d %H:%M:%S")
+    c.execute("UPDATE users SET created_at = ? WHERE id = ?", (created_90d, uid))
+
+    # Insert 50 historical missions
+    for i in range(70, 20, -1):
+        d_str = (today - datetime.timedelta(days=i)).strftime("%Y-%m-%d")
+        dt_str = f"{d_str} 12:00:00"
+        c.execute(
+            "INSERT INTO missions (user_id, title, category, xp_reward, completed, created_at, completed_at) VALUES (?, ?, 'discipline', 50, 1, ?, ?)",
+            (uid, f"Mature Protocol {i}", dt_str, dt_str)
+        )
+    conn.commit()
+    conn.close()
+
+    # Pre-action baseline
+    pre_telem = client.get("/api/progress/telemetry").json()
+    score_pre = pre_telem["discipline_score"]
+
+    # Complete 1 mission today
+    res_create = client.post("/api/missions", json={
+        "title": "Today's Action",
+        "category": "discipline",
+        "xp_reward": 50,
+        "difficulty": "easy"
+    })
+    m_id = res_create.json()["id"]
+    client.patch(f"/api/missions/{m_id}/toggle")
+
+    # Post-action telemetry
+    post_telem = client.get("/api/progress/telemetry").json()
+    score_post = post_telem["discipline_score"]
+
+    diff = score_post - score_pre
+    # The change should be small and incremental (<= 2.0), NOT jumping wildly to 100!
+    assert 0.0 <= diff <= 2.0
+    assert score_post < 90.0

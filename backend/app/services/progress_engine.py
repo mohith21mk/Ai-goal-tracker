@@ -1,4 +1,5 @@
 import datetime
+import math
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from ..database import get_connection
@@ -19,6 +20,17 @@ def _parse_date(val: Any) -> Optional[datetime.date]:
         return None
 
 
+def confidence_factor(n: float, k: float = 15.0) -> float:
+    """
+    Asymptotic volume-confidence adjustment function: C_v(n) = 1 - exp(-n / k).
+    Ensures that low-sample accounts receive conservative, confidence-adjusted scores
+    instead of misleading 90-100 scores from 1 action.
+    """
+    if n <= 0:
+        return 0.0
+    return max(0.0, min(1.0, 1.0 - math.exp(-n / k)))
+
+
 def calculate_streak_metrics(active_dates: Set[str], reference_date: datetime.date) -> Tuple[int, int]:
     """
     Calculate (current_streak, longest_streak) up to reference_date.
@@ -34,7 +46,6 @@ def calculate_streak_metrics(active_dates: Set[str], reference_date: datetime.da
     if not parsed_dates:
         return 0, 0
 
-    # Calculate longest streak across all history up to reference date
     longest_streak = 1
     running_streak = 1
     for i in range(1, len(parsed_dates)):
@@ -49,7 +60,6 @@ def calculate_streak_metrics(active_dates: Set[str], reference_date: datetime.da
     if running_streak > longest_streak:
         longest_streak = running_streak
 
-    # Calculate current streak ending on reference_date or reference_date - 1
     current_streak = 0
     latest_date = parsed_dates[-1]
     days_since_latest = (reference_date - latest_date).days
@@ -76,8 +86,9 @@ def compute_daily_progress_from_records(
     target_date_str: str,
 ) -> Dict[str, Any]:
     """
-    Compute progress strictly for target_date_str (YYYY-MM-DD).
-    Zero DB queries.
+    Compute System 2 — Daily Progress strictly for target_date_str (YYYY-MM-DD).
+    Answers: 'How did I perform today?'
+    Resets for the next calendar day.
     """
     # 1. Missions completed on target_date
     completed_missions_today = [
@@ -91,7 +102,6 @@ def compute_daily_progress_from_records(
     missions_xp_today = sum(int(m.get("xp_reward") or 0) for m in completed_missions_today)
 
     # 2. Missions scheduled/active for target_date
-    # Active missions: created on or before target date, and either incomplete or completed on target_date
     active_missions_today = [
         m for m in missions
         if (not m.get("created_at") or str(m["created_at"])[:10] <= target_date_str) and (
@@ -151,16 +161,28 @@ def compute_overall_performance_from_records(
     date_cutoff_str: str,
 ) -> Dict[str, Any]:
     """
-    Compute normalized, gradual, lifetime overall performance metrics up to date_cutoff_str.
-    Zero DB queries.
+    Compute System 1 — True Overall Performance Metrics up to date_cutoff_str.
+    Answers: 'How have I developed throughout my complete MKC journey?'
+    
+    Uses multi-time horizons (Lifetime 50%, 90-day 25%, 30-day 15%, 7-day 10%),
+    account-age normalization, and asymptotic volume-confidence scaling.
     """
     cutoff_date = _parse_date(date_cutoff_str) or datetime.date.today()
     cutoff_datetime_str = f"{cutoff_date.strftime('%Y-%m-%d')} 23:59:59"
 
-    # 1. Account Age & Active Days Calculation
+    # Multi-horizon date window bounds
+    d_7_start = (cutoff_date - datetime.timedelta(days=6)).strftime("%Y-%m-%d")
+    d_30_start = (cutoff_date - datetime.timedelta(days=29)).strftime("%Y-%m-%d")
+    d_90_start = (cutoff_date - datetime.timedelta(days=89)).strftime("%Y-%m-%d")
+
+    # ---------------------------------------------------------
+    # 1. Account Age & Active Days Across Horizons
+    # ---------------------------------------------------------
     created_date = _parse_date(account_created_at) or cutoff_date
     account_age_days = max(1, (cutoff_date - created_date).days + 1)
+    effective_account_baseline = max(7, account_age_days)
 
+    # Active dates (Missions, Habits, Journals)
     m_active_dates = {
         str(m.get("completed_at") or m.get("created_at"))[:10]
         for m in missions
@@ -181,83 +203,128 @@ def compute_overall_performance_from_records(
     }
 
     all_active_dates = m_active_dates | h_active_dates | j_active_dates
-    active_days_count = len(all_active_dates)
+    active_days_life = len(all_active_dates)
+    active_days_90d = len({d for d in all_active_dates if d >= d_90_start})
+    active_days_30d = len({d for d in all_active_dates if d >= d_30_start})
+    active_days_7d = len({d for d in all_active_dates if d >= d_7_start})
 
     current_streak, longest_streak = calculate_streak_metrics(all_active_dates, cutoff_date)
 
-    # 2. Historical Missions in Scope
+    # ---------------------------------------------------------
+    # 2. Multi-Horizon Mission Completion Rates
+    # ---------------------------------------------------------
     missions_in_scope = [
         m for m in missions
         if not m.get("created_at") or str(m["created_at"]) <= cutoff_datetime_str
     ]
-    total_missions_hist = len(missions_in_scope)
-    completed_missions_hist = sum(
+    tot_m_life = len(missions_in_scope)
+    comp_m_life = sum(
         1 for m in missions_in_scope
         if m.get("completed") == 1 and (
             not m.get("completed_at") or str(m["completed_at"]) <= cutoff_datetime_str
         )
     )
 
-    if total_missions_hist > 0:
-        raw_mission_rate = (completed_missions_hist / total_missions_hist) * 100.0
-        volume_weight = min(1.0, total_missions_hist / 10.0)
-        mission_score = (raw_mission_rate * volume_weight) + (50.0 * (1.0 - volume_weight) * (raw_mission_rate / 100.0))
-    else:
-        mission_score = 0.0
+    missions_90d = [m for m in missions_in_scope if str(m.get("created_at") or "")[:10] >= d_90_start]
+    tot_m_90d = len(missions_90d)
+    comp_m_90d = sum(1 for m in missions_90d if m.get("completed") == 1)
 
-    # 3. Habit Consistency Calculation (28-day rolling window)
-    start_28d = (cutoff_date - datetime.timedelta(days=27)).strftime("%Y-%m-%d")
+    missions_30d = [m for m in missions_in_scope if str(m.get("created_at") or "")[:10] >= d_30_start]
+    tot_m_30d = len(missions_30d)
+    comp_m_30d = sum(1 for m in missions_30d if m.get("completed") == 1)
+
+    missions_7d = [m for m in missions_in_scope if str(m.get("created_at") or "")[:10] >= d_7_start]
+    tot_m_7d = len(missions_7d)
+    comp_m_7d = sum(1 for m in missions_7d if m.get("completed") == 1)
+
+    rate_life = (comp_m_life / tot_m_life * 100.0) if tot_m_life > 0 else 0.0
+    rate_90d = (comp_m_90d / tot_m_90d * 100.0) if tot_m_90d > 0 else rate_life
+    rate_30d = (comp_m_30d / tot_m_30d * 100.0) if tot_m_30d > 0 else rate_90d
+    rate_7d = (comp_m_7d / tot_m_7d * 100.0) if tot_m_7d > 0 else rate_30d
+
+    # Multi-horizon weighted mission completion rate
+    m_horiz_score = (0.50 * rate_life) + (0.25 * rate_90d) + (0.15 * rate_30d) + (0.10 * rate_7d)
+
+    # ---------------------------------------------------------
+    # 3. Multi-Horizon Active Day Density
+    # ---------------------------------------------------------
+    density_life = min(100.0, (active_days_life / effective_account_baseline) * 100.0)
+    density_90d = min(100.0, (active_days_90d / min(90, effective_account_baseline)) * 100.0)
+    density_30d = min(100.0, (active_days_30d / min(30, effective_account_baseline)) * 100.0)
+    density_7d = min(100.0, (active_days_7d / min(7, effective_account_baseline)) * 100.0)
+
+    density_horiz_score = (0.40 * density_life) + (0.30 * density_90d) + (0.20 * density_30d) + (0.10 * density_7d)
+
+    # ---------------------------------------------------------
+    # 4. Multi-Horizon Habit Consistency
+    # ---------------------------------------------------------
     habits_in_scope = [
         h for h in habits
         if not h.get("created_at") or str(h["created_at"]) <= cutoff_datetime_str
     ]
     tot_habits_count = len(habits_in_scope)
 
-    logs_28d = [
-        l for l in habit_logs
-        if l.get("completed_date") and start_28d <= str(l["completed_date"])[:10] <= str(cutoff_date)
-    ]
-    completed_28d_logs = len(logs_28d)
+    logs_life = [l for l in habit_logs if l.get("completed_date") and str(l["completed_date"])[:10] <= str(cutoff_date)]
+    logs_90d = [l for l in logs_life if str(l["completed_date"])[:10] >= d_90_start]
+    logs_30d = [l for l in logs_life if str(l["completed_date"])[:10] >= d_30_start]
+    logs_7d = [l for l in logs_life if str(l["completed_date"])[:10] >= d_7_start]
 
-    days_in_window = min(account_age_days, 28)
-    expected_logs_28d = max(1, tot_habits_count * days_in_window)
-    raw_habit_pct = (completed_28d_logs / expected_logs_28d) * 100.0 if tot_habits_count > 0 else 0.0
-    habit_consistency_score = min(100.0, raw_habit_pct)
+    expected_logs_90d = max(1, tot_habits_count * min(90, effective_account_baseline))
+    expected_logs_30d = max(1, tot_habits_count * min(30, effective_account_baseline))
+    expected_logs_7d = max(1, tot_habits_count * min(7, effective_account_baseline))
 
-    active_density_score = min(100.0, (active_days_count / account_age_days) * 100.0)
-    streak_score = min(100.0, (current_streak / 30.0) * 100.0)
+    h_rate_90d = min(100.0, (len(logs_90d) / expected_logs_90d) * 100.0) if tot_habits_count > 0 else 0.0
+    h_rate_30d = min(100.0, (len(logs_30d) / expected_logs_30d) * 100.0) if tot_habits_count > 0 else 0.0
+    h_rate_7d = min(100.0, (len(logs_7d) / expected_logs_7d) * 100.0) if tot_habits_count > 0 else 0.0
 
-    # 4. Overall Discipline Score Formula
-    if total_missions_hist > 0 or tot_habits_count > 0 or active_days_count > 0:
+    habit_horiz_score = (0.50 * h_rate_90d) + (0.35 * h_rate_30d) + (0.15 * h_rate_7d)
+
+    # ---------------------------------------------------------
+    # 5. Streak Stability & Momentum
+    # ---------------------------------------------------------
+    streak_stability = (
+        (current_streak / max(1, longest_streak)) * 100.0
+    ) if longest_streak > 0 else 0.0
+    streak_momentum = min(100.0, (current_streak / 30.0) * 100.0)
+    streak_combined = (0.60 * streak_stability) + (0.40 * streak_momentum)
+
+    # Total historical action count for confidence weighting
+    total_actions_life = comp_m_life + len(logs_life) + len(j_active_dates)
+    disc_conf = confidence_factor(total_actions_life, k=15.0)
+
+    # ---------------------------------------------------------
+    # METRIC 1: DISCIPLINE SCORE (0-100)
+    # Model: Mission Horizon (40%) + Active Density (30%) + Habit Horizon (20%) + Streak (10%)
+    # Scaled by volume confidence.
+    # ---------------------------------------------------------
+    if total_actions_life > 0 or tot_m_life > 0:
         raw_discipline = (
-            (mission_score * 0.40) +
-            (active_density_score * 0.30) +
-            (habit_consistency_score * 0.20) +
-            (streak_score * 0.10)
+            (m_horiz_score * 0.40) +
+            (density_horiz_score * 0.30) +
+            (habit_horiz_score * 0.20) +
+            (streak_combined * 0.10)
         )
-        discipline_score = round(min(100.0, max(0.0, raw_discipline)), 1)
+        discipline_score = round(min(100.0, max(0.0, raw_discipline * disc_conf)), 1)
     else:
         discipline_score = 0.0
 
-    # 5. Mindset Strength Formula
+    # ---------------------------------------------------------
+    # METRIC 2: MINDSET STRENGTH (0-100)
+    # Model: Mindset Missions (40%) + Journal Reflection Frequency (35%) + Energy/Mood (25%)
+    # Scaled by volume confidence.
+    # ---------------------------------------------------------
     mindset_missions = [
         m for m in missions_in_scope
         if (m.get("category") or "").lower() == "mindset"
     ]
-    tot_mindset_m = len(mindset_missions)
-    comp_mindset_m = sum(
+    tot_mind_life = len(mindset_missions)
+    comp_mind_life = sum(
         1 for m in mindset_missions
         if m.get("completed") == 1 and (
             not m.get("completed_at") or str(m["completed_at"]) <= cutoff_datetime_str
         )
     )
-
-    if tot_mindset_m > 0:
-        raw_mind_rate = (comp_mindset_m / tot_mindset_m) * 100.0
-        mind_vol = min(1.0, tot_mindset_m / 5.0)
-        mindset_m_score = (raw_mind_rate * mind_vol) + (50.0 * (1.0 - mind_vol) * (raw_mind_rate / 100.0))
-    else:
-        mindset_m_score = mission_score
+    mindset_m_rate = (comp_mind_life / tot_mind_life * 100.0) if tot_mind_life > 0 else m_horiz_score
 
     journals_in_scope = [
         j for j in journal_entries
@@ -268,38 +335,51 @@ def compute_overall_performance_from_records(
         sum(float(j.get("energy_level") or 0.0) for j in journals_in_scope) / tot_journals
     ) if tot_journals > 0 else 0.0
 
-    journal_freq_score = min(100.0, (tot_journals / max(1, active_days_count)) * 100.0) if tot_journals > 0 else 0.0
+    journals_90d = [j for j in journals_in_scope if str(j["entry_date"])[:10] >= d_90_start]
+    journals_30d = [j for j in journals_in_scope if str(j["entry_date"])[:10] >= d_30_start]
+
+    j_freq_90d = min(100.0, (len(journals_90d) / max(1, active_days_90d)) * 100.0) if active_days_90d > 0 else 0.0
+    j_freq_30d = min(100.0, (len(journals_30d) / max(1, active_days_30d)) * 100.0) if active_days_30d > 0 else 0.0
+    journal_freq_score = (0.60 * j_freq_90d) + (0.40 * j_freq_30d) if tot_journals > 0 else 0.0
     energy_score = min(100.0, avg_energy * 10.0) if tot_journals > 0 else 50.0
 
-    if tot_journals > 0 or tot_mindset_m > 0 or total_missions_hist > 0:
+    mind_actions = comp_mind_life + tot_journals
+    mind_conf = confidence_factor(mind_actions if mind_actions > 0 else total_actions_life, k=10.0)
+
+    if tot_journals > 0 or tot_mind_life > 0 or tot_m_life > 0:
         if tot_journals > 0:
             raw_mindset = (
-                (mindset_m_score * 0.40) +
+                (mindset_m_rate * 0.40) +
                 (journal_freq_score * 0.35) +
                 (energy_score * 0.25)
             )
         else:
-            raw_mindset = (mindset_m_score * 0.60) + (active_density_score * 0.40)
-        mindset_strength = round(min(100.0, max(0.0, raw_mindset)), 1)
+            raw_mindset = (mindset_m_rate * 0.60) + (density_horiz_score * 0.40)
+        mindset_strength = round(min(100.0, max(0.0, raw_mindset * mind_conf)), 1)
     else:
         mindset_strength = 0.0
 
-    # 6. Consistency Formula
-    streak_stability = (
-        (current_streak / max(1, longest_streak)) * 100.0
-    ) if longest_streak > 0 else 0.0
-
-    if active_days_count > 0 or tot_habits_count > 0 or total_missions_hist > 0:
+    # ---------------------------------------------------------
+    # METRIC 3: CONSISTENCY (0-100)
+    # Model: Active Day Horizon (40%) + Habit Horizon (35%) + Streak Stability (25%)
+    # Scaled by volume confidence.
+    # ---------------------------------------------------------
+    cons_conf = confidence_factor(active_days_life + len(logs_life), k=12.0)
+    if active_days_life > 0 or tot_habits_count > 0 or tot_m_life > 0:
         raw_consistency = (
-            (active_density_score * 0.40) +
-            (habit_consistency_score * 0.35) +
+            (density_horiz_score * 0.40) +
+            (habit_horiz_score * 0.35) +
             (streak_stability * 0.25)
         )
-        consistency = round(min(100.0, max(0.0, raw_consistency)), 1)
+        consistency = round(min(100.0, max(0.0, raw_consistency * cons_conf)), 1)
     else:
         consistency = 0.0
 
-    # 7. Growth Index Formula
+    # ---------------------------------------------------------
+    # METRIC 4: GROWTH INDEX (0-100)
+    # Model: Goal Completion (35%) + Blueprint Milestones (35%) + Cumulative XP Velocity (30%)
+    # Scaled by volume confidence.
+    # ---------------------------------------------------------
     goals_in_scope = [
         g for g in goals
         if not g.get("created_at") or str(g["created_at"]) <= cutoff_datetime_str
@@ -331,7 +411,10 @@ def compute_overall_performance_from_records(
     xp_level = (total_xp_hist // 500) + 1
     xp_velocity_score = min(100.0, (total_xp_hist / 5000.0) * 100.0)
 
-    if tot_goals > 0 or tot_milestones > 0 or total_missions_hist > 0 or total_xp_hist > 0:
+    growth_actions = tot_goals + tot_milestones + (total_xp_hist / 100.0)
+    growth_conf = confidence_factor(growth_actions, k=10.0)
+
+    if tot_goals > 0 or tot_milestones > 0 or tot_m_life > 0 or total_xp_hist > 0:
         if tot_goals > 0 or tot_milestones > 0:
             raw_growth = (
                 (goal_score * 0.35) +
@@ -339,12 +422,14 @@ def compute_overall_performance_from_records(
                 (xp_velocity_score * 0.30)
             )
         else:
-            raw_growth = (mission_score * 0.50) + (xp_velocity_score * 0.50)
-        growth_index = round(min(100.0, max(0.0, raw_growth)), 1)
+            raw_growth = (m_horiz_score * 0.50) + (xp_velocity_score * 0.50)
+        growth_index = round(min(100.0, max(0.0, raw_growth * growth_conf)), 1)
     else:
         growth_index = 0.0
 
-    # 8. Financial Goal Progress
+    # ---------------------------------------------------------
+    # 8. Financial Freedom Goal Progress
+    # ---------------------------------------------------------
     fin_goals = [
         g for g in goals_in_scope
         if (g.get("category") or "").lower() in ("finance", "wealth", "financial", "money") or
@@ -360,12 +445,12 @@ def compute_overall_performance_from_records(
         "consistency": consistency,
         "growth_index": growth_index,
         "financial_goal": fin_pct,
-        "active_days": active_days_count,
+        "active_days": active_days_life,
         "current_streak": current_streak,
         "longest_streak": longest_streak,
         "streak_days": current_streak,
-        "completed_missions": completed_missions_hist,
-        "total_missions": total_missions_hist,
+        "completed_missions": comp_m_life,
+        "total_missions": tot_m_life,
         "total_goals": tot_goals,
         "completed_goals": comp_goals,
         "total_habits": tot_habits_count,
