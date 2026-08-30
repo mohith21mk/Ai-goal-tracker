@@ -17,7 +17,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import MKCLogo from './MKCLogo';
-import { getProgress, getConversations } from '../services/api';
+import { getProgress, getDailyProgress, getConversations } from '../services/api';
 import { useNotificationsSocket } from '../hooks/useNotificationsSocket';
 import { ROUTES } from '../constants/routes';
 import './Sidebar.css';
@@ -125,12 +125,18 @@ const Sidebar = () => {
     let isMounted = true;
     async function loadData() {
       try {
-        const [prog, convs] = await Promise.all([
-          getProgress().catch(() => null),
+        const [dailyProg, convs] = await Promise.all([
+          getDailyProgress().catch(() => getProgress().catch(() => null)),
           getConversations().catch(() => [])
         ]);
         if (isMounted) {
-          if (prog) setProgress(prog);
+          if (dailyProg) {
+            setProgress({
+              completed: dailyProg.completed_actions !== undefined ? dailyProg.completed_actions : (dailyProg.completed || 0),
+              total: dailyProg.total_actions !== undefined ? dailyProg.total_actions : (dailyProg.total || 0),
+              percentage: dailyProg.completion_percentage !== undefined ? dailyProg.completion_percentage : (dailyProg.percentage || 0),
+            });
+          }
           if (Array.isArray(convs)) {
             const total = convs.reduce((acc, c) => acc + (c.unread_count || 0), 0);
             setUnreadChatCount(total);

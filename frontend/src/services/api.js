@@ -437,8 +437,16 @@ export async function getProgress() {
   return response.json();
 }
 
+export async function getDailyProgress() {
+  const response = await apiFetch('/api/progress/daily');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch daily progress: ${response.statusText}`);
+  }
+  return response.json();
+}
+
 export async function getTelemetry() {
-  const response = await apiFetch('/api/telemetry');
+  const response = await apiFetch('/api/progress/telemetry');
   if (!response.ok) {
     throw new Error(`Failed to fetch dashboard telemetry: ${response.statusText}`);
   }
