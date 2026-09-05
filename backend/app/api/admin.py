@@ -101,7 +101,13 @@ async def get_admin_overview(
         timeline.append({"date": day_str, "count": cnt})
 
     # 5. Global Engagement Stats
-    cursor.execute("SELECT COUNT(*) FROM missions WHERE completed = 1")
+    cursor.execute("""
+        SELECT COUNT(*) FROM (
+            SELECT id FROM mission_logs
+            UNION ALL
+            SELECT id FROM missions WHERE completed = 1 AND completed_at IS NOT NULL AND id NOT IN (SELECT mission_id FROM mission_logs)
+        )
+    """)
     total_missions_completed = cursor.fetchone()[0] or 0
 
     cursor.execute("SELECT COUNT(*) FROM habits WHERE status = 'active'")
@@ -114,7 +120,13 @@ async def get_admin_overview(
     total_blueprints = cursor.fetchone()[0] or 0
 
     # Total XP Awarded System-wide
-    cursor.execute("SELECT COALESCE(SUM(xp_reward), 0) FROM missions WHERE completed = 1")
+    cursor.execute("""
+        SELECT COALESCE(SUM(xp_reward), 0) FROM (
+            SELECT id, xp_reward FROM mission_logs
+            UNION ALL
+            SELECT id, xp_reward FROM missions WHERE completed = 1 AND completed_at IS NOT NULL AND id NOT IN (SELECT mission_id FROM mission_logs)
+        )
+    """)
     mission_xp_sum = cursor.fetchone()[0] or 0
     total_xp_awarded = int(mission_xp_sum) + (int(total_habit_logs) * 15)
 
@@ -205,7 +217,13 @@ async def get_admin_users(
         streak = get_user_max_habit_streak(uid)
 
         # Count completed missions, active goals, habits, and credentials
-        cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ? AND completed = 1", (uid,))
+        cursor.execute("""
+            SELECT COUNT(*) FROM (
+                SELECT id FROM mission_logs WHERE user_id = ?
+                UNION ALL
+                SELECT id FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL AND id NOT IN (SELECT mission_id FROM mission_logs WHERE user_id = ?)
+            )
+        """, (uid, uid, uid))
         comp_m = cursor.fetchone()[0] or 0
 
         cursor.execute("SELECT COUNT(*) FROM goals WHERE user_id = ? AND status = 'active'", (uid,))
@@ -288,7 +306,13 @@ async def get_admin_user_detail(
     streak = get_user_max_habit_streak(uid)
 
     # Completed missions count and recent missions
-    cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ? AND completed = 1", (uid,))
+    cursor.execute("""
+        SELECT COUNT(*) FROM (
+            SELECT id FROM mission_logs WHERE user_id = ?
+            UNION ALL
+            SELECT id FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL AND id NOT IN (SELECT mission_id FROM mission_logs WHERE user_id = ?)
+        )
+    """, (uid, uid, uid))
     comp_m = cursor.fetchone()[0] or 0
 
     cursor.execute(

@@ -18,10 +18,15 @@ def calculate_user_xp(user_id: int) -> Dict[str, int]:
     cursor.execute(
         """
         SELECT COALESCE(SUM(xp_reward), 0)
-        FROM missions
-        WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL
+        FROM (
+            SELECT id, xp_reward FROM mission_logs WHERE user_id = ?
+            UNION ALL
+            SELECT id, xp_reward FROM missions 
+            WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL 
+              AND id NOT IN (SELECT mission_id FROM mission_logs WHERE user_id = ?)
+        )
         """,
-        (user_id,),
+        (user_id, user_id, user_id),
     )
     mission_row = cursor.fetchone()
     mission_xp = int(mission_row[0] if mission_row and mission_row[0] is not None else 0)
@@ -197,10 +202,15 @@ def evaluate_and_issue_credentials(user_id: int) -> Dict[str, Any]:
     cursor.execute(
         """
         SELECT COUNT(*)
-        FROM missions
-        WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL
+        FROM (
+            SELECT id FROM mission_logs WHERE user_id = ?
+            UNION ALL
+            SELECT id FROM missions 
+            WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL 
+              AND id NOT IN (SELECT mission_id FROM mission_logs WHERE user_id = ?)
+        )
         """,
-        (user_id,),
+        (user_id, user_id, user_id),
     )
     mission_count_row = cursor.fetchone()
     completed_missions = int(mission_count_row[0] if mission_count_row else 0)

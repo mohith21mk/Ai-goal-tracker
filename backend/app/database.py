@@ -600,6 +600,37 @@ def init_db() -> None:
         )
         conn.commit()
 
+    # 3b. Create mission_logs table for recurring daily completions and auto-reset
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS mission_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            mission_id INTEGER NOT NULL,
+            completed_date TEXT NOT NULL,
+            completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            xp_reward INTEGER DEFAULT 10,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (mission_id) REFERENCES missions(id) ON DELETE CASCADE,
+            UNIQUE(user_id, mission_id, completed_date)
+        )
+        """
+    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_mission_logs_user_date ON mission_logs(user_id, completed_date)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_mission_logs_mission_date ON mission_logs(mission_id, completed_date)")
+    conn.commit()
+
+    # Backfill mission_logs from legacy completed missions if not already logged
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO mission_logs (user_id, mission_id, completed_date, completed_at, xp_reward)
+        SELECT user_id, id, substr(completed_at, 1, 10), completed_at, COALESCE(xp_reward, 10)
+        FROM missions
+        WHERE completed = 1 AND completed_at IS NOT NULL AND user_id IS NOT NULL
+        """
+    )
+    conn.commit()
+
     # 4. Create messages table for AI Coach chat history persistence
     cursor.execute(
         """

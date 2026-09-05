@@ -16,26 +16,42 @@ def generate_daily_reflection(user_id: int) -> Dict[str, Any]:
     cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ?", (user_id,))
     total_missions = cursor.fetchone()[0] or 0
 
-    cursor.execute("SELECT COUNT(*) FROM missions WHERE user_id = ? AND completed = 1", (user_id,))
+    cursor.execute("""
+        SELECT COUNT(*) FROM (
+            SELECT id FROM mission_logs WHERE user_id = ?
+            UNION ALL
+            SELECT id FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL AND id NOT IN (SELECT mission_id FROM mission_logs WHERE user_id = ?)
+        )
+    """, (user_id, user_id, user_id))
     completed_missions = cursor.fetchone()[0] or 0
 
     pending_missions = max(0, total_missions - completed_missions)
     mission_pct = round((completed_missions / total_missions) * 100) if total_missions > 0 else 0
 
     # 2. XP Earned
-    cursor.execute("SELECT SUM(xp_reward) FROM missions WHERE user_id = ? AND completed = 1", (user_id,))
+    cursor.execute("""
+        SELECT COALESCE(SUM(xp_reward), 0) FROM (
+            SELECT id, xp_reward FROM mission_logs WHERE user_id = ?
+            UNION ALL
+            SELECT id, xp_reward FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL AND id NOT IN (SELECT mission_id FROM mission_logs WHERE user_id = ?)
+        )
+    """, (user_id, user_id, user_id))
     xp_row = cursor.fetchone()[0]
     xp_earned = int(xp_row) if xp_row is not None else 0
 
     # 3. Mission Streak
     cursor.execute(
         """
+        SELECT DISTINCT completed_date as comp_date
+        FROM mission_logs
+        WHERE user_id = ?
+        UNION
         SELECT DISTINCT DATE(completed_at) as comp_date
         FROM missions
         WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL
         ORDER BY comp_date DESC
         """,
-        (user_id,),
+        (user_id, user_id),
     )
     date_rows = cursor.fetchall()
     dates = [str(r["comp_date"])[:10] for r in date_rows if r["comp_date"]]

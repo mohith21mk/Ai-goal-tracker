@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from app import create_app
 from app.database import get_connection, init_db
 from app.services.auth import create_session, hash_password
+from app.services.progression import calculate_user_xp
 
 app = create_app()
 client = TestClient(app)
@@ -16,6 +17,7 @@ def setup_test_user(prefix: str, role: str = "user"):
     init_db()
     conn = get_connection()
     c = conn.cursor()
+    c.execute("DELETE FROM mission_logs WHERE user_id IN (SELECT id FROM users WHERE email LIKE ?)", (f"{prefix}%",))
     c.execute("DELETE FROM missions WHERE user_id IN (SELECT id FROM users WHERE email LIKE ?)", (f"{prefix}%",))
     c.execute("DELETE FROM app_sessions WHERE user_id IN (SELECT id FROM users WHERE email LIKE ?)", (f"{prefix}%",))
     c.execute("DELETE FROM users WHERE email LIKE ?", (f"{prefix}%",))
@@ -35,6 +37,7 @@ def setup_test_user(prefix: str, role: str = "user"):
 def cleanup_test_user(uid: int):
     conn = get_connection()
     c = conn.cursor()
+    c.execute("DELETE FROM mission_logs WHERE user_id = ?", (uid,))
     c.execute("DELETE FROM missions WHERE user_id = ?", (uid,))
     c.execute("DELETE FROM app_sessions WHERE user_id = ?", (uid,))
     c.execute("DELETE FROM users WHERE id = ?", (uid,))
@@ -123,3 +126,91 @@ def test_missions_unauthenticated_guards():
 
     res_post = client.post("/api/missions", json={"title": "No auth mission"})
     assert res_post.status_code == 401
+
+
+def test_daily_mission_auto_reset_on_next_day():
+    """
+    CRITICAL USER REQUIREMENT:
+    When a daily mission is completed on Day 1, on Day 2 (next day) the checklist
+    must automatically reset to unchecked, while Day 1's history and XP are preserved.
+    Completing it again on Day 2 accumulates XP and maintains streak.
+    """
+    uid, token = setup_test_user("v2msn_rst")
+    try:
+        # Create 2 starter daily missions
+        m1 = client.post(
+            "/api/missions",
+            json={"title": "Morning Protocol & System Architecture Block", "xp_reward": 15},
+            cookies={"mkc_session": token},
+        ).json()
+        m2 = client.post(
+            "/api/missions",
+            json={"title": "Complete Morning Deep Work Protocol", "xp_reward": 15},
+            cookies={"mkc_session": token},
+        ).json()
+
+        m1_id = m1["id"]
+        m2_id = m2["id"]
+
+        # 1. Day 1: Complete m1 on Day 1 (2026-09-04)
+        day1 = "2026-09-04"
+        res_t1 = client.patch(f"/api/missions/{m1_id}/toggle?target_date={day1}", cookies={"mkc_session": token})
+        assert res_t1.status_code == 200
+        assert res_t1.json()["completed"] is True
+
+        # Check Day 1 status: m1 is completed, m2 is not completed
+        res_day1 = client.get(f"/api/missions?target_date={day1}", cookies={"mkc_session": token})
+        assert res_day1.status_code == 200
+        day1_missions = {m["id"]: m["completed"] for m in res_day1.json()}
+        assert day1_missions[m1_id] is True
+        assert day1_missions[m2_id] is False
+
+        # Verify Day 1 XP: exactly 15 XP
+        xp_day1 = calculate_user_xp(uid)
+        assert xp_day1["total_xp"] == 15
+
+        # 2. Day 2 arrives (2026-09-05)
+        # THE CHECKLIST MUST AUTOMATICALLY RESET TO UNCHECKED FOR BOTH MISSIONS!
+        day2 = "2026-09-05"
+        res_day2 = client.get(f"/api/missions?target_date={day2}", cookies={"mkc_session": token})
+        assert res_day2.status_code == 200
+        day2_missions = {m["id"]: m["completed"] for m in res_day2.json()}
+        # Both missions must be unchecked (auto-reset)!
+        assert day2_missions[m1_id] is False, "Completed mission from Day 1 must reset to unchecked on Day 2"
+        assert day2_missions[m2_id] is False, "Uncompleted mission from Day 1 must remain unchecked on Day 2"
+
+        # Overall XP must NOT reset on Day 2
+        xp_day2_morning = calculate_user_xp(uid)
+        assert xp_day2_morning["total_xp"] == 15, "XP must persist across days"
+
+        # 3. User completes both missions on Day 2!
+        res_t1_d2 = client.patch(f"/api/missions/{m1_id}/toggle?target_date={day2}", cookies={"mkc_session": token})
+        assert res_t1_d2.status_code == 200
+        assert res_t1_d2.json()["completed"] is True
+
+        res_t2_d2 = client.patch(f"/api/missions/{m2_id}/toggle?target_date={day2}", cookies={"mkc_session": token})
+        assert res_t2_d2.status_code == 200
+        assert res_t2_d2.json()["completed"] is True
+
+        # Now on Day 2: 2/2 Protocol Completed Today
+        res_day2_after = client.get(f"/api/missions?target_date={day2}", cookies={"mkc_session": token})
+        day2_missions_after = {m["id"]: m["completed"] for m in res_day2_after.json()}
+        assert day2_missions_after[m1_id] is True
+        assert day2_missions_after[m2_id] is True
+
+        # Total XP has accumulated: 15 (from Day 1) + 15 (m1 Day 2) + 15 (m2 Day 2) = 45 XP!
+        xp_day2_night = calculate_user_xp(uid)
+        assert xp_day2_night["total_xp"] == 45, "XP must be cumulative across days"
+
+        # 4. Day 3 arrives (2026-09-06)
+        # THE CHECKLIST MUST RESET AGAIN!
+        day3 = "2026-09-06"
+        res_day3 = client.get(f"/api/missions?target_date={day3}", cookies={"mkc_session": token})
+        day3_missions = {m["id"]: m["completed"] for m in res_day3.json()}
+        assert day3_missions[m1_id] is False, "Checklist must reset again on Day 3"
+        assert day3_missions[m2_id] is False, "Checklist must reset again on Day 3"
+        # Total XP remains 45!
+        assert calculate_user_xp(uid)["total_xp"] == 45
+
+    finally:
+        cleanup_test_user(uid)

@@ -471,6 +471,7 @@ def delete_user_account(user_id: int) -> None:
     cursor.execute("DELETE FROM messages WHERE user_id = ?", (user_id,))
 
     # 4. Delete goals, missions, habits & journal
+    cursor.execute("DELETE FROM mission_logs WHERE user_id = ?", (user_id,))
     cursor.execute("DELETE FROM habit_logs WHERE user_id = ?", (user_id,))
     cursor.execute("DELETE FROM habits WHERE user_id = ?", (user_id,))
     cursor.execute("DELETE FROM journal_entries WHERE user_id = ?", (user_id,))

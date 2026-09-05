@@ -84,31 +84,47 @@ def compute_daily_progress_from_records(
     habits: List[Dict[str, Any]],
     habit_logs: List[Dict[str, Any]],
     target_date_str: str,
+    mission_logs: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Compute System 2 — Daily Progress strictly for target_date_str (YYYY-MM-DD).
     Answers: 'How did I perform today?'
     Resets for the next calendar day.
     """
-    # 1. Missions completed on target_date
-    completed_missions_today = [
-        m for m in missions
-        if m.get("completed") == 1 and (
-            (m.get("completed_at") and str(m["completed_at"])[:10] == target_date_str) or
-            (not m.get("completed_at") and m.get("created_at") and str(m["created_at"])[:10] == target_date_str)
+    if mission_logs is None:
+        mission_logs = []
+
+    # 1. Missions completed on target_date (from mission_logs or legacy missions)
+    logged_user_mission_ids = {l["mission_id"] for l in mission_logs}
+    completed_mission_ids_today = {
+        l["mission_id"] for l in mission_logs
+        if l.get("completed_date") and str(l["completed_date"])[:10] == target_date_str
+    }
+    # Check legacy missions not tracked in mission_logs
+    for m in missions:
+        if m.get("id") not in logged_user_mission_ids and m.get("completed") == 1:
+            if (m.get("completed_at") and str(m["completed_at"])[:10] == target_date_str) or (
+                not m.get("completed_at") and m.get("created_at") and str(m["created_at"])[:10] == target_date_str
+            ):
+                completed_mission_ids_today.add(m["id"])
+
+    missions_completed_count = len(completed_mission_ids_today)
+
+    logged_xp_today = sum(
+        int(l.get("xp_reward") or 0) for l in mission_logs
+        if l.get("completed_date") and str(l["completed_date"])[:10] == target_date_str
+    )
+    if logged_xp_today == 0 and missions_completed_count > 0:
+        logged_xp_today = sum(
+            int(m.get("xp_reward") or 0) for m in missions
+            if m.get("id") in completed_mission_ids_today
         )
-    ]
-    missions_completed_count = len(completed_missions_today)
-    missions_xp_today = sum(int(m.get("xp_reward") or 0) for m in completed_missions_today)
+    missions_xp_today = logged_xp_today
 
     # 2. Missions scheduled/active for target_date
     active_missions_today = [
         m for m in missions
-        if (not m.get("created_at") or str(m["created_at"])[:10] <= target_date_str) and (
-            m.get("completed") == 0 or
-            (m.get("completed_at") and str(m["completed_at"])[:10] == target_date_str) or
-            (not m.get("completed_at") and m.get("created_at") and str(m["created_at"])[:10] == target_date_str)
-        )
+        if not m.get("created_at") or str(m["created_at"])[:10] <= target_date_str
     ]
     total_missions_today = max(len(active_missions_today), missions_completed_count)
 
@@ -159,14 +175,15 @@ def compute_overall_performance_from_records(
     milestones: List[Dict[str, Any]],
     account_created_at: Optional[str],
     date_cutoff_str: str,
+    mission_logs: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Compute System 1 — True Overall Performance Metrics up to date_cutoff_str.
     Answers: 'How have I developed throughout my complete MKC journey?'
-    
-    Uses multi-time horizons (Lifetime 50%, 90-day 25%, 30-day 15%, 7-day 10%),
-    account-age normalization, and asymptotic volume-confidence scaling.
     """
+    if mission_logs is None:
+        mission_logs = []
+
     cutoff_date = _parse_date(date_cutoff_str) or datetime.date.today()
     cutoff_datetime_str = f"{cutoff_date.strftime('%Y-%m-%d')} 23:59:59"
 
@@ -175,22 +192,29 @@ def compute_overall_performance_from_records(
     d_30_start = (cutoff_date - datetime.timedelta(days=29)).strftime("%Y-%m-%d")
     d_90_start = (cutoff_date - datetime.timedelta(days=89)).strftime("%Y-%m-%d")
 
-    # ---------------------------------------------------------
     # 1. Account Age & Active Days Across Horizons
-    # ---------------------------------------------------------
     created_date = _parse_date(account_created_at) or cutoff_date
     account_age_days = max(1, (cutoff_date - created_date).days + 1)
     effective_account_baseline = max(7, account_age_days)
 
-    # Active dates (Missions, Habits, Journals)
-    m_active_dates = {
-        str(m.get("completed_at") or m.get("created_at"))[:10]
-        for m in missions
-        if m.get("completed") == 1 and (
-            (m.get("completed_at") and str(m["completed_at"]) <= cutoff_datetime_str) or
-            (not m.get("completed_at") and (not m.get("created_at") or str(m["created_at"]) <= cutoff_datetime_str))
-        )
-    }
+    # Collect all completed mission events (seamlessly merging mission_logs and legacy completed missions)
+    logged_mission_ids = {l["mission_id"] for l in mission_logs}
+    all_completed_mission_events = [
+        {"date": str(l["completed_date"])[:10], "xp": int(l.get("xp_reward") or 0)}
+        for l in mission_logs
+        if l.get("completed_date") and str(l["completed_date"])[:10] <= str(cutoff_date)
+    ]
+    missions_in_scope = [
+        m for m in missions
+        if not m.get("created_at") or str(m["created_at"]) <= cutoff_datetime_str
+    ]
+    for m in missions_in_scope:
+        if m.get("completed") == 1 and m["id"] not in logged_mission_ids:
+            dt_str = str(m.get("completed_at") or m.get("created_at") or "")[:10]
+            if dt_str and dt_str <= str(cutoff_date):
+                all_completed_mission_events.append({"date": dt_str, "xp": int(m.get("xp_reward") or 0)})
+
+    m_active_dates = {e["date"] for e in all_completed_mission_events}
     h_active_dates = {
         str(l["completed_date"])[:10]
         for l in habit_logs
@@ -210,44 +234,25 @@ def compute_overall_performance_from_records(
 
     current_streak, longest_streak = calculate_streak_metrics(all_active_dates, cutoff_date)
 
-    # ---------------------------------------------------------
     # 2. Multi-Horizon Mission Completion Rates
-    # ---------------------------------------------------------
-    missions_in_scope = [
-        m for m in missions
-        if not m.get("created_at") or str(m["created_at"]) <= cutoff_datetime_str
-    ]
     tot_m_life = len(missions_in_scope)
-    comp_m_life = sum(
-        1 for m in missions_in_scope
-        if m.get("completed") == 1 and (
-            not m.get("completed_at") or str(m["completed_at"]) <= cutoff_datetime_str
-        )
-    )
+    comp_m_life = len(all_completed_mission_events)
+    comp_m_90d = len([e for e in all_completed_mission_events if e["date"] >= d_90_start])
+    comp_m_30d = len([e for e in all_completed_mission_events if e["date"] >= d_30_start])
+    comp_m_7d = len([e for e in all_completed_mission_events if e["date"] >= d_7_start])
 
-    missions_90d = [m for m in missions_in_scope if str(m.get("created_at") or "")[:10] >= d_90_start]
-    tot_m_90d = len(missions_90d)
-    comp_m_90d = sum(1 for m in missions_90d if m.get("completed") == 1)
+    tot_m_90d = len([m for m in missions_in_scope if str(m.get("created_at") or "")[:10] >= d_90_start]) or tot_m_life
+    tot_m_30d = len([m for m in missions_in_scope if str(m.get("created_at") or "")[:10] >= d_30_start]) or tot_m_life
+    tot_m_7d = len([m for m in missions_in_scope if str(m.get("created_at") or "")[:10] >= d_7_start]) or tot_m_life
 
-    missions_30d = [m for m in missions_in_scope if str(m.get("created_at") or "")[:10] >= d_30_start]
-    tot_m_30d = len(missions_30d)
-    comp_m_30d = sum(1 for m in missions_30d if m.get("completed") == 1)
+    rate_life = (comp_m_life / max(1, tot_m_life) * 100.0) if tot_m_life > 0 else 0.0
+    rate_90d = (comp_m_90d / max(1, tot_m_90d) * 100.0) if tot_m_90d > 0 else rate_life
+    rate_30d = (comp_m_30d / max(1, tot_m_30d) * 100.0) if tot_m_30d > 0 else rate_90d
+    rate_7d = (comp_m_7d / max(1, tot_m_7d) * 100.0) if tot_m_7d > 0 else rate_30d
 
-    missions_7d = [m for m in missions_in_scope if str(m.get("created_at") or "")[:10] >= d_7_start]
-    tot_m_7d = len(missions_7d)
-    comp_m_7d = sum(1 for m in missions_7d if m.get("completed") == 1)
-
-    rate_life = (comp_m_life / tot_m_life * 100.0) if tot_m_life > 0 else 0.0
-    rate_90d = (comp_m_90d / tot_m_90d * 100.0) if tot_m_90d > 0 else rate_life
-    rate_30d = (comp_m_30d / tot_m_30d * 100.0) if tot_m_30d > 0 else rate_90d
-    rate_7d = (comp_m_7d / tot_m_7d * 100.0) if tot_m_7d > 0 else rate_30d
-
-    # Multi-horizon weighted mission completion rate
     m_horiz_score = (0.50 * rate_life) + (0.25 * rate_90d) + (0.15 * rate_30d) + (0.10 * rate_7d)
 
-    # ---------------------------------------------------------
     # 3. Multi-Horizon Active Day Density
-    # ---------------------------------------------------------
     density_life = min(100.0, (active_days_life / effective_account_baseline) * 100.0)
     density_90d = min(100.0, (active_days_90d / min(90, effective_account_baseline)) * 100.0)
     density_30d = min(100.0, (active_days_30d / min(30, effective_account_baseline)) * 100.0)
@@ -255,9 +260,7 @@ def compute_overall_performance_from_records(
 
     density_horiz_score = (0.40 * density_life) + (0.30 * density_90d) + (0.20 * density_30d) + (0.10 * density_7d)
 
-    # ---------------------------------------------------------
     # 4. Multi-Horizon Habit Consistency
-    # ---------------------------------------------------------
     habits_in_scope = [
         h for h in habits
         if not h.get("created_at") or str(h["created_at"]) <= cutoff_datetime_str
@@ -279,24 +282,17 @@ def compute_overall_performance_from_records(
 
     habit_horiz_score = (0.50 * h_rate_90d) + (0.35 * h_rate_30d) + (0.15 * h_rate_7d)
 
-    # ---------------------------------------------------------
     # 5. Streak Stability & Momentum
-    # ---------------------------------------------------------
     streak_stability = (
         (current_streak / max(1, longest_streak)) * 100.0
     ) if longest_streak > 0 else 0.0
     streak_momentum = min(100.0, (current_streak / 30.0) * 100.0)
     streak_combined = (0.60 * streak_stability) + (0.40 * streak_momentum)
 
-    # Total historical action count for confidence weighting
     total_actions_life = comp_m_life + len(logs_life) + len(j_active_dates)
     disc_conf = confidence_factor(total_actions_life, k=15.0)
 
-    # ---------------------------------------------------------
     # METRIC 1: DISCIPLINE SCORE (0-100)
-    # Model: Mission Horizon (40%) + Active Density (30%) + Habit Horizon (20%) + Streak (10%)
-    # Scaled by volume confidence.
-    # ---------------------------------------------------------
     if total_actions_life > 0 or tot_m_life > 0:
         raw_discipline = (
             (m_horiz_score * 0.40) +
@@ -308,11 +304,7 @@ def compute_overall_performance_from_records(
     else:
         discipline_score = 0.0
 
-    # ---------------------------------------------------------
     # METRIC 2: MINDSET STRENGTH (0-100)
-    # Model: Mindset Missions (40%) + Journal Reflection Frequency (35%) + Energy/Mood (25%)
-    # Scaled by volume confidence.
-    # ---------------------------------------------------------
     mindset_missions = [
         m for m in missions_in_scope
         if (m.get("category") or "").lower() == "mindset"
@@ -359,11 +351,7 @@ def compute_overall_performance_from_records(
     else:
         mindset_strength = 0.0
 
-    # ---------------------------------------------------------
     # METRIC 3: CONSISTENCY (0-100)
-    # Model: Active Day Horizon (40%) + Habit Horizon (35%) + Streak Stability (25%)
-    # Scaled by volume confidence.
-    # ---------------------------------------------------------
     cons_conf = confidence_factor(active_days_life + len(logs_life), k=12.0)
     if active_days_life > 0 or tot_habits_count > 0 or tot_m_life > 0:
         raw_consistency = (
@@ -375,11 +363,7 @@ def compute_overall_performance_from_records(
     else:
         consistency = 0.0
 
-    # ---------------------------------------------------------
     # METRIC 4: GROWTH INDEX (0-100)
-    # Model: Goal Completion (35%) + Blueprint Milestones (35%) + Cumulative XP Velocity (30%)
-    # Scaled by volume confidence.
-    # ---------------------------------------------------------
     goals_in_scope = [
         g for g in goals
         if not g.get("created_at") or str(g["created_at"]) <= cutoff_datetime_str
@@ -396,13 +380,7 @@ def compute_overall_performance_from_records(
     comp_milestones = sum(1 for ms in milestones_in_scope if ms.get("completed") == 1)
     milestone_score = (comp_milestones / tot_milestones) * 100.0 if tot_milestones > 0 else 0.0
 
-    mission_xp_hist = sum(
-        int(m.get("xp_reward") or 0)
-        for m in missions_in_scope
-        if m.get("completed") == 1 and (
-            not m.get("completed_at") or str(m["completed_at"]) <= cutoff_datetime_str
-        )
-    )
+    mission_xp_hist = sum(e["xp"] for e in all_completed_mission_events)
     habit_xp_hist = sum(
         15 for l in habit_logs
         if l.get("completed_date") and str(l["completed_date"])[:10] <= str(cutoff_date)
@@ -427,9 +405,7 @@ def compute_overall_performance_from_records(
     else:
         growth_index = 0.0
 
-    # ---------------------------------------------------------
-    # 8. Financial Freedom Goal Progress
-    # ---------------------------------------------------------
+    # Financial Goal Progress
     fin_goals = [
         g for g in goals_in_scope
         if (g.get("category") or "").lower() in ("finance", "wealth", "financial", "money") or
@@ -463,7 +439,7 @@ def compute_overall_performance_from_records(
 def compute_comprehensive_progress(user_id: int) -> Dict[str, Any]:
     """
     Unified, high-efficiency calculation returning separated overall performance and daily progress.
-    Fetches raw user data in 7 fast batch queries.
+    Fetches raw user data in 8 fast batch queries.
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -481,6 +457,12 @@ def compute_comprehensive_progress(user_id: int) -> Dict[str, Any]:
         (user_id,),
     )
     missions = [dict(r) for r in cursor.fetchall()]
+
+    cursor.execute(
+        "SELECT id, mission_id, user_id, completed_date, completed_at, xp_reward FROM mission_logs WHERE user_id = ?",
+        (user_id,),
+    )
+    mission_logs = [dict(r) for r in cursor.fetchall()]
 
     cursor.execute(
         "SELECT id, entry_date, energy_level FROM journal_entries WHERE user_id = ?",
@@ -520,11 +502,11 @@ def compute_comprehensive_progress(user_id: int) -> Dict[str, Any]:
     conn.close()
 
     # 1. Compute System 2 — Daily Progress (Today Only)
-    daily_progress = compute_daily_progress_from_records(missions, habits, habit_logs, today_str)
+    daily_progress = compute_daily_progress_from_records(missions, habits, habit_logs, today_str, mission_logs)
 
     # 2. Compute System 1 — Overall Performance Metrics (Lifetime)
     current_overall = compute_overall_performance_from_records(
-        missions, journal_entries, habits, habit_logs, goals, milestones, account_created_at, now_str
+        missions, journal_entries, habits, habit_logs, goals, milestones, account_created_at, now_str, mission_logs
     )
 
     progression = get_user_progression(user_id)
@@ -548,7 +530,7 @@ def compute_comprehensive_progress(user_id: int) -> Dict[str, Any]:
         target_day = today_dt - datetime.timedelta(days=i)
         cutoff_str = f"{target_day.strftime('%Y-%m-%d')} 23:59:59"
         snap = compute_overall_performance_from_records(
-            missions, journal_entries, habits, habit_logs, goals, milestones, account_created_at, cutoff_str
+            missions, journal_entries, habits, habit_logs, goals, milestones, account_created_at, cutoff_str, mission_logs
         )
         sparklines["discipline_score"].append(snap["discipline_score"])
         sparklines["mindset_strength"].append(snap["mindset_strength"])

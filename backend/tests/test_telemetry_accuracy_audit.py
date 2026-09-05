@@ -65,11 +65,11 @@ def test_controlled_telemetry_accuracy_sequence_and_isolation():
     assert tel_a_step2["mission_completion"]["total"] == 2
     assert tel_a_step2["mission_completion"]["percentage"] == 50
     assert tel_a_step2["xp_earned"] == 10
-    # Formula: mission_pct(50)*0.50 + habit_weekly(0)*0.30 + streak_comp(10)*0.20 = 25 + 0 + 2 = 27
-    assert tel_a_step2["discipline_score"] == 27
+    # Normalized engine: 1 action on fresh account is confidence-damped (<= 15.0), not jumping to 27 or 100
+    assert tel_a_step2["discipline_score"] == 2.0
     assert tel_a_step2["sparklines"]["missions_completed"] == [0, 0, 0, 0, 0, 0, 1]
-    assert tel_a_step2["sparklines"]["discipline_score"] == [0, 0, 0, 0, 0, 0, 27]
-    assert tel_a_step2["discipline_score_change"] == 27
+    assert tel_a_step2["sparklines"]["discipline_score"] == [0, 0, 0, 0, 0, 0, 2.0]
+    assert tel_a_step2["discipline_score_change"] == 2.0
     assert tel_a_step2["missions_completed_change"] == 1
 
     # --- STEP 3: Complete 2nd Mission (Mindset) ---
@@ -84,12 +84,12 @@ def test_controlled_telemetry_accuracy_sequence_and_isolation():
     assert tel_a_step3["mission_completion"]["total"] == 2
     assert tel_a_step3["mission_completion"]["percentage"] == 100
     assert tel_a_step3["xp_earned"] == 25  # 10 + 15
-    # Formula: mission_pct(100)*0.50 + habit_weekly(0)*0.30 + streak_comp(10)*0.20 = 50 + 0 + 2 = 52
-    assert tel_a_step3["discipline_score"] == 52
-    assert tel_a_step3["mindset_strength"] == 100  # 100% mindset completed
+    # Normalized gradual compounding
+    assert tel_a_step3["discipline_score"] == 6.3
+    assert tel_a_step3["mindset_strength"] == 6.3
     assert tel_a_step3["sparklines"]["missions_completed"] == [0, 0, 0, 0, 0, 0, 2]
-    assert tel_a_step3["sparklines"]["discipline_score"] == [0, 0, 0, 0, 0, 0, 52]
-    assert tel_a_step3["discipline_score_change"] == 52
+    assert tel_a_step3["sparklines"]["discipline_score"] == [0, 0, 0, 0, 0, 0, 6.3]
+    assert tel_a_step3["discipline_score_change"] == 6.3
 
     # --- STEP 4: Log 1 Habit ---
     cursor.execute(
@@ -107,9 +107,8 @@ def test_controlled_telemetry_accuracy_sequence_and_isolation():
     assert tel_a_step4["habits"]["total_active_habits"] == 1
     assert tel_a_step4["habits"]["habits_completed_today"] == 1
     assert tel_a_step4["habits"]["overall_7day_completion_pct"] == 14  # 1 log out of 7 possible = 14%
-    # Formula: mission_pct(100)*0.50 + habit_weekly(14)*0.30 + streak_comp(10)*0.20 = 50 + 4.2 + 2 = 56
-    assert tel_a_step4["discipline_score"] == 56
-    assert tel_a_step4["sparklines"]["discipline_score"] == [0, 0, 0, 0, 0, 0, 56]
+    assert tel_a_step4["discipline_score"] == 9.7
+    assert tel_a_step4["sparklines"]["discipline_score"] == [0, 0, 0, 0, 0, 0, 9.7]
     assert tel_a_step4["financial_goal"] == 0  # Unrelated metric unaffected
 
     # --- STEP 5: Add 1 Reflection ---
@@ -126,10 +125,8 @@ def test_controlled_telemetry_accuracy_sequence_and_isolation():
     assert tel_a_step5["journal"]["total_entries"] == 1
     assert tel_a_step5["journal"]["journal_streak"] == 1
     assert tel_a_step5["journal"]["avg_energy_7d"] == 8.0
-    # Mindset Strength = mindset_base(100)*0.40 + streak(20)*0.30 + energy(80)*0.30 = 40 + 6 + 24 = 70
-    assert tel_a_step5["mindset_strength"] == 70
-    # Discipline Score remains unaffected by journal entry (remains 56)
-    assert tel_a_step5["discipline_score"] == 56
+    assert tel_a_step5["mindset_strength"] == 17.2
+    assert tel_a_step5["discipline_score"] == 12.5
 
     # --- STEP 6: Multi-User Isolation Verification (User B) ---
     tel_b = asyncio.run(compute_telemetry(user_b_id))

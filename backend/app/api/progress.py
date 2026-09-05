@@ -8,8 +8,8 @@ from .auth import get_current_user
 router = APIRouter()
 
 
-async def compute_telemetry(user_id: int) -> Dict[str, Any]:
-    """Compute overall lifetime performance telemetry for user_id."""
+def compute_telemetry_sync(user_id: int) -> Dict[str, Any]:
+    """Compute overall lifetime performance telemetry for user_id synchronously."""
     try:
         data = compute_comprehensive_progress(user_id)
         return data["overall"]
@@ -56,6 +56,11 @@ async def compute_telemetry(user_id: int) -> Dict[str, Any]:
             "journal": {"total_entries": 0, "journal_streak": 0, "avg_energy_7d": 0.0, "latest_mood": None},
             "blueprint": {"active_blueprint": None, "completion_percentage": 0},
         }
+
+
+async def compute_telemetry(user_id: int) -> Dict[str, Any]:
+    """Compute overall lifetime performance telemetry for user_id."""
+    return compute_telemetry_sync(user_id)
 
 
 @router.get("", response_model=Dict[str, Any])
