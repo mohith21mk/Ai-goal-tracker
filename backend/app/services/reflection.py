@@ -40,21 +40,16 @@ def generate_daily_reflection(user_id: int) -> Dict[str, Any]:
     xp_earned = int(xp_row) if xp_row is not None else 0
 
     # 3. Mission Streak
+    cursor.execute("SELECT completed_date FROM mission_logs WHERE user_id = ?", (user_id,))
+    log_dates = {str(r["completed_date"])[:10] for r in cursor.fetchall() if r["completed_date"]}
+
     cursor.execute(
-        """
-        SELECT DISTINCT completed_date as comp_date
-        FROM mission_logs
-        WHERE user_id = ?
-        UNION
-        SELECT DISTINCT DATE(completed_at) as comp_date
-        FROM missions
-        WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL
-        ORDER BY comp_date DESC
-        """,
-        (user_id, user_id),
+        "SELECT completed_at FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL",
+        (user_id,),
     )
-    date_rows = cursor.fetchall()
-    dates = [str(r["comp_date"])[:10] for r in date_rows if r["comp_date"]]
+    mission_dates = {str(r["completed_at"])[:10] for r in cursor.fetchall() if r["completed_at"]}
+
+    dates = sorted(log_dates | mission_dates, reverse=True)
 
     streak_days = 0
     if dates:

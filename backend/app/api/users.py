@@ -141,21 +141,16 @@ def _get_user_profile_dict(user_id: int) -> Dict[str, Any]:
     active_goals = cursor.fetchone()[0] or 0
 
     # User-isolated streak calculation
+    cursor.execute("SELECT completed_date FROM mission_logs WHERE user_id = ?", (user_id,))
+    log_dates = {str(r["completed_date"])[:10] for r in cursor.fetchall() if r["completed_date"]}
+
     cursor.execute(
-        """
-        SELECT DISTINCT completed_date as comp_date
-        FROM mission_logs
-        WHERE user_id = ?
-        UNION
-        SELECT DISTINCT DATE(completed_at) as comp_date
-        FROM missions
-        WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL
-        ORDER BY comp_date DESC
-        """,
-        (user_id, user_id),
+        "SELECT completed_at FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL",
+        (user_id,),
     )
-    date_rows = cursor.fetchall()
-    dates = [str(r["comp_date"])[:10] for r in date_rows if r["comp_date"]]
+    mission_dates = {str(r["completed_at"])[:10] for r in cursor.fetchall() if r["completed_at"]}
+
+    dates = sorted(log_dates | mission_dates, reverse=True)
 
     streak_days = 0
     if dates:
