@@ -259,6 +259,26 @@ def init_db() -> None:
             cursor.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS attachment_url TEXT")
             cursor.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS attachment_metadata TEXT")
             cursor.execute("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS attachment_duration INTEGER")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS mission_logs (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    mission_id INTEGER NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+                    completed_date VARCHAR(50) NOT NULL,
+                    completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    xp_reward INTEGER DEFAULT 10,
+                    CONSTRAINT uq_mission_user_date UNIQUE (user_id, mission_id, completed_date)
+                )
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_mission_logs_user_date ON mission_logs(user_id, completed_date)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_mission_logs_mission_date ON mission_logs(mission_id, completed_date)")
+            cursor.execute("""
+                INSERT INTO mission_logs (user_id, mission_id, completed_date, completed_at, xp_reward)
+                SELECT user_id, id, SUBSTRING(completed_at::text, 1, 10), completed_at, COALESCE(xp_reward, 10)
+                FROM missions
+                WHERE completed = 1 AND completed_at IS NOT NULL AND user_id IS NOT NULL
+                ON CONFLICT (user_id, mission_id, completed_date) DO NOTHING
+            """)
             conn.commit()
             conn.close()
         except Exception as e:

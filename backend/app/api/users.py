@@ -123,7 +123,7 @@ def _get_user_profile_dict(user_id: int) -> Dict[str, Any]:
             SELECT id FROM mission_logs WHERE user_id = ?
             UNION ALL
             SELECT id FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL AND id NOT IN (SELECT mission_id FROM mission_logs WHERE user_id = ?)
-        )
+        ) AS sub_m
     """, (user_id, user_id, user_id))
     completed_missions = cursor.fetchone()[0] or 0
 
@@ -132,7 +132,7 @@ def _get_user_profile_dict(user_id: int) -> Dict[str, Any]:
             SELECT id, xp_reward FROM mission_logs WHERE user_id = ?
             UNION ALL
             SELECT id, xp_reward FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL AND id NOT IN (SELECT mission_id FROM mission_logs WHERE user_id = ?)
-        )
+        ) AS sub_xp
     """, (user_id, user_id, user_id))
     xp_row = cursor.fetchone()[0]
     xp_earned = int(xp_row) if xp_row is not None else 0

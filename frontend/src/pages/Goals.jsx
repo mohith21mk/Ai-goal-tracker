@@ -65,10 +65,13 @@ const Goals = () => {
     setLoading(true);
     setApiError(null);
     try {
-      const [goalsList, missionsList] = await Promise.all([
+      const [goalsRes, missionsRes] = await Promise.allSettled([
         getGoals(),
         getMissions()
       ]);
+
+      const goalsList = goalsRes.status === 'fulfilled' ? goalsRes.value : null;
+      const missionsList = missionsRes.status === 'fulfilled' ? missionsRes.value : null;
 
       if (Array.isArray(goalsList) && goalsList.length > 0) {
         setGoals(goalsList);
@@ -82,6 +85,15 @@ const Goals = () => {
         setMissions(missionsList);
       } else {
         setMissions(defaultFallbackMissions);
+      }
+
+      if (goalsRes.status === 'rejected' && missionsRes.status === 'rejected') {
+        setApiError('Unable to connect to live API server. Showing cached goals.');
+      } else if (goalsRes.status === 'rejected' || missionsRes.status === 'rejected') {
+        console.warn('Partial API sync notice:', {
+          goals: goalsRes.reason?.message,
+          missions: missionsRes.reason?.message,
+        });
       }
     } catch (err) {
       console.warn('Backend server offline or failed, using fallback goals:', err.message);

@@ -139,8 +139,12 @@ async def toggle_mission(
 
     if not is_completed_today:
         cursor.execute(
+            "DELETE FROM mission_logs WHERE user_id = ? AND mission_id = ? AND completed_date = ?",
+            (user_id, mission_id, today_str),
+        )
+        cursor.execute(
             """
-            INSERT OR REPLACE INTO mission_logs (user_id, mission_id, completed_date, completed_at, xp_reward)
+            INSERT INTO mission_logs (user_id, mission_id, completed_date, completed_at, xp_reward)
             VALUES (?, ?, ?, ?, ?)
             """,
             (user_id, mission_id, today_str, timestamp_str, xp),

@@ -24,7 +24,7 @@ def calculate_user_xp(user_id: int) -> Dict[str, int]:
             SELECT id, xp_reward FROM missions 
             WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL 
               AND id NOT IN (SELECT mission_id FROM mission_logs WHERE user_id = ?)
-        )
+        ) AS sub_xp
         """,
         (user_id, user_id, user_id),
     )
@@ -208,7 +208,7 @@ def evaluate_and_issue_credentials(user_id: int) -> Dict[str, Any]:
             SELECT id FROM missions 
             WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL 
               AND id NOT IN (SELECT mission_id FROM mission_logs WHERE user_id = ?)
-        )
+        ) AS sub_m
         """,
         (user_id, user_id, user_id),
     )

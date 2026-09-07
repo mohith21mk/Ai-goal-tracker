@@ -106,7 +106,7 @@ async def get_admin_overview(
             SELECT id FROM mission_logs
             UNION ALL
             SELECT id FROM missions WHERE completed = 1 AND completed_at IS NOT NULL AND id NOT IN (SELECT mission_id FROM mission_logs)
-        )
+        ) AS sub_m
     """)
     total_missions_completed = cursor.fetchone()[0] or 0
 
@@ -125,7 +125,7 @@ async def get_admin_overview(
             SELECT id, xp_reward FROM mission_logs
             UNION ALL
             SELECT id, xp_reward FROM missions WHERE completed = 1 AND completed_at IS NOT NULL AND id NOT IN (SELECT mission_id FROM mission_logs)
-        )
+        ) AS sub_xp
     """)
     mission_xp_sum = cursor.fetchone()[0] or 0
     total_xp_awarded = int(mission_xp_sum) + (int(total_habit_logs) * 15)
@@ -222,7 +222,7 @@ async def get_admin_users(
                 SELECT id FROM mission_logs WHERE user_id = ?
                 UNION ALL
                 SELECT id FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL AND id NOT IN (SELECT mission_id FROM mission_logs WHERE user_id = ?)
-            )
+            ) AS sub_m
         """, (uid, uid, uid))
         comp_m = cursor.fetchone()[0] or 0
 
@@ -311,7 +311,7 @@ async def get_admin_user_detail(
             SELECT id FROM mission_logs WHERE user_id = ?
             UNION ALL
             SELECT id FROM missions WHERE user_id = ? AND completed = 1 AND completed_at IS NOT NULL AND id NOT IN (SELECT mission_id FROM mission_logs WHERE user_id = ?)
-        )
+        ) AS sub_m
     """, (uid, uid, uid))
     comp_m = cursor.fetchone()[0] or 0
 

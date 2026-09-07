@@ -70,6 +70,21 @@ class Mission(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), server_default=func.now())
 
 
+class MissionLog(Base):
+    __tablename__ = "mission_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    mission_id = Column(Integer, ForeignKey("missions.id", ondelete="CASCADE"), nullable=False)
+    completed_date = Column(String(50), nullable=False)
+    completed_at = Column(DateTime, default=lambda: datetime.now(UTC), server_default=func.now())
+    xp_reward = Column(Integer, default=10)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "mission_id", "completed_date", name="uq_mission_user_date"),
+    )
+
+
 class JournalEntry(Base):
     __tablename__ = "journal_entries"
 
