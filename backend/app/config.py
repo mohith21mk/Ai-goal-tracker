@@ -12,7 +12,7 @@ class Settings:
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development").lower()
     DEBUG: bool = os.getenv("DEBUG", "False" if os.getenv("ENVIRONMENT") == "production" else "True").lower() == "true"
     DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{(Path(__file__).resolve().parent / 'app.db').as_posix()}")
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    REDIS_URL: str = os.getenv("REDIS_URL", "" if os.getenv("ENVIRONMENT", "").lower() == "production" else "redis://localhost:6379/0")
     SECRET_KEY: str = os.getenv("SECRET_KEY", "fallback-secret-key-change-in-production")
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-flash-latest")

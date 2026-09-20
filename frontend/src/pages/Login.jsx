@@ -27,7 +27,12 @@ const Login = () => {
       navigate('/dashboard');
     } catch (err) {
       console.error('Login error:', err);
-      setErrorMsg(err.message || 'Invalid username/email or password.');
+      const isTimeout = err.message && (err.message.includes('Timeout') || err.message.includes('timeout'));
+      if (isTimeout) {
+        setErrorMsg('Server is waking up from idle mode. Please wait a few seconds and try again.');
+      } else {
+        setErrorMsg(err.message || 'Invalid username/email or password.');
+      }
     } finally {
       setSubmitting(false);
     }

@@ -73,8 +73,10 @@ async function apiFetch(endpoint, options = {}) {
     ? { 'Content-Type': 'application/json' }
     : {};
 
-  // Safe timeout configuration (default 4000ms for auth bootstrap, 8000ms for GET, 15000ms for mutations)
-  const defaultTimeout = endpoint.startsWith('/api/auth/me') ? 4000 : (method === 'GET' ? 8000 : 15000);
+  // Safe timeout configuration (4000ms for auth bootstrap, 60000ms for login/register cold-starts, 10000ms for GET, 30000ms for mutations)
+  const isAuthBootstrap = endpoint.startsWith('/api/auth/me');
+  const isAuthAction = endpoint.startsWith('/api/auth/login') || endpoint.startsWith('/api/auth/register');
+  const defaultTimeout = isAuthBootstrap ? 4000 : (isAuthAction ? 60000 : (method === 'GET' ? 10000 : 30000));
   const timeoutMs = options.timeoutMs || options.timeout || defaultTimeout;
 
   const controller = new AbortController();

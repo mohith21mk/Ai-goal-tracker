@@ -6,7 +6,7 @@ services:
     rootDir: backend
     plan: free
     buildCommand: python -m pip install --upgrade pip && pip install --no-cache-dir --retries 5 --timeout 60 -r requirements.txt && python -m alembic upgrade head
-    startCommand: gunicorn app.main:app -w 2 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$PORT
+    startCommand: gunicorn app.main:app -w 2 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$PORT --timeout 120 --graceful-timeout 30
     healthCheckPath: /ready
     envVars:
       - key: PYTHON_VERSION

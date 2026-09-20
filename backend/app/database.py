@@ -123,7 +123,7 @@ def get_connection():
             import psycopg2
             from psycopg2.extras import RealDictCursor
             pg_url = db_url.replace("postgres://", "postgresql://", 1)
-            conn = psycopg2.connect(pg_url, cursor_factory=RealDictCursor)
+            conn = psycopg2.connect(pg_url, cursor_factory=RealDictCursor, connect_timeout=10)
             return _PgCompatConnection(conn)
         except Exception as err:
             # Fallback to local SQLite if PostgreSQL connection fails in local testing

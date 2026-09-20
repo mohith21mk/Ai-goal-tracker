@@ -43,9 +43,10 @@ def test_dist_index_html_has_proper_icons():
     assert os.path.isfile(DIST_INDEX), "dist/index.html must exist"
     with open(DIST_INDEX, "r", encoding="utf-8") as f:
         html = f.read()
-    assert '<link rel="icon" type="image/svg+xml" href="/favicon.svg"' in html, "Must link svg favicon"
-    assert '<link rel="icon" type="image/png" href="/mkc-anchor-logo.png"' in html, "Must link png icon"
-    assert '<link rel="apple-touch-icon" href="/mkc-anchor-logo.png"' in html, "Must link apple-touch-icon"
+    assert 'href="/mkc-favicon.svg?v=2"' in html, "Must link versioned mkc-favicon.svg"
+    assert 'href="/favicon.svg?v=2"' in html, "Must link versioned favicon.svg"
+    assert 'href="/mkc-anchor-logo.png?v=2"' in html, "Must link versioned png icon"
+    assert '<link rel="apple-touch-icon" href="/mkc-anchor-logo.png?v=2"' in html, "Must link apple-touch-icon"
 
 
 def test_auth_context_has_safety_timer():
@@ -63,8 +64,9 @@ def test_api_js_has_timeout_and_no_duplicate_fetch():
         code = f.read()
     # Ensure AbortController is used
     assert "AbortController" in code, "apiFetch must use AbortController"
-    # Ensure 4000ms auth timeout and 8000ms GET timeout
-    assert "defaultTimeout = endpoint.startsWith('/api/auth/me') ? 4000" in code
+    # Ensure 4000ms auth timeout and 60000ms login timeout
+    assert "isAuthBootstrap = endpoint.startsWith('/api/auth/me')" in code
+    assert "isAuthAction = endpoint.startsWith('/api/auth/login')" in code
     # Ensure duplicate fetch was removed: line 163 used to be `return fetch(`${API_BASE_URL}${endpoint}`, config);`
     # inside GET block. In GET block, it should now return rawResponse or makeErrorResponse(504, ...)
     assert "makeErrorResponse(504, 'Gateway Timeout'" in code, "Must return synthetic 504 on timeout"
