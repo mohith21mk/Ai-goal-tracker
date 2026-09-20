@@ -1,13 +1,23 @@
-# Netlify root configuration for monorepo structure
+# Netlify configuration for unified frontend and Netlify Functions backend
 [build]
-  base = "frontend"
-  publish = "dist"
   command = "npm run build"
+  publish = "frontend/dist"
+  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
 
+[functions]
+  node_bundler = "esbuild"
+
+# Proxy /api/* to the serverless function handler
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+# Client-side SPA routing fallback
 [[redirects]]
   from = "/*"
   to = "/index.html"

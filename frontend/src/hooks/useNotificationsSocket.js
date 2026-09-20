@@ -25,19 +25,17 @@ export function useNotificationsSocket(onNotificationReceived) {
 
     let wsUrl = import.meta.env.VITE_WS_URL;
     if (!wsUrl) {
-      const defaultApiUrl = import.meta.env.PROD 
-        ? 'https://mkc-backend-iguj.onrender.com' 
-        : 'http://localhost:8000';
+      const defaultApiUrl = import.meta.env.PROD ? '' : 'http://localhost:8000';
       let apiUrl = import.meta.env.VITE_API_URL || defaultApiUrl;
-      if (import.meta.env.PROD && (apiUrl.includes('your-backend-service') || apiUrl.includes('localhost'))) {
-        apiUrl = defaultApiUrl;
+      if (import.meta.env.PROD && (apiUrl.includes('render') || apiUrl.includes('your-backend-service') || apiUrl.includes('localhost'))) {
+        apiUrl = '';
       }
       apiUrl = apiUrl.replace(/\/+$/, '');
       if (apiUrl.startsWith('https://')) {
         wsUrl = apiUrl.replace(/^https:\/\//, 'wss://') + '/api/notifications/ws';
       } else if (apiUrl.startsWith('http://')) {
         wsUrl = apiUrl.replace(/^http:\/\//, 'ws://') + '/api/notifications/ws';
-      } else {
+      } else if (typeof window !== 'undefined') {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host;
         wsUrl = `${protocol}//${host}/api/notifications/ws`;

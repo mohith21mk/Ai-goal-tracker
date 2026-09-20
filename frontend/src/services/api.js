@@ -1,9 +1,8 @@
-const defaultApiUrl = import.meta.env.PROD 
-  ? 'https://mkc-backend-iguj.onrender.com' 
-  : 'http://localhost:8000';
-let rawApiUrl = import.meta.env.VITE_API_URL || defaultApiUrl;
-if (import.meta.env.PROD && (rawApiUrl.includes('your-backend-service') || rawApiUrl.includes('localhost'))) {
-  rawApiUrl = defaultApiUrl;
+// In production on Netlify, the backend is co-located as Netlify Functions at /api/*
+const defaultApiUrl = import.meta.env.PROD ? '' : 'http://localhost:8000';
+let rawApiUrl = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : defaultApiUrl;
+if (import.meta.env.PROD && (rawApiUrl.includes('render') || rawApiUrl.includes('your-backend-service') || rawApiUrl.includes('localhost'))) {
+  rawApiUrl = '';
 }
 const API_BASE_URL = rawApiUrl.replace(/\/+$/, '');
 

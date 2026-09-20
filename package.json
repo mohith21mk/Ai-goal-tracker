@@ -4,6 +4,24 @@
   "private": true,
   "scripts": {
     "build": "cd frontend && npm install && npm run build",
-    "lint": "cd frontend && npm run lint"
+    "build:functions": "tsc",
+    "lint": "cd frontend && npm run lint",
+    "test:backend": "tsc && node tests/test_netlify_backend.js"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.1",
+    "express": "^5.2.1",
+    "pg": "^8.23.0",
+    "serverless-http": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.2",
+    "@types/pg": "^8.23.1",
+    "typescript": "^7.0.2"
   }
 }
