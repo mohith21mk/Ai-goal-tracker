@@ -51,6 +51,13 @@ export async function query<T = any>(text: string, params?: any[]): Promise<Quer
     return mockQueryHandler(text, params);
   }
 
+  const connectionString = process.env.DATABASE_URL || '';
+  const isPostgres = connectionString.startsWith('postgres://') || connectionString.startsWith('postgresql://');
+
+  if (!isPostgres) {
+    throw new Error('DATABASE_URL is not configured in Netlify environment variables. Please add your Supabase connection string to Netlify Dashboard (Site configuration -> Environment variables).');
+  }
+
   const p = getPool();
   return p.query<T>(text, params);
 }
