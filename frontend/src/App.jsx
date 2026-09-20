@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 // Core & Authentication Pages (Static Imports)
@@ -85,6 +85,18 @@ const PublicOnlyRoute = ({ children }) => {
 
 function AppContent() {
   const { user, loading } = useAuth();
+  const [showEmergencyFallback, setShowEmergencyFallback] = useState(false);
+
+  useEffect(() => {
+    if (!loading) return;
+    const timer = setTimeout(() => {
+      setShowEmergencyFallback(true);
+    }, 4000);
+    return () => {
+      clearTimeout(timer);
+      setShowEmergencyFallback(false);
+    };
+  }, [loading]);
 
   useEffect(() => {
     if (user) {
@@ -102,14 +114,63 @@ function AppContent() {
     return (
       <div style={{
         display: 'flex',
+        flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        height: '100vh',
+        minHeight: '100vh',
         background: 'var(--dark-bg, #020914)',
         color: 'var(--text-secondary, #94A3B8)',
-        fontFamily: 'sans-serif'
+        fontFamily: 'sans-serif',
+        gap: '16px',
+        padding: '20px',
+        textAlign: 'center'
       }}>
-        Loading Mastery Key Coach...
+        <div style={{
+          width: '36px',
+          height: '36px',
+          border: '3px solid rgba(56, 189, 248, 0.2)',
+          borderTopColor: 'var(--cyan, #38bdf8)',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite'
+        }} />
+        <div style={{ fontSize: '15px', fontWeight: '500', color: '#e2e8f0' }}>
+          Loading Mastery Key Coach...
+        </div>
+        {showEmergencyFallback && (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px',
+            marginTop: '12px',
+            maxWidth: '360px',
+            background: 'rgba(255, 255, 255, 0.03)',
+            padding: '16px',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 255, 255, 0.08)'
+          }}>
+            <span style={{ fontSize: '13px', color: '#fbbf24' }}>
+              Backend is taking longer than usual to respond.
+            </span>
+            <button
+              onClick={() => {
+                window.location.href = ROUTES.LOGIN;
+              }}
+              style={{
+                padding: '8px 18px',
+                background: 'rgba(56, 189, 248, 0.12)',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                borderRadius: '6px',
+                color: '#38bdf8',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '500'
+              }}
+            >
+              Continue to Sign In
+            </button>
+          </div>
+        )}
       </div>
     );
   }

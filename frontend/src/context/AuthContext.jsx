@@ -26,19 +26,35 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     let isMounted = true;
+    let finished = false;
+
+    // Hard fallback safety timer: Never let the app hang on the loading screen > 3.5s
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted && !finished) {
+        console.warn('MKC Auth bootstrap safety timeout reached (3.5s). Unblocking UI.');
+        setUser(null);
+        setLoading(false);
+      }
+    }, 3500);
+
     async function initAuth() {
       try {
         const u = await getCurrentUser();
-        if (isMounted) setUser(u);
-      } catch {
-        if (isMounted) setUser(null);
+        if (isMounted && !finished) setUser(u);
+      } catch (err) {
+        console.warn('Failed to retrieve current user on init:', err);
+        if (isMounted && !finished) setUser(null);
       } finally {
+        finished = true;
+        clearTimeout(safetyTimeout);
         if (isMounted) setLoading(false);
       }
     }
     initAuth();
     return () => {
       isMounted = false;
+      finished = true;
+      clearTimeout(safetyTimeout);
     };
   }, []);
 

@@ -72,14 +72,51 @@ async function apiFetch(endpoint, options = {}) {
   const defaultHeaders = (options.body && !(options.body instanceof FormData))
     ? { 'Content-Type': 'application/json' }
     : {};
+
+  // Safe timeout configuration (default 4000ms for auth bootstrap, 8000ms for GET, 15000ms for mutations)
+  const defaultTimeout = endpoint.startsWith('/api/auth/me') ? 4000 : (method === 'GET' ? 8000 : 15000);
+  const timeoutMs = options.timeoutMs || options.timeout || defaultTimeout;
+
+  const controller = new AbortController();
+  let timeoutId = setTimeout(() => {
+    try {
+      controller.abort(new Error(`MKC Request Timeout: ${endpoint} after ${timeoutMs}ms`));
+    } catch {
+      controller.abort();
+    }
+  }, timeoutMs);
+
+  // If caller provided an external signal, link aborts
+  if (options.signal) {
+    if (options.signal.aborted) {
+      controller.abort(options.signal.reason);
+    } else {
+      options.signal.addEventListener('abort', () => controller.abort(options.signal.reason), { once: true });
+    }
+  }
+
+  const restOptions = { ...options };
+  delete restOptions.timeout;
+  delete restOptions.timeoutMs;
   const config = {
     credentials: 'include',
-    ...options,
+    ...restOptions,
+    signal: controller.signal,
     headers: {
       ...defaultHeaders,
       ...options.headers,
     },
   };
+
+  // Helper for synthetic offline/timeout response
+  const makeErrorResponse = (status, statusText, message) => ({
+    ok: false,
+    status,
+    statusText,
+    json: async () => ({ detail: message }),
+    text: async () => message,
+    headers: new Headers({ 'Content-Type': 'application/json' }),
+  });
 
   // 1. GET requests: SWR caching + concurrent request deduplication
   if (method === 'GET') {
@@ -90,6 +127,7 @@ async function apiFetch(endpoint, options = {}) {
     // Cache HIT (fresh within TTL)
     const cached = apiCache.get(cacheKey);
     if (cached && (now - cached.timestamp) < cached.ttl) {
+      clearTimeout(timeoutId);
       return {
         ok: true,
         status: 200,
@@ -102,6 +140,7 @@ async function apiFetch(endpoint, options = {}) {
 
     // In-Flight Request Deduplication
     if (inFlightRequests.has(cacheKey)) {
+      clearTimeout(timeoutId);
       const data = await inFlightRequests.get(cacheKey);
       if (data !== null) {
         return {
@@ -116,18 +155,26 @@ async function apiFetch(endpoint, options = {}) {
     }
 
     // Launch single background/foreground network request
+    let rawResponse = null;
     const fetchPromise = (async () => {
       try {
         const res = await fetch(`${API_BASE_URL}${endpoint}`, config);
+        rawResponse = res;
         if (res.ok) {
           const data = await res.json();
           apiCache.set(cacheKey, { data, timestamp: Date.now(), ttl });
           return data;
         }
         return null;
-      } catch {
+      } catch (err) {
+        rawResponse = makeErrorResponse(
+          err.name === 'AbortError' ? 504 : 503,
+          err.name === 'AbortError' ? 'Gateway Timeout' : 'Service Unavailable',
+          err.message || 'Network request failed'
+        );
         return null;
       } finally {
+        clearTimeout(timeoutId);
         inFlightRequests.delete(cacheKey);
       }
     })();
@@ -159,8 +206,11 @@ async function apiFetch(endpoint, options = {}) {
       };
     }
 
-    // Fallback if initial fetch failed
-    return fetch(`${API_BASE_URL}${endpoint}`, config);
+    // Fallback if initial fetch failed: return captured response or synthetic timeout error
+    if (rawResponse) {
+      return rawResponse;
+    }
+    return makeErrorResponse(504, 'Gateway Timeout', 'Request timed out or network failed');
   }
 
   // 2. Mutations (POST, PUT, PATCH, DELETE): Invalidate relevant cache branches
@@ -186,7 +236,18 @@ async function apiFetch(endpoint, options = {}) {
     clearApiCache(/^\/api\/(users|auth)/);
   }
 
-  return fetch(`${API_BASE_URL}${endpoint}`, config);
+  try {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    return res;
+  } catch (err) {
+    return makeErrorResponse(
+      err.name === 'AbortError' ? 504 : 503,
+      err.name === 'AbortError' ? 'Gateway Timeout' : 'Service Unavailable',
+      err.message || 'Network request failed'
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 // -------------------------------------------------------------------
